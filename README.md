@@ -15,9 +15,11 @@ npm install @graphile-contrib/view-constraints
 import { PgViewConstraintsPlugin } from "@graphile-contrib/view-constraints";
 
 export default {
-  plugins: [PgViewConstraintsPlugin({ declare: true })],
+  plugins: [PgViewConstraintsPlugin()],
 };
 ```
 
 The plugin runs before `PgFakeConstraintsPlugin`, which turns the derived tags
 into relations in the generated schema.
+
+Pass `declare: false` only to inspect a `report` without changing the schema.
