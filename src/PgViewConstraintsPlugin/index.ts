@@ -35,8 +35,8 @@
 // `|@fieldName currency` — stay where it is while the assertion under it becomes
 // derived.
 //
-// `declare` is off unless asked for, so that `report` can be handed everything
-// derived beside everything the view declares without either touching the schema.
+// `declare` is on unless disabled, so that adding the plugin adds the relations it
+// derives. `report` may observe the same derivation without changing that default.
 
 import 'graphile-config'
 import type {} from 'graphile-build'
@@ -94,8 +94,8 @@ export interface ViewConstraintsReport {
 
 export interface ViewConstraintsOptions {
   /**
-   * Write the derived relations onto the view as smart tags. Off unless asked for:
-   * a reporting run must leave the schema exactly as it found it.
+   * Write the derived relations onto the view as smart tags. On by default; turn it
+   * off to inspect a report without changing the schema.
    */
   declare?: boolean
   /** Receives the derivation and the view's own declarations, once per service. */
@@ -191,6 +191,7 @@ function namesPrivilegedConnection(pgService: {
 export function PgViewConstraintsPlugin(
   options: ViewConstraintsOptions = {}
 ): GraphileConfig.Plugin {
+  const declare = options.declare ?? true
   return {
     name: 'PgViewConstraintsPlugin',
     version: '0.1.0',
@@ -249,7 +250,7 @@ export function PgViewConstraintsPlugin(
                 typeof tags['primaryKey'] === 'string' ? tags['primaryKey'] : null,
               declaredNotNullColumns: declaredNotNullColumnsOf(pgClass)
             })
-            if (!options.declare) continue
+            if (!declare) continue
             for (const column of derived.notNullColumns) {
               const attribute = pgClass.getAttribute({ name: column })
               if (attribute) attribute.getTagsAndDescription().tags['notNull'] = true
