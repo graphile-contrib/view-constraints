@@ -38,13 +38,7 @@
 // `declare` is on unless disabled, so that adding the plugin adds the relations it
 // derives. `report` may observe the same derivation without changing that default.
 
-import 'graphile-config'
-import type {} from 'graphile-build'
-import type {} from 'graphile-build-pg'
-import {
-  withPgClientFromPgService,
-  withSuperuserPgClientFromPgService
-} from '@dataplan/pg'
+import type {} from 'postgraphile'
 import { collectViewConstraints } from './collect.js'
 import type { RunQuery } from './collect.js'
 import type { ViewDerivation } from './derive.js'
@@ -117,12 +111,7 @@ export interface ViewConstraintsOptions {
  */
 export function foreignKeyReference(tag: string): string {
   const [spec = ''] = tag.split('|')
-  return spec
-    .replaceAll('"', '')
-    .replaceAll(/\s+/g, ' ')
-    .replaceAll(' (', '(')
-    .trim()
-    .toLowerCase()
+  return spec.replaceAll('"', '').replaceAll(/\s+/g, ' ').replaceAll(' (', '(').trim().toLowerCase()
 }
 
 function asStringArray(value: unknown): string[] {
@@ -151,10 +140,7 @@ function declaredNotNullColumnsOf(pgClass: {
 
 /** The only thing `collect.ts` asks of a connection, over a PostGraphile client. */
 function runQueryOn(client: {
-  query<Row>(spec: {
-    text: string
-    values?: unknown[]
-  }): Promise<{ rows: readonly Row[] }>
+  query<Row>(spec: { text: string; values?: unknown[] }): Promise<{ rows: readonly Row[] }>
 }): RunQuery {
   return async <Row>(text: string, values?: unknown[]) => {
     const result = await client.query<Row>({ text, values })
@@ -175,16 +161,12 @@ function runQueryOn(client: {
  * the surface's own role and report the permission error it raises as if it were the
  * materialized view's answer.
  */
-function namesPrivilegedConnection(pgService: {
-  adaptorSettings?: unknown
-}): boolean {
+function namesPrivilegedConnection(pgService: { adaptorSettings?: unknown }): boolean {
   const settings = pgService.adaptorSettings
   if (typeof settings !== 'object' || settings === null) return false
   const named = settings as Record<string, unknown>
   return Boolean(
-    named['superuserPool'] ??
-      named['superuserPoolClient'] ??
-      named['superuserConnectionString']
+    named['superuserPool'] ?? named['superuserPoolClient'] ?? named['superuserConnectionString']
   )
 }
 
@@ -196,8 +178,8 @@ export function PgViewConstraintsPlugin(
     name: 'PgViewConstraintsPlugin',
     version: '0.1.0',
     description:
-      'Derives a view\'s foreign keys, primary key and non-null columns from the ' +
-      'planner\'s account of where its columns come from, confirmed against ' +
+      "Derives a view's foreign keys, primary key and non-null columns from the " +
+      "planner's account of where its columns come from, confirmed against " +
       'pg_constraint, pg_index and pg_attribute, and states them as the smart tags ' +
       'PgFakeConstraintsPlugin already understands.',
     after: ['smart-tags'],
@@ -205,13 +187,12 @@ export function PgViewConstraintsPlugin(
     gather: {
       hooks: {
         async pgIntrospection_introspection(info, event) {
+          const { withPgClientFromPgService, withSuperuserPgClientFromPgService } =
+            info.lib.dataplanPg
           const { introspection, serviceName } = event
           const pgServices = info.resolvedPreset.pgServices as
-            | readonly GraphileConfig.PgServiceConfiguration[]
-            | undefined
-          const pgService = pgServices?.find(
-            (service) => service.name === serviceName
-          )
+            readonly GraphileConfig.PgServiceConfiguration[] | undefined
+          const pgService = pgServices?.find((service) => service.name === serviceName)
           if (!pgService) return
           const schemas = pgService.schemas ?? []
           if (schemas.length === 0) return
@@ -225,11 +206,8 @@ export function PgViewConstraintsPlugin(
               if (!namesPrivilegedConnection(pgService)) {
                 return collectViewConstraints(query, [...schemas], null)
               }
-              return withSuperuserPgClientFromPgService(
-                pgService,
-                pgSettings,
-                (privilegedClient) =>
-                  collectViewConstraints(query, [...schemas], runQueryOn(privilegedClient))
+              return withSuperuserPgClientFromPgService(pgService, pgSettings, (privilegedClient) =>
+                collectViewConstraints(query, [...schemas], runQueryOn(privilegedClient))
               )
             }
           )
@@ -274,8 +252,7 @@ export function PgViewConstraintsPlugin(
           )
           const refused = new Map([
             ...collected.failures.map(
-              (failure) =>
-                [`${failure.schema}.${failure.view}`, failure.error] as const
+              (failure) => [`${failure.schema}.${failure.view}`, failure.error] as const
             ),
             ...collected.skipped.map(
               (skip) => [`${skip.schema}.${skip.view}`, skip.reason] as const

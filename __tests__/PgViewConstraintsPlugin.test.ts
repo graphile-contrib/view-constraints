@@ -22,32 +22,35 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
-import { deriveViewConstraints, valuePreservingCast } from '../src/PgViewConstraintsPlugin/derive.js'
+import {
+  deriveViewConstraints,
+  valuePreservingCast
+} from '../src/PgViewConstraintsPlugin/derive.ts'
 import type {
   CatalogRelation,
   TypeCoercions,
   ViewColumn
-} from '../src/PgViewConstraintsPlugin/derive.js'
+} from '../src/PgViewConstraintsPlugin/derive.ts'
 import {
   collectViewConstraints,
   NO_PRIVILEGED_CONNECTION_REASON,
   subqueryViewCandidates
-} from '../src/PgViewConstraintsPlugin/collect.js'
-import type { ViewSourceRow } from '../src/PgViewConstraintsPlugin/collect.js'
-import type { RunQuery } from '../src/PgViewConstraintsPlugin/collect.js'
+} from '../src/PgViewConstraintsPlugin/collect.ts'
+import type { ViewSourceRow } from '../src/PgViewConstraintsPlugin/collect.ts'
+import type { RunQuery } from '../src/PgViewConstraintsPlugin/collect.ts'
 import {
   COLUMN_REFUSALS,
   PLAN_REFUSALS,
   parseReference,
   readPlanOrigins
-} from '../src/PgViewConstraintsPlugin/plan-origins.js'
+} from '../src/PgViewConstraintsPlugin/plan-origins.ts'
 import type {
   ColumnRefusal,
   ExplainPlanNode,
   PlanOrigins,
   PlanRefusal,
   ViewShape
-} from '../src/PgViewConstraintsPlugin/plan-origins.js'
+} from '../src/PgViewConstraintsPlugin/plan-origins.ts'
 
 interface Fixture {
   catalog: (Omit<CatalogRelation, 'columns'> & {
@@ -102,7 +105,10 @@ const DEFAULT_REGIME = 'default'
 const REGIMES = [...new Set(fixture.views.map((view) => view.regime))]
 
 /** What one lab view's derivation reduces to, in the shape the cases are written in. */
-function derive(name: string, regime: string = DEFAULT_REGIME): {
+function derive(
+  name: string,
+  regime: string = DEFAULT_REGIME
+): {
   origins: string[] | null
   notNull: string[]
   foreignKeys: string[]
@@ -346,10 +352,7 @@ const CASES: Case[] = [
       'and no key is assembled across the two',
     origins: ['a_id=tx.id', 'b_cur_code=tx.cur_code'],
     notNull: ['a_id', 'b_cur_code'],
-    foreignKeys: [
-      '(a_id) references lab.tx (id)',
-      '(b_cur_code) references lab.currency (code)'
-    ],
+    foreignKeys: ['(a_id) references lab.tx (id)', '(b_cur_code) references lab.currency (code)'],
     primaryKey: null
   },
   {
@@ -704,9 +707,7 @@ test('every view in the fixture is a case, and every case is in the fixture', ()
     CASES.map((testCase) => testCase.view).sort(),
     [
       ...new Set(
-        fixture.views
-          .filter((view) => view.regime === DEFAULT_REGIME)
-          .map((view) => view.view)
+        fixture.views.filter((view) => view.regime === DEFAULT_REGIME).map((view) => view.view)
       )
     ].sort()
   )
@@ -773,7 +774,13 @@ test('an unqualified name is a column only where the plan reads exactly one rela
     'Join Type': 'Inner',
     Output: ['id', 'code'],
     Plans: [
-      { 'Node Type': 'Seq Scan', Schema: 'lab', 'Relation Name': 'tx', Alias: 'tx', Output: ['id'] },
+      {
+        'Node Type': 'Seq Scan',
+        Schema: 'lab',
+        'Relation Name': 'tx',
+        Alias: 'tx',
+        Output: ['id']
+      },
       {
         'Node Type': 'Seq Scan',
         Schema: 'lab',
@@ -969,7 +976,6 @@ test('with no privileged connection the materialized view is named, not passed o
     }
   ])
 })
-
 
 // ── The refusals are a closed list, and every one of them has a case ─────────────
 //

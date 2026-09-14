@@ -4,22 +4,19 @@
 // without `ANALYZE` builds a plan and throws it away, and `COSTS OFF` keeps the
 // answer free of the estimates that would make it depend on table statistics.
 
-import { deriveViewConstraints } from './derive.js'
+import { deriveViewConstraints } from './derive.ts'
 import type {
   CatalogForeignKey,
   CatalogRelation,
   TypeCoercions,
   ViewColumn,
   ViewDerivation
-} from './derive.js'
-import { readPlanOrigins } from './plan-origins.js'
-import type { ExplainPlanNode, ViewShape } from './plan-origins.js'
+} from './derive.ts'
+import { readPlanOrigins } from './plan-origins.ts'
+import type { ExplainPlanNode, ViewShape } from './plan-origins.ts'
 
 /** The one thing this module needs of a connection: run SQL, get rows. */
-export type RunQuery = <Row>(
-  text: string,
-  values?: unknown[]
-) => Promise<readonly Row[]>
+export type RunQuery = <Row>(text: string, values?: unknown[]) => Promise<readonly Row[]>
 
 /** One view of the schemas asked about, with the columns `EXPLAIN` is asked for. */
 export interface ViewRow {
@@ -243,9 +240,7 @@ function quoteIdentifier(name: string): string {
   return BARE_IDENTIFIER.test(name) ? name : `"${name.replaceAll('"', '""')}"`
 }
 
-export async function readCatalogRelations(
-  query: RunQuery
-): Promise<Map<string, CatalogRelation>> {
+export async function readCatalogRelations(query: RunQuery): Promise<Map<string, CatalogRelation>> {
   const catalog = new Map<string, CatalogRelation>()
   const relationOf = (schema: string, relation: string): CatalogRelation => {
     const key = `${schema}.${relation}`
@@ -364,10 +359,7 @@ export async function readTypeCoercions(query: RunQuery): Promise<TypeCoercions>
  * asking a real database the questions this module asks, rather than by transcribing
  * them a second time.
  */
-export async function readViews(
-  query: RunQuery,
-  schemas: string[]
-): Promise<readonly ViewRow[]> {
+export async function readViews(query: RunQuery, schemas: string[]): Promise<readonly ViewRow[]> {
   return query<ViewRow>(VIEW_QUERY, [schemas])
 }
 

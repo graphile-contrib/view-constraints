@@ -12,11 +12,11 @@ npm install @graphile-contrib/view-constraints
 ## Use
 
 ```ts
-import { PgViewConstraintsPlugin } from "@graphile-contrib/view-constraints";
+import { PgViewConstraintsPlugin } from '@graphile-contrib/view-constraints'
 
 export default {
-  plugins: [PgViewConstraintsPlugin()],
-};
+  plugins: [PgViewConstraintsPlugin()]
+}
 ```
 
 The plugin runs before `PgFakeConstraintsPlugin`, which turns the derived tags

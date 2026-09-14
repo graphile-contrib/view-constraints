@@ -286,9 +286,7 @@ function nullExtendedAliases(root: ExplainPlanNode): Set<string> {
     if (node.Alias !== undefined && underNull) nulled.add(node.Alias)
     const joinType = node['Join Type']
     const nulledSides =
-      joinType === undefined
-        ? undefined
-        : (JOIN_TYPE_NULLED_SIDES.get(joinType) ?? BOTH_JOIN_SIDES)
+      joinType === undefined ? undefined : (JOIN_TYPE_NULLED_SIDES.get(joinType) ?? BOTH_JOIN_SIDES)
     for (const child of node.Plans ?? []) {
       const relationship = child['Parent Relationship'] ?? ''
       const nulledHere =
@@ -591,9 +589,7 @@ class OriginReader {
     const [sole] = [...this.relations]
     const aliasNodes = countNodes(root, (node) => node.Alias !== undefined)
     this.soleRelation =
-      aliasNodes === 1 && this.relations.size === 1 && sole
-        ? { alias: sole[0], ...sole[1] }
-        : null
+      aliasNodes === 1 && this.relations.size === 1 && sole ? { alias: sole[0], ...sole[1] } : null
   }
 
   /** `Subquery Scan` nodes this reader descends through, by alias. */
@@ -717,10 +713,12 @@ export interface PlanOrigins {
 }
 
 function hasJoinOtherThanInner(root: ExplainPlanNode): boolean {
-  return countNodes(root, (node) => {
-    const joinType = node['Join Type']
-    return joinType !== undefined && joinType !== 'Inner'
-  }) > 0
+  return (
+    countNodes(root, (node) => {
+      const joinType = node['Join Type']
+      return joinType !== undefined && joinType !== 'Inner'
+    }) > 0
+  )
 }
 
 /**
