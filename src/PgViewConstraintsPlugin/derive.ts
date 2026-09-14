@@ -355,8 +355,8 @@ export function deriveViewConstraints(
     if (plan.nullIntroduced[index] !== false) continue
     const everyBranchNotNull = sources.every(
       (origin) =>
-        catalog.get(`${origin.schema}.${origin.relation}`)?.columns.get(origin.column)
-          ?.notNull === true
+        catalog.get(`${origin.schema}.${origin.relation}`)?.columns.get(origin.column)?.notNull ===
+        true
     )
     if (everyBranchNotNull) notNullColumns.push(viewColumn)
   }
@@ -503,8 +503,7 @@ export function deriveViewConstraints(
       (key) =>
         // A unique index admits nulls where the primary key cannot; a null key
         // identifies no row, so only an all-NOT NULL one is a row identity.
-        key.isPrimary ||
-        key.columns.every((column) => base?.columns.get(column)?.notNull === true)
+        key.isPrimary || key.columns.every((column) => base?.columns.get(column)?.notNull === true)
     )
     const carriedCandidates = candidates
       .map((key) => ({
