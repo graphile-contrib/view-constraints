@@ -30,5 +30,11 @@
     "prettier": "^3.9.6",
     "typescript": "^5.5.4"
   },
+  "prettier": {
+    "singleQuote": true,
+    "semi": false,
+    "trailingComma": "none",
+    "printWidth": 100
+  },
   "packageManager": "yarn@4.18.0"
 }
