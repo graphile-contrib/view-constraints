@@ -13,7 +13,7 @@
     "prepack": "rm -Rf dist && yarn build",
     "lint:fix": "prettier --ignore-path .gitignore --write '**/*.{js,jsx,ts,tsx,graphql,md,json}'",
     "prettier:check": "prettier --ignore-path .gitignore --check '**/*.{js,jsx,ts,tsx,graphql,md,json}'",
-    "test": "node --test __tests__/PgViewConstraintsPlugin.test.ts"
+    "test": "node --experimental-strip-types --test __tests__/PgViewConstraintsPlugin.test.ts"
   },
   "repository": {
     "type": "git",

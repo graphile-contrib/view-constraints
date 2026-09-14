@@ -39,12 +39,12 @@
 // derives. `report` may observe the same derivation without changing that default.
 
 import type {} from 'postgraphile'
-import { collectViewConstraints } from './collect.js'
-import type { RunQuery } from './collect.js'
-import type { ViewDerivation } from './derive.js'
+import { collectViewConstraints } from './collect.ts'
+import type { RunQuery } from './collect.ts'
+import type { ViewDerivation } from './derive.ts'
 
-export type { ViewDerivation } from './derive.js'
-export type { ColumnOrigin, ColumnSources } from './plan-origins.js'
+export type { ViewDerivation } from './derive.ts'
+export type { ColumnOrigin, ColumnSources } from './plan-origins.ts'
 
 /** What one view was found to declare by hand, next to what was derived for it. */
 export interface ViewConstraintsComparison {
@@ -88,8 +88,8 @@ export interface ViewConstraintsReport {
 
 export interface ViewConstraintsOptions {
   /**
-   * Write the derived relations onto the view as smart tags. On by default; turn it
-   * off to inspect a report without changing the schema.
+   * Write the derived relations onto the view as smart tags. Off unless asked for:
+   * a reporting run must leave the schema exactly as it found it.
    */
   declare?: boolean
   /** Receives the derivation and the view's own declarations, once per service. */
@@ -197,6 +197,35 @@ export function PgViewConstraintsPlugin(
           const schemas = pgService.schemas ?? []
           if (schemas.length === 0) return
 
+          const classOf = (schema: string, relation: string) =>
+            introspection.classes.find(
+              (candidate) =>
+                candidate.relname === relation && candidate.getNamespace()?.nspname === schema
+            )
+
+          // A view the surface publishes as an enumeration rather than as an object.
+          // `PgEnumTablesPlugin` turns a column referencing one into that enum, so a
+          // relation led there would retype a published field rather than lead
+          // anywhere; the tag lives in the smart tags, not in the catalog, which is
+          // why the question is answered here and handed down.
+          const publishedAsEnumeration = (schema: string, view: string): boolean => {
+            const tag = classOf(schema, view)?.getTagsAndDescription().tags['enum']
+            return tag === true || typeof tag === 'string'
+          }
+
+          // The `@primaryKey` a human wrote on a view. Handed down for the same
+          // reason: it lives in the smart tags and it is the key the view is
+          // published under, because the derived one is declared below only where
+          // the view states none. A relation may only point at the key that reaches
+          // the schema. Presence is what matters, so a tag that is there and is not a
+          // string — `@primaryKey` with no value — names no columns and matches no
+          // derived key, exactly as it declares none below.
+          const declaredRowIdentity = (schema: string, view: string): string | null => {
+            const tag = classOf(schema, view)?.getTagsAndDescription().tags['primaryKey']
+            if (tag === undefined) return null
+            return typeof tag === 'string' ? tag : ''
+          }
+
           const pgSettings = pgService.pgSettingsForIntrospection ?? null
           const collected = await withPgClientFromPgService(
             pgService,
@@ -204,10 +233,22 @@ export function PgViewConstraintsPlugin(
             async (client) => {
               const query = runQueryOn(client)
               if (!namesPrivilegedConnection(pgService)) {
-                return collectViewConstraints(query, [...schemas], null)
+                return collectViewConstraints(
+                  query,
+                  [...schemas],
+                  null,
+                  publishedAsEnumeration,
+                  declaredRowIdentity
+                )
               }
               return withSuperuserPgClientFromPgService(pgService, pgSettings, (privilegedClient) =>
-                collectViewConstraints(query, [...schemas], runQueryOn(privilegedClient))
+                collectViewConstraints(
+                  query,
+                  [...schemas],
+                  runQueryOn(privilegedClient),
+                  publishedAsEnumeration,
+                  declaredRowIdentity
+                )
               )
             }
           )

@@ -1,4 +1,4 @@
--- The schema behind __tests__/PgViewConstraintsPlugin.fixture.json.
+-- The schema behind test/unit/view-constraints.fixture.json.
 --
 -- One relation per case the reader of a plan has to get right, positive and
 -- negative alike. The fixture is PostgreSQL's answer for this schema, not a
@@ -221,3 +221,75 @@ create view v_values_scan as
 -- NEGATIVE: a constant-false qualifier leaves a plan with no scan in it at all, while
 -- the select list still spells the relation that is not read.
 create view v_where_false as select id, cur_code from tx where 1 = 0;
+
+-- ── A relation from one view to another ───────────────────────────────────────
+--
+-- A relation is led to a projection instead of only to a table when two catalog
+-- facts stand under it: a real foreign key on the base column the referencing view
+-- proxies, and a projection whose derived row identity is the very key that foreign
+-- key points at. Row identity, not the proxy alone — a view that repeats the key
+-- is not keyed by it.
+--
+-- These relations need their own tables. Every view above is a projection of `tx`,
+-- so `tx`'s own key is the row identity of a dozen of them at once, which is the
+-- ambiguous case and never the unambiguous one.
+
+create table merchant (id bigint primary key, title text not null);
+create table invoice (id bigint primary key, merchant_id bigint not null references merchant(id));
+-- POSITIVE: exactly one projection of `merchant` is a row of it, so `v_invoice`'s
+-- `merchant_id` is led to `v_merchant` as well as to `merchant`.
+create view v_merchant with (security_barrier = true) as select id, title from merchant;
+create view v_invoice as select id, merchant_id from invoice;
+
+-- POSITIVE, through a unique index that is not the primary key: `entry` references
+-- `ledger(code)`, and the projection keyed by `code` is the one the relation is led
+-- to. The projection keyed by `ledger`'s primary key is not a candidate for it —
+-- it is a row of the same table by a key the relation does not point at.
+create table ledger (id bigint primary key, code text not null);
+create unique index ledger_code_key on ledger (code);
+create table entry (id bigint primary key, ledger_code text not null references ledger(code));
+create view v_ledger_by_code as select code from ledger;
+create view v_ledger_by_id as select id from ledger;
+create view v_entry as select id, ledger_code from entry;
+
+-- NEGATIVE: two projections of `carrier` are rows of it by the same key, and
+-- nothing in the catalog says which of them a relation to `carrier(id)` was meant
+-- for. The relation to the table stands; the one to a projection is declined by
+-- name.
+create table carrier (id bigint primary key, title text not null);
+create table parcel (id bigint primary key, carrier_id bigint not null references carrier(id));
+create view v_carrier_titled as select id, title from carrier;
+create view v_carrier_bare as select id from carrier;
+create view v_parcel as select id, carrier_id from parcel;
+
+-- NEGATIVE: a projection that carries the key and is not keyed by it. The join
+-- repeats every `depot` row once per `crate`, so `depot.id` is not unique in the
+-- view and the view has no derived row identity — a relation pointing at it would
+-- point at several rows.
+create table depot (id bigint primary key, title text not null);
+create table crate (id bigint primary key, depot_id bigint not null references depot(id));
+create view v_depot_joined as
+  select d.id, c.id as crate_id from depot d join crate c on c.depot_id = d.id;
+create view v_crate as select id, depot_id from crate;
+
+-- POSITIVE, a self-referencing table: `node.parent_id` points at `node(id)`, so the
+-- only projection the relation can be led to is the projection asking for it. Two
+-- relations point at that key and they are not the same statement — `(id)` is the
+-- row's identity with its own row, which `@primaryKey` already says, while
+-- `(parent_id)` reaches the parent, about which it says nothing.
+create table node (id bigint primary key, parent_id bigint references node(id));
+create view v_node as select id, parent_id from node;
+
+-- POSITIVE, a composite key the projection spells in another order and under other
+-- names, referenced by a foreign key that spells it in a third order. The key is
+-- matched as a set, and each column is carried to the view column that proxies it,
+-- so neither the order nor the names have to line up anywhere.
+create table crew (ship_code text, seat int, name text not null, primary key (ship_code, seat));
+create table shift (
+  id bigint primary key,
+  seat int not null,
+  ship_code text not null,
+  foreign key (seat, ship_code) references crew (seat, ship_code)
+);
+create view v_crew as select seat as berth, ship_code as vessel, name from crew;
+create view v_shift as select id, seat, ship_code from shift;

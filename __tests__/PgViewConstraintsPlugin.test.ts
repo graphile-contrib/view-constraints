@@ -23,13 +23,17 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import {
+  deriveProjectionRelations,
   deriveViewConstraints,
+  TARGET_REFUSALS,
   valuePreservingCast
 } from '../src/PgViewConstraintsPlugin/derive.ts'
 import type {
   CatalogRelation,
+  TargetRefusal,
   TypeCoercions,
-  ViewColumn
+  ViewColumn,
+  ViewDerivation
 } from '../src/PgViewConstraintsPlugin/derive.ts'
 import {
   collectViewConstraints,
@@ -689,6 +693,128 @@ const CASES: Case[] = [
     notNull: [],
     foreignKeys: [],
     primaryKey: null
+  },
+
+  // ── The relations a view is led to on its own, before any projection ───────────
+  //
+  // These views exist for the pass that leads a relation to a projection, which is
+  // an answer over a whole surface and not over one view; `derive` below is the
+  // per-view half of it, so what a case here states is what the view carries before
+  // any other view of the lab is looked at. The pass itself is held further down.
+  {
+    view: 'v_merchant',
+    about: 'a barrier projection of `merchant`, and the only view that is a row of it',
+    origins: ['id=merchant.id', 'title=merchant.title'],
+    notNull: ['id', 'title'],
+    foreignKeys: ['(id) references lab.merchant (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_invoice',
+    about: 'the referencing side: `merchant_id` carries a real foreign key on `invoice`',
+    origins: ['id=invoice.id', 'merchant_id=invoice.merchant_id'],
+    notNull: ['id', 'merchant_id'],
+    foreignKeys: ['(id) references lab.invoice (id)', '(merchant_id) references lab.merchant (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_ledger_by_code',
+    about: 'a row of `ledger` by a unique index that is not its primary key',
+    origins: ['code=ledger.code'],
+    notNull: ['code'],
+    foreignKeys: [],
+    primaryKey: 'code'
+  },
+  {
+    view: 'v_ledger_by_id',
+    about: 'a row of the same table by the key no relation here points at',
+    origins: ['id=ledger.id'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.ledger (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_entry',
+    about: 'the referencing side of a foreign key that points at a unique index',
+    origins: ['id=entry.id', 'ledger_code=entry.ledger_code'],
+    notNull: ['id', 'ledger_code'],
+    foreignKeys: ['(id) references lab.entry (id)', '(ledger_code) references lab.ledger (code)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_carrier_titled',
+    about: 'one of two projections of `carrier` that are rows of it by the same key',
+    origins: ['id=carrier.id', 'title=carrier.title'],
+    notNull: ['id', 'title'],
+    foreignKeys: ['(id) references lab.carrier (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_carrier_bare',
+    about: 'and the other one',
+    origins: ['id=carrier.id'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.carrier (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_parcel',
+    about: 'the referencing side of the ambiguous case',
+    origins: ['id=parcel.id', 'carrier_id=parcel.carrier_id'],
+    notNull: ['id', 'carrier_id'],
+    foreignKeys: ['(carrier_id) references lab.carrier (id)', '(id) references lab.parcel (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_depot_joined',
+    about:
+      'a view that carries `depot`\u2019s key and is not keyed by it: the join repeats ' +
+      'every depot row once per crate, so the plan proves no row identity',
+    origins: ['id=depot.id', 'crate_id=crate.id'],
+    notNull: ['id', 'crate_id'],
+    foreignKeys: ['(crate_id) references lab.crate (id)', '(id) references lab.depot (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_crate',
+    about: 'the referencing side of the case with no keyed projection to lead to',
+    origins: ['id=crate.id', 'depot_id=crate.depot_id'],
+    notNull: ['id', 'depot_id'],
+    foreignKeys: ['(depot_id) references lab.depot (id)', '(id) references lab.crate (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_node',
+    about:
+      'a projection of a self-referencing table: two relations at one key, one of ' +
+      'them the row\u2019s own identity and the other the parent',
+    origins: ['id=node.id', 'parent_id=node.parent_id'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.node (id)', '(parent_id) references lab.node (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_crew',
+    about:
+      'a composite key carried under other names and in the other order: the key is ' +
+      'matched as a set and each column is carried to the view column proxying it',
+    origins: ['berth=crew.seat', 'vessel=crew.ship_code', 'name=crew.name'],
+    notNull: ['berth', 'vessel', 'name'],
+    foreignKeys: ['(vessel,berth) references lab.crew (ship_code,seat)'],
+    primaryKey: 'vessel,berth'
+  },
+  {
+    view: 'v_shift',
+    about:
+      'the referencing side of that composite key, whose own constraint spells it ' +
+      'in a third order again',
+    origins: ['id=shift.id', 'seat=shift.seat', 'ship_code=shift.ship_code'],
+    notNull: ['id', 'seat', 'ship_code'],
+    foreignKeys: [
+      '(id) references lab.shift (id)',
+      '(seat,ship_code) references lab.crew (seat,ship_code)'
+    ],
+    primaryKey: 'id'
   }
 ]
 
@@ -753,7 +879,7 @@ test('a reference parses; anything with structure does not', () => {
   assert.deepEqual(parseReference('cur_id'), { alias: null, column: 'cur_id', coerced: false })
   for (const entry of [
     '7',
-    "'deposit.event'::text",
+    "'example.event'::text",
     '(b1.cur_id + 0)',
     'COALESCE(b1.cur_id, 0)',
     'count(*)',
@@ -1094,4 +1220,300 @@ test('a Subquery Scan is crossed only where the catalog pins it to one view', ()
     'through-an-unpinned-subquery',
     'through-an-unpinned-subquery'
   ])
+})
+
+// ── A relation led to a projection ──────────────────────────────────────────────
+//
+// The pass that leads a relation to another view is an answer over a whole surface:
+// which view is a row of a base key is not a question one view can be asked. So it
+// runs over every derivation of the lab at once, and these cases read what it did to
+// each of them — against the same fixture, regime by regime, because a pass over
+// answers that do not move with the plan may not move with the plan either.
+
+/** Every lab view derived under one regime, before any pass over the surface. */
+function labDerivations(regime: string = DEFAULT_REGIME): ViewDerivation[] {
+  return fixture.views
+    .filter((view) => view.regime === regime)
+    .map((view) =>
+      deriveViewConstraints(
+        view.schema,
+        view.view,
+        view.relkind,
+        view.columns,
+        readPlanOrigins(
+          view.plan,
+          view.columns.length,
+          subqueryViewCandidates(fixture.viewSources, view.schema, view.view)
+        ),
+        catalog,
+        coercions
+      )
+    )
+}
+
+/** Every lab view derived under one regime, with the projection pass applied. */
+function labSurface(
+  regime: string = DEFAULT_REGIME,
+  publishedAsEnumeration?: (schema: string, view: string) => boolean,
+  declaredRowIdentity?: (schema: string, view: string) => string | null
+): Map<string, ViewDerivation> {
+  const derivations = labDerivations(regime)
+  deriveProjectionRelations(derivations, catalog, publishedAsEnumeration, declaredRowIdentity)
+  return new Map(derivations.map((derivation) => [derivation.view, derivation]))
+}
+
+function relationsOf(surface: Map<string, ViewDerivation>, view: string): string[] {
+  const derivation = surface.get(view)
+  assert.ok(derivation, `no derivation for lab.${view}`)
+  return derivation.foreignKeys.map((foreignKey) => foreignKey.tag)
+}
+
+function declinedBy(
+  surface: Map<string, ViewDerivation>,
+  view: string
+): { key: string; refusal: string; candidates: string[] }[] {
+  const derivation = surface.get(view)
+  assert.ok(derivation, `no derivation for lab.${view}`)
+  return derivation.declinedViewTargets.map((declined) => ({
+    key: declined.key,
+    refusal: declined.refusal,
+    candidates: declined.candidates
+  }))
+}
+
+test('a relation is led to the one projection that is a row of the key it points at', () => {
+  const surface = labSurface()
+  // The relation to the table is left exactly where it was; the one to the
+  // projection stands beside it, because a table row and a projection row are
+  // different objects and choosing between them is not a derivation's choice.
+  assert.deepEqual(relationsOf(surface, 'v_invoice'), [
+    '(id) references lab.invoice (id)',
+    '(merchant_id) references lab.merchant (id)',
+    '(merchant_id) references lab.v_merchant (id)'
+  ])
+  assert.deepEqual(declinedBy(surface, 'v_invoice'), [])
+})
+
+test('the key led to may be a unique index rather than a primary key', () => {
+  const surface = labSurface()
+  // `entry.ledger_code` references `ledger(code)`, so the projection keyed by `code`
+  // is where it is led. `v_ledger_by_id` is a row of the same table by a key this
+  // relation does not point at, and is no candidate for it.
+  assert.deepEqual(relationsOf(surface, 'v_entry'), [
+    '(id) references lab.entry (id)',
+    '(ledger_code) references lab.ledger (code)',
+    '(ledger_code) references lab.v_ledger_by_code (code)'
+  ])
+  assert.deepEqual(relationsOf(surface, 'v_ledger_by_id'), ['(id) references lab.ledger (id)'])
+})
+
+test('a view is not led to its own row', () => {
+  const surface = labSurface()
+  // `v_merchant` is the one row of `merchant(id)`, and it is also the view asking.
+  // The relation would be the row's identity with its own row, which its own
+  // `@primaryKey` already says — so it is dropped, and nothing is reported about it.
+  assert.deepEqual(relationsOf(surface, 'v_merchant'), ['(id) references lab.merchant (id)'])
+  assert.deepEqual(declinedBy(surface, 'v_merchant'), [])
+})
+
+test('a view is led to another of its own rows: the parent of a hierarchy', () => {
+  const surface = labSurface()
+  // Both relations of `v_node` point at `node(id)` and the only projection of that
+  // key is `v_node` itself, but they are not the same statement. `(id) → (id)` is
+  // the row's identity with its own row and is dropped; `(parent_id) → (id)` reaches
+  // the parent row, which no `@primaryKey` says anything about, and is led.
+  assert.deepEqual(relationsOf(surface, 'v_node'), [
+    '(id) references lab.node (id)',
+    '(parent_id) references lab.node (id)',
+    '(parent_id) references lab.v_node (id)'
+  ])
+  assert.deepEqual(declinedBy(surface, 'v_node'), [])
+})
+
+test('a composite key is carried by column, not by order or by name', () => {
+  const surface = labSurface()
+  // `shift`'s constraint spells the key `(seat, ship_code)`, `crew`'s index spells it
+  // `(ship_code, seat)`, and `v_crew` spells it `berth`/`vessel` in a third order
+  // again. Each column is carried to the view column that proxies it, so the led
+  // relation pairs `seat → berth` and `ship_code → vessel`.
+  assert.deepEqual(relationsOf(surface, 'v_shift'), [
+    '(id) references lab.shift (id)',
+    '(seat,ship_code) references lab.crew (seat,ship_code)',
+    '(seat,ship_code) references lab.v_crew (berth,vessel)'
+  ])
+  // And the composite identity of `v_crew` with its own row is dropped the way the
+  // single-column one is: every column of the reference names the column it is led
+  // from, whatever order the base key is spelled in.
+  assert.deepEqual(relationsOf(surface, 'v_crew'), [
+    '(vessel,berth) references lab.crew (ship_code,seat)'
+  ])
+})
+
+test('a projection keyed by hand over other columns is no place to lead a relation', () => {
+  // Both keys are right: `v_merchant` is a row of `merchant(id)` by derivation, and
+  // an author who wrote `@primaryKey title` publishes it under `title` instead —
+  // the plugin declares what it derives only where the view states nothing. A
+  // relation to `v_merchant (id)` would then reference a key the view does not
+  // publish, and `PgFakeConstraintsPlugin` fails the build over it.
+  const byHand = labSurface(DEFAULT_REGIME, undefined, (schema, view) =>
+    schema === 'lab' && view === 'v_merchant' ? 'title' : null
+  )
+  assert.deepEqual(relationsOf(byHand, 'v_invoice'), [
+    '(id) references lab.invoice (id)',
+    '(merchant_id) references lab.merchant (id)'
+  ])
+  assert.deepEqual(declinedBy(byHand, 'v_invoice'), [])
+  // A hand tag naming the derived key is the same key, so it changes nothing. The
+  // spelling is read the way `PgFakeConstraintsPlugin` reads it: an unquoted
+  // identifier is lower-cased, and the `|@behavior …` tail is not part of the key.
+  const sameKey = labSurface(DEFAULT_REGIME, undefined, (schema, view) =>
+    schema === 'lab' && view === 'v_merchant' ? 'ID|@behavior -update' : null
+  )
+  assert.deepEqual(relationsOf(sameKey, 'v_invoice'), [
+    '(id) references lab.invoice (id)',
+    '(merchant_id) references lab.merchant (id)',
+    '(merchant_id) references lab.v_merchant (id)'
+  ])
+  // A composite hand tag is compared as a set, because that is how the referenced
+  // attributes are matched.
+  const composite = labSurface(DEFAULT_REGIME, undefined, (schema, view) =>
+    schema === 'lab' && view === 'v_crew' ? 'berth,vessel' : null
+  )
+  assert.deepEqual(relationsOf(composite, 'v_shift'), [
+    '(id) references lab.shift (id)',
+    '(seat,ship_code) references lab.crew (seat,ship_code)',
+    '(seat,ship_code) references lab.v_crew (berth,vessel)'
+  ])
+})
+
+test('the pass answers the same however often it is run, and in whatever order', () => {
+  const rendering = (surface: Map<string, ViewDerivation>): string[] =>
+    [...surface.keys()]
+      .sort()
+      .flatMap((view) => [
+        `${view} fk ${relationsOf(surface, view).join(' ')}`,
+        `${view} declined ${JSON.stringify(declinedBy(surface, view))}`,
+        `${view} notes ${JSON.stringify(surface.get(view)?.notes)}`
+      ])
+  const once = labDerivations()
+  deriveProjectionRelations(once, catalog)
+  const expected = rendering(new Map(once.map((d) => [d.view, d])))
+
+  // Run twice over the same derivations: a relation already led is one of the tags
+  // the pass reads back, and a target already declined is not declined twice, so
+  // neither the relations, nor the declined targets, nor the notes double.
+  const twice = labDerivations()
+  deriveProjectionRelations(twice, catalog)
+  deriveProjectionRelations(twice, catalog)
+  assert.deepEqual(rendering(new Map(twice.map((d) => [d.view, d]))), expected)
+
+  // And the order the derivations arrive in is not part of the answer: which view is
+  // a row of a base key is read off the whole surface before any view is led.
+  const reversed = labDerivations().reverse()
+  deriveProjectionRelations(reversed, catalog)
+  assert.deepEqual(rendering(new Map(reversed.map((d) => [d.view, d]))), expected)
+})
+
+test('more than one projection of a key is declined by name, not guessed between', () => {
+  const surface = labSurface()
+  assert.deepEqual(relationsOf(surface, 'v_parcel'), [
+    '(carrier_id) references lab.carrier (id)',
+    '(id) references lab.parcel (id)'
+  ])
+  assert.deepEqual(declinedBy(surface, 'v_parcel'), [
+    {
+      key: 'lab.carrier(id)',
+      refusal: 'more-than-one-projection-carries-the-key',
+      candidates: ['lab.v_carrier_bare', 'lab.v_carrier_titled']
+    }
+  ])
+})
+
+test('a view that carries a key without being keyed by it is no candidate', () => {
+  const surface = labSurface()
+  // `v_depot_joined` proxies `depot.id` and repeats it once per crate, so the plan
+  // proves no row identity and the key is not a key of the view. Nothing is led to
+  // it, and `v_crate` says nothing either: no projection of `depot(id)` is not a
+  // refusal, it is the ordinary state of a surface that publishes none.
+  assert.equal(surface.get('v_depot_joined')?.primaryKey, null)
+  assert.deepEqual(relationsOf(surface, 'v_crate'), [
+    '(depot_id) references lab.depot (id)',
+    '(id) references lab.crate (id)'
+  ])
+  assert.deepEqual(declinedBy(surface, 'v_crate'), [])
+})
+
+test('leading a relation to a projection does not move with the plan', () => {
+  const rendering = (regime: string): string[] => {
+    const surface = labSurface(regime)
+    return [...surface.keys()]
+      .sort()
+      .flatMap((view) => [
+        `${view} fk ${relationsOf(surface, view).join(' ')}`,
+        `${view} declined ${JSON.stringify(declinedBy(surface, view))}`
+      ])
+  }
+  const expected = rendering(DEFAULT_REGIME)
+  for (const regime of REGIMES) {
+    assert.deepEqual(rendering(regime), expected, regime)
+  }
+})
+
+// The third closed list, held exactly as the other two are. A relation the catalog
+// authorises and this reader did not lead has to say so, or "no projection is a row
+// of this key" and "several are" become one silence.
+const TARGET_REFUSAL_CASES: Record<TargetRefusal, string> = {
+  'more-than-one-projection-carries-the-key': 'v_parcel'
+}
+
+test('the closed list of target refusals is exactly the list with cases', () => {
+  assert.deepEqual(Object.keys(TARGET_REFUSAL_CASES).sort(), Object.keys(TARGET_REFUSALS).sort())
+})
+
+test('every target refusal a lab view stands for is the one that view gives', () => {
+  const surface = labSurface()
+  for (const [refusal, view] of Object.entries(TARGET_REFUSAL_CASES)) {
+    const declined = declinedBy(surface, view)
+    assert.ok(declined.length > 0, `lab.${view} declined nothing`)
+    assert.equal(declined[0]?.refusal, refusal, `lab.${view} was to stand for ${refusal}`)
+  }
+})
+
+test('every target refusal of a lab view is one of the closed list', () => {
+  const surface = labSurface()
+  const named = new Set(Object.keys(TARGET_REFUSALS))
+  for (const view of surface.keys()) {
+    for (const declined of declinedBy(surface, view)) {
+      assert.ok(named.has(declined.refusal), declined.refusal)
+      assert.ok(declined.candidates.length > 1, `${view}: ${declined.key}`)
+    }
+  }
+})
+
+test('a view published as an enumeration is no place to lead a relation to', () => {
+  // `PgEnumTablesPlugin` "converts columns that reference `@enum` tables into enums":
+  // the relation would not lead anywhere, it would retype `v_invoice.merchant_id` in
+  // the published schema. So such a view is not a candidate, and the relation to the
+  // table stands alone.
+  const surface = labSurface(
+    DEFAULT_REGIME,
+    (schema, view) => schema === 'lab' && view === 'v_merchant'
+  )
+  assert.deepEqual(relationsOf(surface, 'v_invoice'), [
+    '(id) references lab.invoice (id)',
+    '(merchant_id) references lab.merchant (id)'
+  ])
+  assert.deepEqual(declinedBy(surface, 'v_invoice'), [])
+  // And it is left out of the count, not declined: with one of the two projections of
+  // `carrier` published as an enumeration, the other one is the sole candidate.
+  const carriers = labSurface(
+    DEFAULT_REGIME,
+    (schema, view) => schema === 'lab' && view === 'v_carrier_bare'
+  )
+  assert.deepEqual(relationsOf(carriers, 'v_parcel'), [
+    '(carrier_id) references lab.carrier (id)',
+    '(carrier_id) references lab.v_carrier_titled (id)',
+    '(id) references lab.parcel (id)'
+  ])
+  assert.deepEqual(declinedBy(carriers, 'v_parcel'), [])
 })

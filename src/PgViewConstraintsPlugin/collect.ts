@@ -4,10 +4,12 @@
 // without `ANALYZE` builds a plan and throws it away, and `COSTS OFF` keeps the
 // answer free of the estimates that would make it depend on table statistics.
 
-import { deriveViewConstraints } from './derive.ts'
+import { deriveProjectionRelations, deriveViewConstraints } from './derive.ts'
 import type {
   CatalogForeignKey,
   CatalogRelation,
+  DeclaredRowIdentity,
+  PublishedAsEnumeration,
   TypeCoercions,
   ViewColumn,
   ViewDerivation
@@ -190,11 +192,10 @@ const COLUMN_QUERY = `
 // way does not make the answer move with the planner.
 //
 // The alias is matched against this relation's own sources, not against every view in
-// the database: two schemas here spell the same view name (`deposit` and `withdrawal`
-// each have an `available_crypto_terms`), and a name that could mean either is not a
-// name this reader may follow. `pg_depend` over `pg_rewrite` is where a view's sources
-// are written down; the closure of it is taken because an intermediate view that is
-// flattened away leaves its own source's `Subquery Scan` behind.
+// the database: a same-named view in another schema is not a relation this reader may
+// follow. `pg_depend` over `pg_rewrite` is where a view's sources are written down;
+// the closure of it is taken because an intermediate view that is flattened away
+// leaves its own source's `Subquery Scan` behind.
 const VIEW_SOURCE_QUERY = `
   SELECT namespace.nspname   AS schema,
          class.relname       AS name,
@@ -405,7 +406,9 @@ export interface CollectResult {
 export async function collectViewConstraints(
   query: RunQuery,
   schemas: string[],
-  privilegedQuery: RunQuery | null
+  privilegedQuery: RunQuery | null,
+  publishedAsEnumeration?: PublishedAsEnumeration,
+  declaredRowIdentity?: DeclaredRowIdentity
 ): Promise<CollectResult> {
   const catalog = await readCatalogRelations(query)
   const coercions = await readTypeCoercions(query)
@@ -464,5 +467,9 @@ export async function collectViewConstraints(
       )
     )
   }
+  // Every view of this surface is derived before any of them is led to a projection:
+  // which view is keyed by a base key is an answer over the whole surface, not over
+  // one view, and the reader may not begin answering it half-read.
+  deriveProjectionRelations(derivations, catalog, publishedAsEnumeration, declaredRowIdentity)
   return { derivations, failures, skipped }
 }
