@@ -38,10 +38,7 @@
 // `declare` is on unless disabled, so that adding the plugin adds the relations it
 // derives. `report` may observe the same derivation without changing that default.
 
-import 'graphile-config'
-import type {} from 'graphile-build'
-import type {} from 'graphile-build-pg'
-import { withPgClientFromPgService, withSuperuserPgClientFromPgService } from '@dataplan/pg'
+import type {} from 'postgraphile'
 import { collectViewConstraints } from './collect.js'
 import type { RunQuery } from './collect.js'
 import type { ViewDerivation } from './derive.js'
@@ -190,6 +187,8 @@ export function PgViewConstraintsPlugin(
     gather: {
       hooks: {
         async pgIntrospection_introspection(info, event) {
+          const { withPgClientFromPgService, withSuperuserPgClientFromPgService } =
+            info.lib.dataplanPg
           const { introspection, serviceName } = event
           const pgServices = info.resolvedPreset.pgServices as
             readonly GraphileConfig.PgServiceConfiguration[] | undefined

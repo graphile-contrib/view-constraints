@@ -25,32 +25,32 @@ import { test } from 'node:test'
 import {
   deriveViewConstraints,
   valuePreservingCast
-} from '../src/PgViewConstraintsPlugin/derive.js'
+} from '../src/PgViewConstraintsPlugin/derive.ts'
 import type {
   CatalogRelation,
   TypeCoercions,
   ViewColumn
-} from '../src/PgViewConstraintsPlugin/derive.js'
+} from '../src/PgViewConstraintsPlugin/derive.ts'
 import {
   collectViewConstraints,
   NO_PRIVILEGED_CONNECTION_REASON,
   subqueryViewCandidates
-} from '../src/PgViewConstraintsPlugin/collect.js'
-import type { ViewSourceRow } from '../src/PgViewConstraintsPlugin/collect.js'
-import type { RunQuery } from '../src/PgViewConstraintsPlugin/collect.js'
+} from '../src/PgViewConstraintsPlugin/collect.ts'
+import type { ViewSourceRow } from '../src/PgViewConstraintsPlugin/collect.ts'
+import type { RunQuery } from '../src/PgViewConstraintsPlugin/collect.ts'
 import {
   COLUMN_REFUSALS,
   PLAN_REFUSALS,
   parseReference,
   readPlanOrigins
-} from '../src/PgViewConstraintsPlugin/plan-origins.js'
+} from '../src/PgViewConstraintsPlugin/plan-origins.ts'
 import type {
   ColumnRefusal,
   ExplainPlanNode,
   PlanOrigins,
   PlanRefusal,
   ViewShape
-} from '../src/PgViewConstraintsPlugin/plan-origins.js'
+} from '../src/PgViewConstraintsPlugin/plan-origins.ts'
 
 interface Fixture {
   catalog: (Omit<CatalogRelation, 'columns'> & {

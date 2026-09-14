@@ -32,14 +32,14 @@
 // of GraphQL then null the whole parent object — so the answer is destroyed rather
 // than thinned. Where there is a doubt, the column is nullable.
 
-import { COLUMN_REFUSALS, PLAN_REFUSALS } from './plan-origins.js'
+import { COLUMN_REFUSALS, PLAN_REFUSALS } from './plan-origins.ts'
 import type {
   ColumnOrigin,
   ColumnRefusal,
   ColumnSources,
   PlanOrigins,
   PlanRefusal
-} from './plan-origins.js'
+} from './plan-origins.ts'
 
 export interface CatalogForeignKey {
   constraintName: string

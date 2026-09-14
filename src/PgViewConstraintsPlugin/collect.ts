@@ -4,16 +4,16 @@
 // without `ANALYZE` builds a plan and throws it away, and `COSTS OFF` keeps the
 // answer free of the estimates that would make it depend on table statistics.
 
-import { deriveViewConstraints } from './derive.js'
+import { deriveViewConstraints } from './derive.ts'
 import type {
   CatalogForeignKey,
   CatalogRelation,
   TypeCoercions,
   ViewColumn,
   ViewDerivation
-} from './derive.js'
-import { readPlanOrigins } from './plan-origins.js'
-import type { ExplainPlanNode, ViewShape } from './plan-origins.js'
+} from './derive.ts'
+import { readPlanOrigins } from './plan-origins.ts'
+import type { ExplainPlanNode, ViewShape } from './plan-origins.ts'
 
 /** The one thing this module needs of a connection: run SQL, get rows. */
 export type RunQuery = <Row>(text: string, values?: unknown[]) => Promise<readonly Row[]>
