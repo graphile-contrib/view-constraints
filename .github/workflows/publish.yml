@@ -25,6 +25,11 @@ jobs:
       - run: yarn build
       - run: yarn test
       - run: yarn prettier:check
-      - run: test "v$(node -p \"require('./package.json').version\")" = "$GITHUB_REF_NAME"
+      - name: Verify tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          package_version=$(node -e "console.log(require('./package.json').version)")
+          test "v$package_version" = "$RELEASE_TAG"
       - run: git merge-base --is-ancestor "$GITHUB_SHA" origin/main
       - run: npm publish --provenance --access public
