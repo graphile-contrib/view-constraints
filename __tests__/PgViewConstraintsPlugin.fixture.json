@@ -60,6 +60,91 @@
     },
     {
       "schema": "lab",
+      "relation": "carrier",
+      "foreignKeys": [],
+      "uniqueKeys": [
+        {
+          "name": "carrier_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "title": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "crate",
+      "foreignKeys": [
+        {
+          "constraintName": "crate_depot_id_fkey",
+          "columns": ["depot_id"],
+          "foreignSchema": "lab",
+          "foreignRelation": "depot",
+          "foreignColumns": ["id"]
+        }
+      ],
+      "uniqueKeys": [
+        {
+          "name": "crate_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "depot_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "crew",
+      "foreignKeys": [],
+      "uniqueKeys": [
+        {
+          "name": "crew_pkey",
+          "isPrimary": true,
+          "columns": ["ship_code", "seat"]
+        }
+      ],
+      "columns": {
+        "ship_code": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "seat": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "name": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "currency",
       "foreignKeys": [],
       "uniqueKeys": [
@@ -76,6 +161,123 @@
           "notNull": true
         },
         "title": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "depot",
+      "foreignKeys": [],
+      "uniqueKeys": [
+        {
+          "name": "depot_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "title": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "entry",
+      "foreignKeys": [
+        {
+          "constraintName": "entry_ledger_code_fkey",
+          "columns": ["ledger_code"],
+          "foreignSchema": "lab",
+          "foreignRelation": "ledger",
+          "foreignColumns": ["code"]
+        }
+      ],
+      "uniqueKeys": [
+        {
+          "name": "entry_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "ledger_code": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "invoice",
+      "foreignKeys": [
+        {
+          "constraintName": "invoice_merchant_id_fkey",
+          "columns": ["merchant_id"],
+          "foreignSchema": "lab",
+          "foreignRelation": "merchant",
+          "foreignColumns": ["id"]
+        }
+      ],
+      "uniqueKeys": [
+        {
+          "name": "invoice_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "merchant_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "ledger",
+      "foreignKeys": [],
+      "uniqueKeys": [
+        {
+          "name": "ledger_code_key",
+          "isPrimary": false,
+          "columns": ["code"]
+        },
+        {
+          "name": "ledger_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "code": {
           "typeId": 25,
           "typeMod": -1,
           "notNull": true
@@ -107,6 +309,94 @@
     },
     {
       "schema": "lab",
+      "relation": "merchant",
+      "foreignKeys": [],
+      "uniqueKeys": [
+        {
+          "name": "merchant_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "title": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "node",
+      "foreignKeys": [
+        {
+          "constraintName": "node_parent_id_fkey",
+          "columns": ["parent_id"],
+          "foreignSchema": "lab",
+          "foreignRelation": "node",
+          "foreignColumns": ["id"]
+        }
+      ],
+      "uniqueKeys": [
+        {
+          "name": "node_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "parent_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "parcel",
+      "foreignKeys": [
+        {
+          "constraintName": "parcel_carrier_id_fkey",
+          "columns": ["carrier_id"],
+          "foreignSchema": "lab",
+          "foreignRelation": "carrier",
+          "foreignColumns": ["id"]
+        }
+      ],
+      "uniqueKeys": [
+        {
+          "name": "parcel_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "carrier_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "refund",
       "foreignKeys": [
         {
@@ -131,6 +421,43 @@
           "notNull": true
         },
         "cur_code": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "shift",
+      "foreignKeys": [
+        {
+          "constraintName": "shift_seat_ship_code_fkey",
+          "columns": ["seat", "ship_code"],
+          "foreignSchema": "lab",
+          "foreignRelation": "crew",
+          "foreignColumns": ["seat", "ship_code"]
+        }
+      ],
+      "uniqueKeys": [
+        {
+          "name": "shift_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "seat": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "ship_code": {
           "typeId": 25,
           "typeMod": -1,
           "notNull": true
@@ -273,7 +600,7 @@
           "notNull": true
         },
         "cur_code": {
-          "typeId": 278195355,
+          "typeId": 282057697,
           "typeMod": -1,
           "notNull": true
         }
@@ -529,6 +856,37 @@
     },
     {
       "schema": "lab",
+      "relation": "v_carrier_bare",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_carrier_titled",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "title": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_cast_domain_to_base",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -655,6 +1013,47 @@
     },
     {
       "schema": "lab",
+      "relation": "v_crate",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "depot_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_crew",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "berth": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "vessel": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "name": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_cte",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -724,6 +1123,24 @@
     },
     {
       "schema": "lab",
+      "relation": "v_depot_joined",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "crate_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_distinct_over_union",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -752,6 +1169,24 @@
           "notNull": false
         },
         "cur_code": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_entry",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "ledger_code": {
           "typeId": 25,
           "typeMod": -1,
           "notNull": false
@@ -850,6 +1285,50 @@
     },
     {
       "schema": "lab",
+      "relation": "v_invoice",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "merchant_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_ledger_by_code",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "code": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_ledger_by_id",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_left_join",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -873,6 +1352,24 @@
     },
     {
       "schema": "lab",
+      "relation": "v_merchant",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "title": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_nested_outer_join",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -884,6 +1381,24 @@
         },
         "title": {
           "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_node",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "parent_id": {
+          "typeId": 20,
           "typeMod": -1,
           "notNull": false
         }
@@ -1048,6 +1563,24 @@
     },
     {
       "schema": "lab",
+      "relation": "v_parcel",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "carrier_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_plain_over_barrier",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -1094,6 +1627,29 @@
           "notNull": false
         },
         "b_cur_code": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_shift",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "seat": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "ship_code": {
           "typeId": 25,
           "typeMod": -1,
           "notNull": false
@@ -1352,7 +1908,7 @@
   "coercions": {
     "binary": ["1043>25", "25>1043"],
     "domainBase": {
-      "278195355": 25
+      "282057697": 25
     }
   },
   "viewSources": [
@@ -1430,6 +1986,18 @@
     },
     {
       "schema": "lab",
+      "name": "v_carrier_bare",
+      "columns": ["id"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_carrier_titled",
+      "columns": ["id", "title"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
       "name": "v_cast_domain_to_base",
       "columns": ["id", "cur_code"],
       "sources": []
@@ -1472,6 +2040,18 @@
     },
     {
       "schema": "lab",
+      "name": "v_crate",
+      "columns": ["id", "depot_id"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_crew",
+      "columns": ["berth", "vessel", "name"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
       "name": "v_cte",
       "columns": ["id", "cur_code", "top_amount"],
       "sources": []
@@ -1490,6 +2070,12 @@
     },
     {
       "schema": "lab",
+      "name": "v_depot_joined",
+      "columns": ["id", "crate_id"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
       "name": "v_distinct_over_union",
       "columns": ["id", "cur_code"],
       "sources": []
@@ -1498,6 +2084,12 @@
       "schema": "lab",
       "name": "v_distinct_src",
       "columns": ["id", "cur_code"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_entry",
+      "columns": ["id", "ledger_code"],
       "sources": []
     },
     {
@@ -1532,14 +2124,44 @@
     },
     {
       "schema": "lab",
+      "name": "v_invoice",
+      "columns": ["id", "merchant_id"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_ledger_by_code",
+      "columns": ["code"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_ledger_by_id",
+      "columns": ["id"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
       "name": "v_left_join",
       "columns": ["id", "bank_id", "cur_code"],
       "sources": []
     },
     {
       "schema": "lab",
+      "name": "v_merchant",
+      "columns": ["id", "title"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
       "name": "v_nested_outer_join",
       "columns": ["id", "title"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_node",
+      "columns": ["id", "parent_id"],
       "sources": []
     },
     {
@@ -1598,6 +2220,12 @@
     },
     {
       "schema": "lab",
+      "name": "v_parcel",
+      "columns": ["id", "carrier_id"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
       "name": "v_plain_over_barrier",
       "columns": ["id", "bank_id"],
       "sources": ["lab.v_barrier"]
@@ -1612,6 +2240,12 @@
       "schema": "lab",
       "name": "v_self_join",
       "columns": ["a_id", "b_cur_code"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_shift",
+      "columns": ["id", "seat", "ship_code"],
       "sources": []
     },
     {
@@ -2105,6 +2739,51 @@
     },
     {
       "schema": "lab",
+      "view": "v_carrier_bare",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["carrier.id"],
+        "Schema": "lab",
+        "Relation Name": "carrier",
+        "Alias": "carrier"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_carrier_titled",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["carrier.id", "carrier.title"],
+        "Schema": "lab",
+        "Relation Name": "carrier",
+        "Alias": "carrier"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_domain_to_base",
       "relkind": "v",
       "regime": "default",
@@ -2322,6 +3001,61 @@
         "Schema": "lab",
         "Relation Name": "tx",
         "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crate",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "depot_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["crate.id", "crate.depot_id"],
+        "Schema": "lab",
+        "Relation Name": "crate",
+        "Alias": "crate"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crew",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "berth",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "vessel",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "name",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["crew.seat", "crew.ship_code", "crew.name"],
+        "Schema": "lab",
+        "Relation Name": "crew",
+        "Alias": "crew"
       }
     },
     {
@@ -2564,6 +3298,54 @@
     },
     {
       "schema": "lab",
+      "view": "v_depot_joined",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "crate_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["d.id", "c.id"],
+        "Join Type": "Inner",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["c.id", "c.depot_id"],
+            "Schema": "lab",
+            "Relation Name": "crate",
+            "Alias": "c",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["d.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["d.id"],
+                "Schema": "lab",
+                "Relation Name": "depot",
+                "Alias": "d",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_distinct_over_union",
       "relkind": "v",
       "regime": "default",
@@ -2638,6 +3420,31 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_entry",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ledger_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["entry.id", "entry.ledger_code"],
+        "Schema": "lab",
+        "Relation Name": "entry",
+        "Alias": "entry"
       }
     },
     {
@@ -2842,6 +3649,71 @@
     },
     {
       "schema": "lab",
+      "view": "v_invoice",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "merchant_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["invoice.id", "invoice.merchant_id"],
+        "Schema": "lab",
+        "Relation Name": "invoice",
+        "Alias": "invoice"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_code",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["ledger.code"],
+        "Schema": "lab",
+        "Relation Name": "ledger",
+        "Alias": "ledger"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_id",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["ledger.id"],
+        "Schema": "lab",
+        "Relation Name": "ledger",
+        "Alias": "ledger"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_left_join",
       "relkind": "v",
       "regime": "default",
@@ -2891,6 +3763,31 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_merchant",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["merchant.id", "merchant.title"],
+        "Schema": "lab",
+        "Relation Name": "merchant",
+        "Alias": "merchant"
       }
     },
     {
@@ -2962,6 +3859,31 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_node",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "parent_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["node.id", "node.parent_id"],
+        "Schema": "lab",
+        "Relation Name": "node",
+        "Alias": "node"
       }
     },
     {
@@ -3253,6 +4175,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_parcel",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "carrier_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["parcel.id", "parcel.carrier_id"],
+        "Schema": "lab",
+        "Relation Name": "parcel",
+        "Alias": "parcel"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_plain_over_barrier",
       "relkind": "v",
       "regime": "default",
@@ -3378,6 +4325,36 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_shift",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "seat",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "ship_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["shift.id", "shift.seat", "shift.ship_code"],
+        "Schema": "lab",
+        "Relation Name": "shift",
+        "Alias": "shift"
       }
     },
     {
@@ -4232,6 +5209,51 @@
     },
     {
       "schema": "lab",
+      "view": "v_carrier_bare",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["carrier.id"],
+        "Schema": "lab",
+        "Relation Name": "carrier",
+        "Alias": "carrier"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_carrier_titled",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["carrier.id", "carrier.title"],
+        "Schema": "lab",
+        "Relation Name": "carrier",
+        "Alias": "carrier"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_domain_to_base",
       "relkind": "v",
       "regime": "serial",
@@ -4449,6 +5471,61 @@
         "Schema": "lab",
         "Relation Name": "tx",
         "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crate",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "depot_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["crate.id", "crate.depot_id"],
+        "Schema": "lab",
+        "Relation Name": "crate",
+        "Alias": "crate"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crew",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "berth",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "vessel",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "name",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["crew.seat", "crew.ship_code", "crew.name"],
+        "Schema": "lab",
+        "Relation Name": "crew",
+        "Alias": "crew"
       }
     },
     {
@@ -4691,6 +5768,54 @@
     },
     {
       "schema": "lab",
+      "view": "v_depot_joined",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "crate_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["d.id", "c.id"],
+        "Join Type": "Inner",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["c.id", "c.depot_id"],
+            "Schema": "lab",
+            "Relation Name": "crate",
+            "Alias": "c",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["d.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["d.id"],
+                "Schema": "lab",
+                "Relation Name": "depot",
+                "Alias": "d",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_distinct_over_union",
       "relkind": "v",
       "regime": "serial",
@@ -4765,6 +5890,31 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_entry",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ledger_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["entry.id", "entry.ledger_code"],
+        "Schema": "lab",
+        "Relation Name": "entry",
+        "Alias": "entry"
       }
     },
     {
@@ -4969,6 +6119,71 @@
     },
     {
       "schema": "lab",
+      "view": "v_invoice",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "merchant_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["invoice.id", "invoice.merchant_id"],
+        "Schema": "lab",
+        "Relation Name": "invoice",
+        "Alias": "invoice"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_code",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["ledger.code"],
+        "Schema": "lab",
+        "Relation Name": "ledger",
+        "Alias": "ledger"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_id",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["ledger.id"],
+        "Schema": "lab",
+        "Relation Name": "ledger",
+        "Alias": "ledger"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_left_join",
       "relkind": "v",
       "regime": "serial",
@@ -5018,6 +6233,31 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_merchant",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["merchant.id", "merchant.title"],
+        "Schema": "lab",
+        "Relation Name": "merchant",
+        "Alias": "merchant"
       }
     },
     {
@@ -5089,6 +6329,31 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_node",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "parent_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["node.id", "node.parent_id"],
+        "Schema": "lab",
+        "Relation Name": "node",
+        "Alias": "node"
       }
     },
     {
@@ -5380,6 +6645,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_parcel",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "carrier_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["parcel.id", "parcel.carrier_id"],
+        "Schema": "lab",
+        "Relation Name": "parcel",
+        "Alias": "parcel"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_plain_over_barrier",
       "relkind": "v",
       "regime": "serial",
@@ -5505,6 +6795,36 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_shift",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "seat",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "ship_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["shift.id", "shift.seat", "shift.ship_code"],
+        "Schema": "lab",
+        "Relation Name": "shift",
+        "Alias": "shift"
       }
     },
     {
@@ -6450,6 +7770,65 @@
     },
     {
       "schema": "lab",
+      "view": "v_carrier_bare",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["carrier.id"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["carrier.id"],
+            "Schema": "lab",
+            "Relation Name": "carrier",
+            "Alias": "carrier",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_carrier_titled",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["carrier.id", "carrier.title"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["carrier.id", "carrier.title"],
+            "Schema": "lab",
+            "Relation Name": "carrier",
+            "Alias": "carrier",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_domain_to_base",
       "relkind": "v",
       "regime": "parallel",
@@ -6713,6 +8092,75 @@
             "Schema": "lab",
             "Relation Name": "tx",
             "Alias": "tx",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crate",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "depot_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["crate.id", "crate.depot_id"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["crate.id", "crate.depot_id"],
+            "Schema": "lab",
+            "Relation Name": "crate",
+            "Alias": "crate",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crew",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "berth",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "vessel",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "name",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["crew.seat", "crew.ship_code", "crew.name"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["crew.seat", "crew.ship_code", "crew.name"],
+            "Schema": "lab",
+            "Relation Name": "crew",
+            "Alias": "crew",
             "Parent Relationship": "Outer"
           }
         ]
@@ -6993,6 +8441,61 @@
     },
     {
       "schema": "lab",
+      "view": "v_depot_joined",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "crate_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["d.id", "c.id"],
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["d.id", "c.id"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["c.id", "c.depot_id"],
+                "Schema": "lab",
+                "Relation Name": "crate",
+                "Alias": "c",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["d.id"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["d.id"],
+                    "Schema": "lab",
+                    "Relation Name": "depot",
+                    "Alias": "d",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_distinct_over_union",
       "relkind": "v",
       "regime": "parallel",
@@ -7086,6 +8589,38 @@
                 "Parent Relationship": "Outer"
               }
             ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_entry",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ledger_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["entry.id", "entry.ledger_code"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["entry.id", "entry.ledger_code"],
+            "Schema": "lab",
+            "Relation Name": "entry",
+            "Alias": "entry",
+            "Parent Relationship": "Outer"
           }
         ]
       }
@@ -7334,6 +8869,92 @@
     },
     {
       "schema": "lab",
+      "view": "v_invoice",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "merchant_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["invoice.id", "invoice.merchant_id"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["invoice.id", "invoice.merchant_id"],
+            "Schema": "lab",
+            "Relation Name": "invoice",
+            "Alias": "invoice",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_code",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["ledger.code"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["ledger.code"],
+            "Schema": "lab",
+            "Relation Name": "ledger",
+            "Alias": "ledger",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_id",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["ledger.id"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["ledger.id"],
+            "Schema": "lab",
+            "Relation Name": "ledger",
+            "Alias": "ledger",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_left_join",
       "relkind": "v",
       "regime": "parallel",
@@ -7388,6 +9009,38 @@
                 ]
               }
             ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_merchant",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["merchant.id", "merchant.title"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["merchant.id", "merchant.title"],
+            "Schema": "lab",
+            "Relation Name": "merchant",
+            "Alias": "merchant",
+            "Parent Relationship": "Outer"
           }
         ]
       }
@@ -7466,6 +9119,38 @@
                 ]
               }
             ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_node",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "parent_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["node.id", "node.parent_id"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["node.id", "node.parent_id"],
+            "Schema": "lab",
+            "Relation Name": "node",
+            "Alias": "node",
+            "Parent Relationship": "Outer"
           }
         ]
       }
@@ -7829,6 +9514,38 @@
     },
     {
       "schema": "lab",
+      "view": "v_parcel",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "carrier_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["parcel.id", "parcel.carrier_id"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["parcel.id", "parcel.carrier_id"],
+            "Schema": "lab",
+            "Relation Name": "parcel",
+            "Alias": "parcel",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_plain_over_barrier",
       "relkind": "v",
       "regime": "parallel",
@@ -7973,6 +9690,43 @@
                 ]
               }
             ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_shift",
+      "relkind": "v",
+      "regime": "parallel",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "seat",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "ship_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["shift.id", "shift.seat", "shift.ship_code"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["shift.id", "shift.seat", "shift.ship_code"],
+            "Schema": "lab",
+            "Relation Name": "shift",
+            "Alias": "shift",
+            "Parent Relationship": "Outer"
           }
         ]
       }
@@ -8906,6 +10660,51 @@
     },
     {
       "schema": "lab",
+      "view": "v_carrier_bare",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["carrier.id"],
+        "Schema": "lab",
+        "Relation Name": "carrier",
+        "Alias": "carrier"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_carrier_titled",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["carrier.id", "carrier.title"],
+        "Schema": "lab",
+        "Relation Name": "carrier",
+        "Alias": "carrier"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_domain_to_base",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -9123,6 +10922,61 @@
         "Schema": "lab",
         "Relation Name": "tx",
         "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crate",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "depot_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["crate.id", "crate.depot_id"],
+        "Schema": "lab",
+        "Relation Name": "crate",
+        "Alias": "crate"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crew",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "berth",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "vessel",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "name",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["crew.seat", "crew.ship_code", "crew.name"],
+        "Schema": "lab",
+        "Relation Name": "crew",
+        "Alias": "crew"
       }
     },
     {
@@ -9379,6 +11233,54 @@
     },
     {
       "schema": "lab",
+      "view": "v_depot_joined",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "crate_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["d.id", "c.id"],
+        "Join Type": "Inner",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["c.id", "c.depot_id"],
+            "Schema": "lab",
+            "Relation Name": "crate",
+            "Alias": "c",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["d.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["d.id"],
+                "Schema": "lab",
+                "Relation Name": "depot",
+                "Alias": "d",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_distinct_over_union",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -9467,6 +11369,31 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_entry",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ledger_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["entry.id", "entry.ledger_code"],
+        "Schema": "lab",
+        "Relation Name": "entry",
+        "Alias": "entry"
       }
     },
     {
@@ -9689,6 +11616,71 @@
     },
     {
       "schema": "lab",
+      "view": "v_invoice",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "merchant_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["invoice.id", "invoice.merchant_id"],
+        "Schema": "lab",
+        "Relation Name": "invoice",
+        "Alias": "invoice"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_code",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["ledger.code"],
+        "Schema": "lab",
+        "Relation Name": "ledger",
+        "Alias": "ledger"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_id",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["ledger.id"],
+        "Schema": "lab",
+        "Relation Name": "ledger",
+        "Alias": "ledger"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_left_join",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -9738,6 +11730,31 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_merchant",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["merchant.id", "merchant.title"],
+        "Schema": "lab",
+        "Relation Name": "merchant",
+        "Alias": "merchant"
       }
     },
     {
@@ -9809,6 +11826,31 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_node",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "parent_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["node.id", "node.parent_id"],
+        "Schema": "lab",
+        "Relation Name": "node",
+        "Alias": "node"
       }
     },
     {
@@ -10107,6 +12149,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_parcel",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "carrier_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["parcel.id", "parcel.carrier_id"],
+        "Schema": "lab",
+        "Relation Name": "parcel",
+        "Alias": "parcel"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_plain_over_barrier",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -10232,6 +12299,36 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_shift",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "seat",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "ship_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["shift.id", "shift.seat", "shift.ship_code"],
+        "Schema": "lab",
+        "Relation Name": "shift",
+        "Alias": "shift"
       }
     },
     {
@@ -11100,6 +13197,51 @@
     },
     {
       "schema": "lab",
+      "view": "v_carrier_bare",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["carrier.id"],
+        "Schema": "lab",
+        "Relation Name": "carrier",
+        "Alias": "carrier"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_carrier_titled",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["carrier.id", "carrier.title"],
+        "Schema": "lab",
+        "Relation Name": "carrier",
+        "Alias": "carrier"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_domain_to_base",
       "relkind": "v",
       "regime": "no-sort",
@@ -11317,6 +13459,61 @@
         "Schema": "lab",
         "Relation Name": "tx",
         "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crate",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "depot_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["crate.id", "crate.depot_id"],
+        "Schema": "lab",
+        "Relation Name": "crate",
+        "Alias": "crate"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crew",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "berth",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "vessel",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "name",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["crew.seat", "crew.ship_code", "crew.name"],
+        "Schema": "lab",
+        "Relation Name": "crew",
+        "Alias": "crew"
       }
     },
     {
@@ -11545,6 +13742,54 @@
     },
     {
       "schema": "lab",
+      "view": "v_depot_joined",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "crate_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["d.id", "c.id"],
+        "Join Type": "Inner",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["c.id", "c.depot_id"],
+            "Schema": "lab",
+            "Relation Name": "crate",
+            "Alias": "c",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["d.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["d.id"],
+                "Schema": "lab",
+                "Relation Name": "depot",
+                "Alias": "d",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_distinct_over_union",
       "relkind": "v",
       "regime": "no-sort",
@@ -11619,6 +13864,31 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_entry",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ledger_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["entry.id", "entry.ledger_code"],
+        "Schema": "lab",
+        "Relation Name": "entry",
+        "Alias": "entry"
       }
     },
     {
@@ -11823,6 +14093,71 @@
     },
     {
       "schema": "lab",
+      "view": "v_invoice",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "merchant_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["invoice.id", "invoice.merchant_id"],
+        "Schema": "lab",
+        "Relation Name": "invoice",
+        "Alias": "invoice"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_code",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["ledger.code"],
+        "Schema": "lab",
+        "Relation Name": "ledger",
+        "Alias": "ledger"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_id",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["ledger.id"],
+        "Schema": "lab",
+        "Relation Name": "ledger",
+        "Alias": "ledger"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_left_join",
       "relkind": "v",
       "regime": "no-sort",
@@ -11872,6 +14207,31 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_merchant",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["merchant.id", "merchant.title"],
+        "Schema": "lab",
+        "Relation Name": "merchant",
+        "Alias": "merchant"
       }
     },
     {
@@ -11943,6 +14303,31 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_node",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "parent_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["node.id", "node.parent_id"],
+        "Schema": "lab",
+        "Relation Name": "node",
+        "Alias": "node"
       }
     },
     {
@@ -12234,6 +14619,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_parcel",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "carrier_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["parcel.id", "parcel.carrier_id"],
+        "Schema": "lab",
+        "Relation Name": "parcel",
+        "Alias": "parcel"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_plain_over_barrier",
       "relkind": "v",
       "regime": "no-sort",
@@ -12359,6 +14769,36 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_shift",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "seat",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "ship_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["shift.id", "shift.seat", "shift.ship_code"],
+        "Schema": "lab",
+        "Relation Name": "shift",
+        "Alias": "shift"
       }
     },
     {
@@ -13213,6 +15653,57 @@
     },
     {
       "schema": "lab",
+      "view": "v_carrier_bare",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Bitmap Heap Scan",
+        "Output": ["carrier.id"],
+        "Schema": "lab",
+        "Relation Name": "carrier",
+        "Alias": "carrier",
+        "Plans": [
+          {
+            "Node Type": "Bitmap Index Scan",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_carrier_titled",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["carrier.id", "carrier.title"],
+        "Schema": "lab",
+        "Relation Name": "carrier",
+        "Alias": "carrier"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_domain_to_base",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -13429,6 +15920,61 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crate",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "depot_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["crate.id", "crate.depot_id"],
+        "Schema": "lab",
+        "Relation Name": "crate",
+        "Alias": "crate"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_crew",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "berth",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "vessel",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "name",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["crew.seat", "crew.ship_code", "crew.name"],
+        "Schema": "lab",
+        "Relation Name": "crew",
+        "Alias": "crew"
       }
     },
     {
@@ -13677,6 +16223,54 @@
     },
     {
       "schema": "lab",
+      "view": "v_depot_joined",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "crate_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["d.id", "c.id"],
+        "Join Type": "Inner",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["c.id", "c.depot_id"],
+            "Schema": "lab",
+            "Relation Name": "crate",
+            "Alias": "c",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["d.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["d.id"],
+                "Schema": "lab",
+                "Relation Name": "depot",
+                "Alias": "d",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_distinct_over_union",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -13751,6 +16345,31 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_entry",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ledger_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["entry.id", "entry.ledger_code"],
+        "Schema": "lab",
+        "Relation Name": "entry",
+        "Alias": "entry"
       }
     },
     {
@@ -13952,6 +16571,83 @@
     },
     {
       "schema": "lab",
+      "view": "v_invoice",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "merchant_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["invoice.id", "invoice.merchant_id"],
+        "Schema": "lab",
+        "Relation Name": "invoice",
+        "Alias": "invoice"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_code",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Bitmap Heap Scan",
+        "Output": ["ledger.code"],
+        "Schema": "lab",
+        "Relation Name": "ledger",
+        "Alias": "ledger",
+        "Plans": [
+          {
+            "Node Type": "Bitmap Index Scan",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_ledger_by_id",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Bitmap Heap Scan",
+        "Output": ["ledger.id"],
+        "Schema": "lab",
+        "Relation Name": "ledger",
+        "Alias": "ledger",
+        "Plans": [
+          {
+            "Node Type": "Bitmap Index Scan",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_left_join",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -14001,6 +16697,31 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_merchant",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "title",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["merchant.id", "merchant.title"],
+        "Schema": "lab",
+        "Relation Name": "merchant",
+        "Alias": "merchant"
       }
     },
     {
@@ -14072,6 +16793,31 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_node",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "parent_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["node.id", "node.parent_id"],
+        "Schema": "lab",
+        "Relation Name": "node",
+        "Alias": "node"
       }
     },
     {
@@ -14375,6 +17121,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_parcel",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "carrier_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["parcel.id", "parcel.carrier_id"],
+        "Schema": "lab",
+        "Relation Name": "parcel",
+        "Alias": "parcel"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_plain_over_barrier",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -14506,6 +17277,36 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_shift",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "seat",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "ship_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["shift.id", "shift.seat", "shift.ship_code"],
+        "Schema": "lab",
+        "Relation Name": "shift",
+        "Alias": "shift"
       }
     },
     {
