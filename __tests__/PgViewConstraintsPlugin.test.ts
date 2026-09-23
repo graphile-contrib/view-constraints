@@ -1,11 +1,10 @@
 // What the planner says about a view column, case by case.
 //
-// `view-constraints.fixture.json` is PostgreSQL 18's own answer — the plans, the
-// constraints, the unique indexes, the column types and the binary-coercible casts —
-// for the schema in `view-constraints.lab.sql`, read through the plugin's own catalog
-// queries. Nothing here is written by hand except the expectations. To rebuild it,
-// create a database, apply that file, and run the collector's `readCatalogRelations`,
-// `readTypeCoercions` and `explainStatement` against it (see the file's header).
+// `PgViewConstraintsPlugin.fixture.json` is PostgreSQL 18's own answer — the plans,
+// the constraints, the unique indexes, the column types and the binary-coercible
+// casts — for the schema in `PgViewConstraintsPlugin.lab.sql`, read through the
+// plugin's own catalog queries. Nothing here is written by hand except the
+// expectations. `yarn fixture` rebuilds it (`build-fixture.ts`).
 //
 // The negative cases carry the weight. A relation this plugin fails to derive costs
 // a smart tag someone writes by hand; a relation it derives wrongly is a join that
@@ -38,7 +37,8 @@ import type {
 import {
   collectViewConstraints,
   NO_PRIVILEGED_CONNECTION_REASON,
-  subqueryViewCandidates
+  subqueryViewCandidates,
+  planCatalogFrom
 } from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { ViewSourceRow } from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { RunQuery } from '../src/PgViewConstraintsPlugin/collect.ts'
@@ -48,6 +48,7 @@ import {
   parseReference,
   readPlanOrigins
 } from '../src/PgViewConstraintsPlugin/plan-origins.ts'
+import { conditionEqualities } from '../src/PgViewConstraintsPlugin/plan-keys.ts'
 import type {
   ColumnRefusal,
   ExplainPlanNode,
@@ -61,13 +62,15 @@ interface Fixture {
     columns: Record<string, { typeId: number; typeMod: number; notNull: boolean }>
   })[]
   coercions: { binary: string[]; domainBase: Record<string, number> }
+  /** Every `=` operator of the lab database is strict. */
+  strictEquality: boolean
   /** Every lab view's select-list order and the views it is built on. */
   viewSources: ViewSourceRow[]
   views: {
     schema: string
     view: string
     relkind: 'v' | 'm'
-    /** The planner regime the plan was taken under; see scripts/view-constraints-fixture.ts. */
+    /** The planner regime the plan was taken under; see build-fixture.ts. */
     regime: string
     columns: ViewColumn[]
     plan: ExplainPlanNode
@@ -85,6 +88,8 @@ const catalog = new Map<string, CatalogRelation>(
   ])
 )
 
+const planCatalog = planCatalogFrom(catalog, fixture.strictEquality)
+
 const coercions: TypeCoercions = {
   binary: new Set(fixture.coercions.binary),
   domainBase: new Map(
@@ -98,7 +103,7 @@ function read(
   columnCount: number,
   candidates?: ReadonlyMap<string, ViewShape>
 ): PlanOrigins {
-  const origins = readPlanOrigins(plan, columnCount, candidates)
+  const origins = readPlanOrigins(plan, columnCount, candidates ?? new Map(), planCatalog)
   assert.ok(typeof origins !== 'string', `plan refused: ${String(origins)}`)
   return origins
 }
@@ -133,7 +138,8 @@ function derive(
     readPlanOrigins(
       view.plan,
       view.columns.length,
-      subqueryViewCandidates(fixture.viewSources, view.schema, view.view)
+      subqueryViewCandidates(fixture.viewSources, view.schema, view.view),
+      planCatalog
     ),
     catalog,
     coercions
@@ -189,8 +195,9 @@ const CASES: Case[] = [
       '(cur_code) references lab.currency (code)',
       '(id) references lab.tx (id)'
     ],
-    // Two relations, so no row identity.
-    primaryKey: null
+    // `bank` is joined by its own key, so no row of `tx` meets two of it, and `tx`'s
+    // key is the view's.
+    primaryKey: 'id'
   },
   {
     view: 'v_group',
@@ -198,7 +205,9 @@ const CASES: Case[] = [
     origins: ['cur_code=tx.cur_code', 'n=—'],
     notNull: ['cur_code'],
     foreignKeys: ['(cur_code) references lab.currency (code)'],
-    primaryKey: null
+    // The group key is a key, and a key the plan makes of its own names no row of
+    // `tx`: no relation is led to it.
+    primaryKey: 'cur_code'
   },
   {
     view: 'v_window',
@@ -313,7 +322,9 @@ const CASES: Case[] = [
     origins: ['id=tx.id', 'cur_code=—'],
     notNull: ['id'],
     foreignKeys: ['(id) references lab.tx (id)'],
-    primaryKey: null
+    // What COALESCE computes is no column; the join under it is still by `wallet`'s
+    // key, so `tx`'s key is the view's.
+    primaryKey: 'id'
   },
   {
     view: 'v_constant',
@@ -377,7 +388,7 @@ const CASES: Case[] = [
     origins: ['id=tx.id', 'title=bank.title'],
     notNull: ['id', 'title'],
     foreignKeys: ['(id) references lab.tx (id)'],
-    primaryKey: null
+    primaryKey: 'id'
   },
   {
     view: 'v_right_join',
@@ -404,7 +415,9 @@ const CASES: Case[] = [
     origins: ['id=refund.id', 'title=bank.title'],
     notNull: ['id'],
     foreignKeys: ['(id) references lab.refund (id)'],
-    primaryKey: null
+    // The nulled side meets `refund` by `bank`'s key, whatever the plan calls the
+    // join, so no `refund` row is repeated.
+    primaryKey: 'id'
   },
   {
     view: 'v_union_null_over_not_null',
@@ -427,10 +440,10 @@ const CASES: Case[] = [
   {
     view: 'v_not_null_predicate',
     about:
-      'WHERE bank_id IS NOT NULL leaves no NULL in the column and is not read: the ' +
-      'rule is about the shape of the plan, never about an expression in it',
+      'WHERE bank_id IS NOT NULL leaves no NULL in the column, and the qualifier the ' +
+      'plan applies to every row says so',
     origins: ['id=tx.id', 'bank_id=tx.bank_id'],
-    notNull: ['id'],
+    notNull: ['id', 'bank_id'],
     foreignKeys: ['(bank_id) references lab.bank (id)', '(id) references lab.tx (id)'],
     primaryKey: 'id'
   },
@@ -769,11 +782,11 @@ const CASES: Case[] = [
     view: 'v_depot_joined',
     about:
       'a view that carries `depot`\u2019s key and is not keyed by it: the join repeats ' +
-      'every depot row once per crate, so the plan proves no row identity',
+      'every depot row once per crate, and the key the plan proves is the crate\u2019s',
     origins: ['id=depot.id', 'crate_id=crate.id'],
     notNull: ['id', 'crate_id'],
     foreignKeys: ['(crate_id) references lab.crate (id)', '(id) references lab.depot (id)'],
-    primaryKey: null
+    primaryKey: 'crate_id'
   },
   {
     view: 'v_crate',
@@ -815,6 +828,423 @@ const CASES: Case[] = [
       '(seat,ship_code) references lab.crew (seat,ship_code)'
     ],
     primaryKey: 'id'
+  },
+
+  // ── Non-nullness from the plan's own qualifiers ─────────────────────────────
+  {
+    view: 'v_joined_on_nullable',
+    about:
+      'a join on the column rejects a NULL in it, at the join or pushed into the ' +
+      'inner scan of a nested loop',
+    origins: ['id=tx.id', 'bank_id=tx.bank_id'],
+    notNull: ['id', 'bank_id'],
+    foreignKeys: ['(bank_id) references lab.bank (id)', '(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_filtered_to_literal',
+    about: 'so does a filter to a literal',
+    origins: ['id=slot.id', 'tag=slot.tag'],
+    notNull: ['id', 'tag'],
+    foreignKeys: ['(id) references lab.slot (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_semi_on_nullable',
+    about: 'a semi join emits only rows that found a match',
+    origins: ['id=tx.id', 'bank_id=tx.bank_id'],
+    notNull: ['id', 'bank_id'],
+    foreignKeys: ['(bank_id) references lab.bank (id)', '(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_partial_index_predicate',
+    about:
+      'a partial index on the predicate drops it from the scan; the predicate of ' +
+      'the index the plan names is read instead',
+    origins: ['id=ticket.id', 'code=ticket.code'],
+    notNull: ['id', 'code'],
+    foreignKeys: ['(id) references lab.ticket (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_union_both_filtered',
+    about: 'every branch of the union rejects the NULL',
+    origins: ['id=tx.id', 'bank_id=tx.bank_id'],
+    notNull: ['id', 'bank_id'],
+    foreignKeys: ['(bank_id) references lab.bank (id)', '(id) references lab.tx (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_left_join_condition',
+    about: 'an outer join keeps the rows its condition does not match',
+    origins: ['id=tx.id', 'bank_id=tx.bank_id', 'title=bank.title'],
+    notNull: ['id'],
+    foreignKeys: ['(bank_id) references lab.bank (id)', '(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_anti_on_nullable',
+    about: 'an anti join keeps only those',
+    origins: ['id=tx.id', 'bank_id=tx.bank_id'],
+    notNull: ['id'],
+    foreignKeys: ['(bank_id) references lab.bank (id)', '(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_disjunction_not_null',
+    about: 'an arm of a disjunction holds of some rows, not of every row',
+    origins: ['id=tx.id', 'bank_id=tx.bank_id'],
+    notNull: ['id'],
+    foreignKeys: ['(bank_id) references lab.bank (id)', '(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_subplan_condition',
+    about:
+      'a subplan\u2019s condition holds of the subplan\u2019s rows — and a `Gather` ' +
+      'that computes the subplan itself is read where it prints the select list',
+    origins: ['id=tx.id', 'bank_id=tx.bank_id', 'known=—'],
+    notNull: ['id'],
+    foreignKeys: ['(bank_id) references lab.bank (id)', '(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_union_one_filtered',
+    about: 'one branch rejects the NULL and the other does not',
+    origins: ['id=tx.id', 'bank_id=tx.bank_id'],
+    notNull: ['id'],
+    foreignKeys: ['(bank_id) references lab.bank (id)', '(id) references lab.tx (id)'],
+    primaryKey: null
+  },
+
+  // ── Row identity: what keeps a key, what makes one, and what loses it ──────────
+  {
+    view: 'v_sale_store',
+    about: 'a join by the other side’s own key multiplies no row of this one',
+    origins: ['id=sale.id', 'store_code=store.code'],
+    notNull: ['id', 'store_code'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_sale_region',
+    about: 'and a chain of such joins, through a relation the view does not show',
+    origins: ['id=sale.id', 'title=region.title'],
+    notNull: ['id', 'title'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_sale_right_store',
+    about: 'the kept side is the preserved one, whichever side the view writes it on',
+    origins: ['id=sale.id', 'code=store.code'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_sale_slot',
+    about:
+      'a nullable unique index keys the other side of a join: the equality admits no ' +
+      'NULL, so a row still meets at most one',
+    origins: ['id=sale.id', 'slot_id=slot.id'],
+    notNull: ['id', 'slot_id'],
+    foreignKeys: ['(id) references lab.sale (id)', '(slot_id) references lab.slot (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_mooring_berth',
+    about: 'a composite key of the other side, every column of it equated',
+    origins: ['id=mooring.id', 'title=berth.title'],
+    notNull: ['id', 'title'],
+    foreignKeys: ['(id) references lab.mooring (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_mooring_first_slot',
+    about: 'a column of that key equated to a literal is equated all the same',
+    origins: ['id=mooring.id', 'title=berth.title'],
+    notNull: ['id', 'title'],
+    foreignKeys: ['(id) references lab.mooring (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_sale_in_live_region',
+    about:
+      'a semi join emits each row once — and reads the same where the planner turns ' +
+      'it into an inner join over a de-duplicated input',
+    origins: ['id=sale.id'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_sale_outside_regions',
+    about: 'an anti join emits each row at most once',
+    origins: ['id=sale.id'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_sale_pairs',
+    about:
+      'two sides neither of which is unique given the other: the pair of their keys ' +
+      'is a key, and it names no one row of either',
+    origins: ['id=sale.id', 'other_id=sale.id'],
+    notNull: ['id', 'other_id'],
+    foreignKeys: ['(id) references lab.sale (id)', '(other_id) references lab.sale (id)'],
+    primaryKey: 'id,other_id'
+  },
+  {
+    view: 'v_barrier_sale',
+    about: 'a barrier view over a many-to-one join',
+    origins: ['id=sale.id', 'amount=sale.amount', 'code=store.code'],
+    notNull: ['id', 'amount', 'code'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_over_barrier_sale',
+    about: 'and a view narrowing it: the key crosses the boundary the way the value does',
+    origins: ['id=sale.id', 'code=store.code'],
+    notNull: ['id', 'code'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_sale_distinct_region',
+    about:
+      'a de-duplicated subquery joined on every column it has: the shape the planner ' +
+      'builds itself to turn a semi join into an inner one',
+    origins: ['id=sale.id'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_sale_store_totals',
+    about:
+      'a grouped subquery with an aggregate beside its key: whether a `Subquery Scan` ' +
+      'hides its columns is the join method’s choice, so it pins nothing',
+    origins: ['id=sale.id', 'n=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_sale_in_shifted_store',
+    about:
+      'a semi join over an expression: its de-duplicated input groups by `st.id + 1`, ' +
+      'emits `st.id`, and is pinned where the join equates that expression',
+    origins: ['id=sale.id'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_sale_lateral_grouping',
+    about:
+      'a lateral grouping tied to another relation: its filter holds of the rows it ' +
+      'collapsed, so it determines nothing, and the key takes both relations',
+    origins: ['id=sale.id', 'store_id=store.id'],
+    notNull: ['id', 'store_id'],
+    foreignKeys: ['(id) references lab.sale (id)', '(store_id) references lab.store (id)'],
+    primaryKey: 'id,store_id'
+  },
+  {
+    view: 'v_first_stores',
+    about: 'a LIMIT keeps the key of what it limits',
+    origins: ['id=store.id', 'code=store.code'],
+    notNull: ['id', 'code'],
+    foreignKeys: ['(id) references lab.store (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_sale_first_store',
+    about:
+      'but under a join a view that ends in a LIMIT is the top of a subquery, whose ' +
+      'boundary the planner keeps or removes by join method',
+    origins: ['id=sale.id', 'code=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_deferred_code',
+    about: 'a deferrable unique constraint admits duplicates until commit: no key',
+    origins: ['code=deferred_code.code'],
+    notNull: ['code'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_mooring_dock',
+    about: 'a join on part of the other side’s key multiplies',
+    origins: ['id=mooring.id', 'title=berth.title'],
+    notNull: ['id', 'title'],
+    foreignKeys: ['(id) references lab.mooring (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_sale_repeated',
+    about: 'a one-to-many join repeats this side, and the key of the other is not shown',
+    origins: ['id=sale.id'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_sale_cast_join',
+    about: 'a cast in the join condition equates the value to something else',
+    origins: ['id=sale.id'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_sale_or_join',
+    about:
+      'a disjunction equates nothing about any one row — not even where the planner ' +
+      'splits it into the arms of a `BitmapOr`',
+    origins: ['id=sale.id'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_group_store',
+    about: 'a group key of column references is a key',
+    origins: ['store_id=sale.store_id', 'code=store.code', 'amount=—'],
+    notNull: ['store_id', 'code'],
+    foreignKeys: ['(store_id) references lab.store (id)'],
+    primaryKey: 'store_id,code'
+  },
+  {
+    view: 'v_distinct_code',
+    about: 'so is what DISTINCT de-duplicates, planned as a `Unique` or as an `Aggregate`',
+    origins: ['cur_code=tx.cur_code'],
+    notNull: ['cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'cur_code'
+  },
+  {
+    view: 'v_group_nullable',
+    about: 'a group key over a column that can be NULL is no row identity',
+    origins: ['cur_code=tx.cur_code', 'bank_id=tx.bank_id', 'n=—'],
+    notNull: ['cur_code'],
+    foreignKeys: [
+      '(bank_id) references lab.bank (id)',
+      '(cur_code) references lab.currency (code)'
+    ],
+    primaryKey: null
+  },
+  {
+    view: 'v_distinct_nullable',
+    about: 'nor is a de-duplication over one',
+    origins: ['bank_id=tx.bank_id'],
+    notNull: [],
+    foreignKeys: ['(bank_id) references lab.bank (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_group_expression',
+    about: 'a group key over an expression is a key of nothing the view can name',
+    origins: ['loud=—', 'n=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_union_discriminated',
+    about:
+      'a union whose branches each write their own text literal into one column: that ' +
+      'column with a key of every branch is a key',
+    origins: ['source=—', 'id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'source,id'
+  },
+  {
+    view: 'v_union_discriminated_joined',
+    about: 'a branch keyed through a many-to-one join is keyed all the same',
+    origins: ['source=—', 'id=sale.id|tx.id', 'code=store.code|tx.cur_code'],
+    notNull: ['id', 'code'],
+    foreignKeys: [],
+    primaryKey: 'source,id'
+  },
+  {
+    view: 'v_barrier_discriminated',
+    about: 'the discriminated union inside a barrier view',
+    origins: ['source=—', 'id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code', 'amount=—'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'source,id'
+  },
+  {
+    view: 'v_over_barrier_discriminated',
+    about: 'and across its boundary, branch by branch',
+    origins: ['source=—', 'id=tx.id|wallet.id'],
+    notNull: ['id'],
+    foreignKeys: [],
+    primaryKey: 'source,id'
+  },
+  {
+    view: 'v_barrier_discriminated_ordered',
+    about: 'a discriminated union in a barrier view whose ORDER BY keeps its boundary',
+    origins: ['source=—', 'id=tx.id|wallet.id'],
+    notNull: ['id'],
+    foreignKeys: [],
+    primaryKey: 'source,id'
+  },
+  {
+    view: 'v_over_barrier_discriminated_cast',
+    about: 'a cast over the discriminator across that boundary can make two literals one',
+    origins: ['source=—', 'id=tx.id|wallet.id'],
+    notNull: ['id'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_union_varchar_lengths',
+    about: 'one text in two lengths is one value, not two discriminators',
+    origins: ['source=—', 'id=tx.id|wallet.id'],
+    notNull: ['id'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_union_same_literal',
+    about: 'one literal in two branches tells them apart no more than none',
+    origins: ['source=—', 'id=tx.id|wallet.id'],
+    notNull: ['id'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_union_numeric_literal',
+    about: 'a numeric literal is no discriminator: two spellings can be one number',
+    origins: ['source=—', 'id=tx.id|wallet.id'],
+    notNull: ['id'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_union_null_discriminator',
+    about: 'a NULL is no literal of a branch of its own',
+    origins: ['source=—', 'id=tx.id|wallet.id'],
+    notNull: ['id'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_union_discriminated_unkeyed',
+    about: 'the branches are told apart, and the rows of one branch are not',
+    origins: ['source=—', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: null
   }
 ]
 
@@ -921,6 +1351,104 @@ test('an unqualified name is a column only where the plan reads exactly one rela
     'unqualified-name-without-a-sole-relation',
     'unqualified-name-without-a-sole-relation'
   ])
+})
+
+test('a condition equates a column to a column or a literal, conjunct by conjunct', () => {
+  const context = { reference: parseReference, soleAlias: null }
+  const COLUMN = (alias: string, column: string): string => `${alias}\u0001${column}`
+  assert.deepEqual(
+    conditionEqualities("((s.store_id = st.id) AND (st.code = 'a = b AND c'::text))", context),
+    [
+      [COLUMN('s', 'store_id'), COLUMN('st', 'id')],
+      [COLUMN('st', 'code'), '\u0002constant']
+    ]
+  )
+  // Anything but a bare column or a literal is kept as an expression operand, by its
+  // text, which pins nothing but a de-duplicated input's own column of that text.
+  const EXPRESSION = (text: string): string => `\u0003${text}`
+  assert.deepEqual(conditionEqualities('((st.id)::text = s.region_code)', context), [
+    [EXPRESSION('(st.id)::text'), COLUMN('s', 'region_code')]
+  ])
+  assert.deepEqual(conditionEqualities('(st.id = (s.store_id + 1))', context), [
+    [COLUMN('st', 'id'), EXPRESSION('s.store_id + 1')]
+  ])
+  for (const condition of ['((st.id = s.store_id) OR (st.id = 0))', '(st.id > s.store_id)']) {
+    assert.deepEqual(conditionEqualities(condition, context), [], condition)
+  }
+})
+
+test('below a Gather, a de-duplication is unique only among one worker\u2019s rows', () => {
+  // A worker sees a share of the input, so a `Unique` it runs de-duplicates that
+  // share. Only the `Unique` above the `Gather` makes the whole unique; the keys of
+  // the scan under it are keys of the whole, because each row reaches one worker.
+  const scan: ExplainPlanNode = {
+    'Node Type': 'Seq Scan',
+    Schema: 'lab',
+    'Relation Name': 'tx',
+    Alias: 'tx',
+    Output: ['tx.cur_code']
+  }
+  const perWorker: ExplainPlanNode = {
+    'Node Type': 'Gather Merge',
+    Output: ['tx.cur_code'],
+    Plans: [{ 'Node Type': 'Unique', Output: ['tx.cur_code'], Plans: [scan] }]
+  }
+  assert.deepEqual(read(perWorker, 1).rowIdentities, [])
+  const whole: ExplainPlanNode = {
+    'Node Type': 'Unique',
+    Output: ['tx.cur_code'],
+    Plans: [perWorker]
+  }
+  assert.deepEqual(
+    read(whole, 1).rowIdentities.map((key) => key.columns),
+    [[0]]
+  )
+})
+
+test('a right semi or anti join emits its inner side, which it neither nulls nor repeats', () => {
+  // The planner states `WHERE x IN (…)` as a `Right Semi` join whenever it hashes the
+  // outer side instead; the side it emits is then the inner one, and reading it as
+  // nulled would make the answer move with that choice.
+  for (const joinType of ['Right Semi', 'Right Anti']) {
+    const plan: ExplainPlanNode = {
+      'Node Type': 'Hash Join',
+      'Join Type': joinType,
+      'Hash Cond': '(wallet.cur_code = tx.cur_code)',
+      Output: ['tx.id'],
+      Plans: [
+        {
+          'Node Type': 'Seq Scan',
+          'Parent Relationship': 'Outer',
+          Schema: 'lab',
+          'Relation Name': 'wallet',
+          Alias: 'wallet',
+          Output: ['wallet.cur_code']
+        },
+        {
+          'Node Type': 'Hash',
+          'Parent Relationship': 'Inner',
+          Output: ['tx.id', 'tx.cur_code'],
+          Plans: [
+            {
+              'Node Type': 'Seq Scan',
+              'Parent Relationship': 'Outer',
+              Schema: 'lab',
+              'Relation Name': 'tx',
+              Alias: 'tx',
+              Output: ['tx.id', 'tx.cur_code']
+            }
+          ]
+        }
+      ]
+    }
+    const origins = read(plan, 1)
+    assert.deepEqual(origins.nullIntroduced, [false], joinType)
+    assert.deepEqual(
+      origins.rowIdentities.map((key) => key.columns),
+      [[0]],
+      joinType
+    )
+  }
 })
 
 test('a binary-coercible cast keeps the value; a function cast and a modifier do not', () => {
@@ -1176,9 +1704,9 @@ test('an Output that does not line up with the view’s columns is refused whole
     Alias: 'tx',
     Output: ['tx.id']
   }
-  assert.equal(readPlanOrigins(short, 2), 'output-not-positional')
+  assert.equal(readPlanOrigins(short, 2, new Map(), planCatalog), 'output-not-positional')
   assert.equal(
-    readPlanOrigins({ 'Node Type': 'Hash Join', 'Join Type': 'Inner' }, 2),
+    readPlanOrigins({ 'Node Type': 'Hash Join', 'Join Type': 'Inner' }, 2, new Map(), planCatalog),
     'output-not-positional'
   )
 })
@@ -1243,7 +1771,8 @@ function labDerivations(regime: string = DEFAULT_REGIME): ViewDerivation[] {
         readPlanOrigins(
           view.plan,
           view.columns.length,
-          subqueryViewCandidates(fixture.viewSources, view.schema, view.view)
+          subqueryViewCandidates(fixture.viewSources, view.schema, view.view),
+          planCatalog
         ),
         catalog,
         coercions
@@ -1431,16 +1960,25 @@ test('more than one projection of a key is declined by name, not guessed between
 
 test('a view that carries a key without being keyed by it is no candidate', () => {
   const surface = labSurface()
-  // `v_depot_joined` proxies `depot.id` and repeats it once per crate, so the plan
-  // proves no row identity and the key is not a key of the view. Nothing is led to
-  // it, and `v_crate` says nothing either: no projection of `depot(id)` is not a
+  // `v_depot_joined` proxies `depot.id` and repeats it once per crate, so `depot`'s
+  // key is not a key of the view. Nothing is led to it by `depot(id)`, and `v_crate`
+  // says nothing about that key either: no projection of `depot(id)` is not a
   // refusal, it is the ordinary state of a surface that publishes none.
-  assert.equal(surface.get('v_depot_joined')?.primaryKey, null)
+  assert.equal(surface.get('v_depot_joined')?.primaryKey?.tag, 'crate_id')
   assert.deepEqual(relationsOf(surface, 'v_crate'), [
     '(depot_id) references lab.depot (id)',
     '(id) references lab.crate (id)'
   ])
-  assert.deepEqual(declinedBy(surface, 'v_crate'), [])
+  // The key it is keyed by is `crate`'s: every crate meets one depot, so every crate
+  // row appears once. That makes it a second projection of `crate(id)` beside
+  // `v_crate`, and a relation to that key is declined between the two.
+  assert.deepEqual(declinedBy(surface, 'v_crate'), [
+    {
+      key: 'lab.crate(id)',
+      refusal: 'more-than-one-projection-carries-the-key',
+      candidates: ['lab.v_crate', 'lab.v_depot_joined']
+    }
+  ])
 })
 
 test('leading a relation to a projection does not move with the plan', () => {

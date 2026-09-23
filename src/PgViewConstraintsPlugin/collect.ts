@@ -16,6 +16,7 @@ import type {
 } from './derive.ts'
 import { readPlanOrigins } from './plan-origins.ts'
 import type { ExplainPlanNode, ViewShape } from './plan-origins.ts'
+import type { PlanCatalog } from './plan-origins.ts'
 
 /** The one thing this module needs of a connection: run SQL, get rows. */
 export type RunQuery = <Row>(text: string, values?: unknown[]) => Promise<readonly Row[]>
@@ -135,7 +136,9 @@ const FOREIGN_KEY_QUERY = `
 // carries its `INCLUDE` columns inside `conkey` as if they were part of the key, a
 // foreign key may reference a unique index that has no constraint at all, and only
 // `indnkeyatts` says where the key actually ends. A partial or expression index is
-// not a key of the relation and is left out.
+// not a key of the relation and is left out, and so is a deferrable one: until the
+// transaction commits, its duplicates are visible (`indimmediate`), which is why
+// PostgreSQL's own proofs of uniqueness leave it out too.
 const UNIQUE_KEY_QUERY = `
   SELECT namespace.nspname AS schema,
          class.relname     AS relation,
@@ -153,9 +156,36 @@ const UNIQUE_KEY_QUERY = `
   WHERE index.indisunique
     AND index.indisvalid
     AND index.indislive
+    AND index.indimmediate
     AND index.indpred IS NULL
     AND index.indexprs IS NULL
     AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')`
+
+// The predicates of partial indexes. A scan through one drops from its `Filter`
+// whatever the predicate implies, so the predicate is the qualifier the plan did not
+// print (`plan-qualifiers.ts`). Printed by `pg_get_expr` against the indexed relation,
+// which names its columns unqualified.
+const PARTIAL_INDEX_QUERY = `
+  SELECT namespace.nspname AS schema,
+         class.relname     AS relation,
+         index_class.relname AS index_name,
+         pg_get_expr(index.indpred, index.indrelid) AS predicate
+  FROM pg_index index
+           JOIN pg_class class ON class.oid = index.indrelid
+           JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
+           JOIN pg_class index_class ON index_class.oid = index.indexrelid
+  WHERE index.indpred IS NOT NULL
+    AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')`
+
+// An equality rejects a NULL only through a strict operator. Every `=` PostgreSQL
+// ships is one; a single non-strict `=` anywhere is enough to stop reading equality as
+// a qualifier at all, since the plan prints the operator's name and not its oid.
+const STRICT_EQUALITY_QUERY = `
+  SELECT NOT EXISTS (SELECT
+                     FROM pg_operator operator
+                              JOIN pg_proc procedure ON procedure.oid = operator.oprcode
+                     WHERE operator.oprname = '='
+                       AND NOT procedure.proisstrict) AS strict`
 
 // Column types, for the one question the plan cannot answer: whether a cast over a
 // column reference leaves the value alone.
@@ -247,7 +277,14 @@ export async function readCatalogRelations(query: RunQuery): Promise<Map<string,
     const key = `${schema}.${relation}`
     let found = catalog.get(key)
     if (!found) {
-      found = { schema, relation, foreignKeys: [], uniqueKeys: [], columns: new Map() }
+      found = {
+        schema,
+        relation,
+        foreignKeys: [],
+        uniqueKeys: [],
+        partialIndexes: [],
+        columns: new Map()
+      }
       catalog.set(key, found)
     }
     return found
@@ -277,13 +314,46 @@ export async function readCatalogRelations(query: RunQuery): Promise<Map<string,
       columns: row.columns
     })
   }
+  for (const row of await query<{
+    schema: string
+    relation: string
+    index_name: string
+    predicate: string
+  }>(PARTIAL_INDEX_QUERY)) {
+    relationOf(row.schema, row.relation).partialIndexes.push({
+      name: row.index_name,
+      predicate: row.predicate
+    })
+  }
   for (const relation of catalog.values()) {
+    relation.partialIndexes.sort((left, right) => left.name.localeCompare(right.name))
     relation.foreignKeys.sort((left, right) =>
       left.constraintName.localeCompare(right.constraintName)
     )
     relation.uniqueKeys.sort((left, right) => left.name.localeCompare(right.name))
   }
   return catalog
+}
+
+/** Whether every `=` operator in the database is strict. */
+export async function readStrictEquality(query: RunQuery): Promise<boolean> {
+  const [row] = await query<{ strict: boolean }>(STRICT_EQUALITY_QUERY)
+  return row?.strict === true
+}
+
+/** What a plan reader asks of the catalog, out of what `readCatalogRelations` read. */
+export function planCatalogFrom(
+  catalog: ReadonlyMap<string, CatalogRelation>,
+  strictEquality: boolean
+): PlanCatalog {
+  return {
+    uniqueKeysOf: (schema, relation) => catalog.get(`${schema}.${relation}`)?.uniqueKeys ?? [],
+    partialIndexPredicate: (schema, relation, index) =>
+      catalog
+        .get(`${schema}.${relation}`)
+        ?.partialIndexes.find((candidate) => candidate.name === index)?.predicate ?? null,
+    strictEquality
+  }
 }
 
 /** One view of the database, with its select-list order and the views it is built on. */
@@ -411,6 +481,7 @@ export async function collectViewConstraints(
   declaredRowIdentity?: DeclaredRowIdentity
 ): Promise<CollectResult> {
   const catalog = await readCatalogRelations(query)
+  const planCatalog = planCatalogFrom(catalog, await readStrictEquality(query))
   const coercions = await readTypeCoercions(query)
   const viewSources = await readViewSources(query)
   const views = await readViews(query, schemas)
@@ -460,7 +531,8 @@ export async function collectViewConstraints(
         readPlanOrigins(
           plan,
           columns.length,
-          subqueryViewCandidates(viewSources, view.schema, view.view)
+          subqueryViewCandidates(viewSources, view.schema, view.view),
+          planCatalog
         ),
         catalog,
         coercions

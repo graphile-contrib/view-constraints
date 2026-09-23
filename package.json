@@ -13,7 +13,8 @@
     "prepack": "rm -Rf dist && yarn build",
     "lint:fix": "prettier --ignore-path .gitignore --write '**/*.{js,jsx,ts,tsx,graphql,md,json}'",
     "prettier:check": "prettier --ignore-path .gitignore --check '**/*.{js,jsx,ts,tsx,graphql,md,json}'",
-    "test": "node --experimental-strip-types --test __tests__/PgViewConstraintsPlugin.test.ts"
+    "test": "node --experimental-strip-types --test __tests__/PgViewConstraintsPlugin.test.ts",
+    "fixture": "node --experimental-strip-types __tests__/build-fixture.ts"
   },
   "repository": {
     "type": "git",
@@ -27,6 +28,8 @@
     "@tsconfig/node-ts": "^23.6.4",
     "@tsconfig/node22": "^22.0.6",
     "@types/node": "^22.10.2",
+    "@types/pg": "^8.23.1",
+    "pg": "^8.16.3",
     "postgraphile": "^5.1.4",
     "prettier": "^3.9.6",
     "typescript": "^5.5.4"
