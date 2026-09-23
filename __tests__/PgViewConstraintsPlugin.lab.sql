@@ -1,10 +1,10 @@
--- The schema behind test/unit/view-constraints.fixture.json.
+-- The schema behind fixture.json.
 --
 -- One relation per case the reader of a plan has to get right, positive and
 -- negative alike. The fixture is PostgreSQL's answer for this schema, not a
 -- transcription of it: apply this file to an empty database and read the plans back
 -- through the plugin's own catalog queries (readCatalogRelations, readTypeCoercions,
--- explainStatement), keeping the plan fields plan-origins.ts reads.
+-- explainStatement), keeping the plan fields plan-origins.ts and plan-keys.ts read.
 
 create schema lab;
 set search_path = lab;
@@ -293,3 +293,222 @@ create table shift (
 );
 create view v_crew as select seat as berth, ship_code as vessel, name from crew;
 create view v_shift as select id, seat, ship_code from shift;
+
+-- ── Row identity ───────────────────────────────────────────────────────────────
+--
+-- A key is carried up the plan the way a value is, and every node answers which of
+-- its output column sets are unique from what its inputs answered. These tables are
+-- the lab's own so that the projections keyed here are rows of no key the relation
+-- cases above point at.
+
+create table region (code text primary key, title text not null);
+create table store (
+  id bigint primary key,
+  code text not null,
+  region_code text not null references region(code)
+);
+create unique index store_code_key on store (code);
+create table sale (
+  id bigint primary key,
+  store_id bigint not null references store(id),
+  region_code text not null,
+  amount numeric not null
+);
+create table berth (dock text, slot int, title text not null, primary key (dock, slot));
+create table mooring (id bigint primary key, dock text not null, slot int not null);
+
+-- POSITIVE: a many-to-one join multiplies no row of the side it keeps.
+create view v_sale_store as
+  select s.id, st.code as store_code from sale s join store st on st.id = s.store_id;
+-- POSITIVE: and a chain of them, through a relation the view does not show.
+create view v_sale_region as
+  select s.id, r.title from sale s
+  join store st on st.id = s.store_id
+  join region r on r.code = st.region_code;
+-- POSITIVE: the kept side is the preserved one, however the view spells the join.
+create view v_sale_right_store as
+  select s.id, st.code from store st right join sale s on st.id = s.store_id;
+-- POSITIVE: a nullable unique index is a key of the other side all the same, because
+-- the equality admits no NULL.
+create view v_sale_slot as
+  select s.id, sl.id as slot_id from sale s join slot sl on sl.tag = s.region_code;
+-- POSITIVE: a composite key of the other side, every column of it equated.
+create view v_mooring_berth as
+  select m.id, b.title from mooring m join berth b on b.dock = m.dock and b.slot = m.slot;
+-- POSITIVE: one column of it equated to a literal is equated all the same.
+create view v_mooring_first_slot as
+  select m.id, b.title from mooring m join berth b on b.dock = m.dock and b.slot = 1;
+-- POSITIVE: a semi join emits each row of its outer side once, and an anti join too.
+create view v_sale_in_live_region as
+  select s.id from sale s where exists (select 1 from store st where st.region_code = s.region_code);
+create view v_sale_outside_regions as
+  select s.id from sale s where not exists (select 1 from store st where st.region_code = s.region_code);
+-- POSITIVE: two relations neither of which is unique given the other: the pair of
+-- their keys is a key, and a key made of two relations names no row of either.
+create view v_sale_pairs as
+  select s.id, other.id as other_id from sale s join sale other on other.store_id = s.store_id;
+-- POSITIVE, across a boundary: a barrier view over a many-to-one join, narrowed.
+create view v_barrier_sale with (security_barrier = true) as
+  select s.id, s.amount, st.code from sale s join store st on st.id = s.store_id;
+create view v_over_barrier_sale as select id, code from v_barrier_sale;
+
+-- NEGATIVE: a join on part of the other side's key multiplies.
+create view v_mooring_dock as
+  select m.id, b.title from mooring m join berth b on b.dock = m.dock;
+-- NEGATIVE: the same, the other way round: the key of the repeated side is not shown.
+create view v_sale_repeated as
+  select s.id from sale s join sale other on other.store_id = s.store_id;
+-- NEGATIVE: a cast equates the value to something else.
+create view v_sale_cast_join as
+  select s.id from sale s join store st on st.id::text = s.region_code;
+-- NEGATIVE: a disjunction equates nothing about any one row.
+create view v_sale_or_join as
+  select s.id from sale s join store st on st.id = s.store_id or st.id = 0;
+
+-- POSITIVE: a group key is a key.
+create view v_group_store as
+  select s.store_id, st.code, sum(s.amount) as amount
+  from sale s join store st on st.id = s.store_id
+  group by s.store_id, st.code;
+-- POSITIVE: so is what `DISTINCT` de-duplicates, whichever way it is planned.
+create view v_distinct_code as select distinct cur_code from tx;
+-- NEGATIVE: a group key over a column that can be NULL is no row identity.
+create view v_group_nullable as
+  select cur_code, bank_id, count(*) as n from tx group by cur_code, bank_id;
+create view v_distinct_nullable as select distinct bank_id from tx;
+-- NEGATIVE: a group key over an expression is a key of nothing the view can name.
+create view v_group_expression as
+  select upper(cur_code) as loud, count(*) as n from tx group by upper(cur_code);
+
+-- POSITIVE: a union whose branches each write their own text literal into one column
+-- keeps the branches apart, so a key of each branch with that column is a key.
+create view v_union_discriminated as
+  select 'tx'::text as source, id, cur_code from tx
+  union all
+  select 'wallet'::text, id, cur_code from wallet;
+-- POSITIVE: a branch keyed through a many-to-one join is keyed all the same.
+create view v_union_discriminated_joined as
+  select 'sale'::text as source, s.id, st.code from sale s join store st on st.id = s.store_id
+  union all
+  select 'tx'::text, t.id, t.cur_code from tx t;
+-- POSITIVE, across a boundary: the discriminated union inside a barrier view.
+create view v_barrier_discriminated with (security_barrier = true) as
+  select 'tx'::text as source, id, cur_code, amount from tx
+  union all
+  select 'wallet'::text, id, cur_code, 0::numeric from wallet;
+create view v_over_barrier_discriminated as
+  select source, id from v_barrier_discriminated;
+-- NEGATIVE: one literal in two branches tells them apart no more than none.
+create view v_union_same_literal as
+  select 'tx'::text as source, id from tx union all select 'tx'::text, id from wallet;
+-- NEGATIVE: a numeric literal is not a discriminator: two spellings, one number.
+create view v_union_numeric_literal as
+  select 1 as source, id from tx union all select 2, id from wallet;
+-- NEGATIVE: a NULL is no literal of its own.
+create view v_union_null_discriminator as
+  select 'tx'::text as source, id from tx union all select NULL::text, id from wallet;
+-- NEGATIVE: the branches are told apart, and a row of one branch is not.
+create view v_union_discriminated_unkeyed as
+  select 'tx'::text as source, cur_code from tx
+  union all
+  select 'wallet'::text, cur_code from wallet;
+
+-- POSITIVE: a de-duplicated subquery joined on every column it has meets each row at
+-- most once — the shape the planner itself builds to turn a semi join into an inner
+-- join.
+create view v_sale_distinct_region as
+  select s.id from sale s
+  join (select distinct region_code from store) live on live.region_code = s.region_code;
+-- NEGATIVE: a grouped subquery with an aggregate beside its group key. Its group key
+-- is a key, but whether the plan keeps a `Subquery Scan` over it — which renames its
+-- columns to names nothing maps back — is the planner's choice of join method, so
+-- below a join a grouping is taken as a key only where it is nothing but its key.
+create view v_sale_store_totals as
+  select s.id, totals.n
+  from sale s
+  left join (select store_id, count(*) as n from sale group by store_id) totals
+    on totals.store_id = s.store_id;
+
+-- NEGATIVE: a lateral grouping that reaches out to another relation. Once the grouping
+-- is pinned, what stood inside it — the filter tying it to `st` — holds of the rows
+-- it collapsed, not of the row it emits, so it determines nothing about `st`.
+create view v_sale_lateral_grouping as
+  select s.id, st.id as store_id
+  from sale s
+  join store st on true
+  join lateral (select distinct x.region_code from sale x where x.store_id = st.id) r
+    on r.region_code = s.region_code;
+-- NEGATIVE: the same text in two lengths is one value, not two discriminators.
+create view v_union_varchar_lengths as
+  select 'x'::varchar(5) as source, id from tx
+  union all
+  select 'x'::varchar(10), id from wallet;
+-- NEGATIVE, across a boundary: a cast over the discriminator can make two literals one
+-- — `'tx'` and `'wallet'` are both something else in two characters. The barrier's
+-- own `ORDER BY` keeps its boundary in the plan, so the cast is read across it.
+create view v_barrier_discriminated_ordered with (security_barrier = true) as
+  select 'deposit'::text as source, id from tx
+  union all
+  select 'debit'::text, id from wallet
+  order by 2;
+create view v_over_barrier_discriminated_cast as
+  select source::varchar(2) as source, id from v_barrier_discriminated_ordered;
+-- NEGATIVE: a deferrable unique constraint admits duplicates until commit.
+create table deferred_code (
+  code text not null,
+  constraint deferred_code_key unique (code) deferrable initially deferred
+);
+create view v_deferred_code as select code from deferred_code;
+-- POSITIVE: a semi join de-duplicated over an expression pins that expression.
+create view v_sale_in_shifted_store as
+  select s.id from sale s where s.store_id in (select st.id + 1 from store st);
+-- NEGATIVE: a view that ends in a LIMIT is, under a join, the top of a subquery.
+create view v_first_stores as select id, code from store order by id limit 10;
+create view v_sale_first_store as
+  select s.id, f.code from sale s join v_first_stores f on f.id = s.store_id;
+
+-- ── Non-nullness from the plan's own qualifiers ─────────────────────────────────
+--
+-- A column the catalog calls nullable is never NULL in a view whose qualifiers reject
+-- the NULL — `IS NOT NULL`, or a strict equality — wherever the qualifier holds of
+-- every row the column arrives in.
+
+-- POSITIVE: a join on the column rejects a NULL in it, whether the join keeps the
+-- condition or a nested loop pushes it into the inner scan.
+create view v_joined_on_nullable as
+  select t.id, t.bank_id from tx t join bank b on b.id = t.bank_id;
+-- POSITIVE: so does a filter to a literal.
+create view v_filtered_to_literal as select id, tag from slot where tag = 'x';
+-- POSITIVE: a semi join emits only rows that found a match.
+create view v_semi_on_nullable as
+  select t.id, t.bank_id from tx t where t.bank_id in (select b.id from bank b);
+-- POSITIVE: a partial index built on the very predicate drops it from the scan's
+-- `Filter`; the predicate the plan names the index of is read instead.
+create table ticket (id bigint primary key, code text);
+create index ticket_code_idx on ticket (code) where code is not null;
+create view v_partial_index_predicate as
+  select id, code from ticket where code is not null order by code;
+-- POSITIVE: every branch of a union rejects the NULL.
+create view v_union_both_filtered as
+  select id, bank_id from tx where bank_id is not null
+  union all
+  select id, bank_id from tx where bank_id is not null and amount > 0;
+
+-- NEGATIVE: an outer join keeps the rows its condition does not match.
+create view v_left_join_condition as
+  select t.id, t.bank_id, b.title from tx t left join bank b on b.id = t.bank_id;
+-- NEGATIVE: so does an anti join, which keeps only those.
+create view v_anti_on_nullable as
+  select t.id, t.bank_id from tx t where not exists (select 1 from bank b where b.id = t.bank_id);
+-- NEGATIVE: an arm of a disjunction holds of some rows, not of every row.
+create view v_disjunction_not_null as
+  select id, bank_id from tx where bank_id is not null or amount > 0;
+-- NEGATIVE: a subplan's condition holds of the subplan's rows.
+create view v_subplan_condition as
+  select t.id, t.bank_id, exists (select 1 from bank b where b.id = t.bank_id) as known
+  from tx t;
+-- NEGATIVE: one branch of a union rejects the NULL and the other does not.
+create view v_union_one_filtered as
+  select id, bank_id from tx where bank_id is not null
+  union all
+  select id, bank_id from tx where amount > 0;

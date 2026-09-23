@@ -14,11 +14,12 @@
 // list on are stepped over rather than read (`PASS_THROUGH_NODE_TYPES`), and every
 // reading that would have depended on the planner being generous is refused instead —
 // deterministically, on a property of the query rather than of the day's plan.
-// `scripts/view-constraints-invariance.ts` is the proof.
+// `invariance.ts` is the proof.
 //
 // This module is the reader of that answer and nothing else: it turns one plan into
 // the sources of one requested column each, or a named refusal where the plan does
-// not say. It never guesses.
+// not say. It never guesses. Which sets of those columns the plan proves unique is
+// the other question the same plan answers, and `plan-keys.ts` reads it.
 //
 // A column is a *proxy* of a base column when its value in every row is either that
 // base column's value or NULL — the criterion this reader implements. A bare
@@ -36,8 +37,20 @@
 // stands over a column, the plan leaves it exactly as its base column, and
 // `derive.ts` may ask `pg_attribute.attnotnull` whether that is never NULL. The plan
 // is asked only about its own shape: no expression in it is examined, so a column
-// made non-null by `COALESCE`, by a strict function or by an `IS NOT NULL` predicate
-// reads here as nullable like any other.
+// made non-null by `COALESCE` or by a strict function reads here as nullable like any
+// other; what the plan's qualifiers reject — `IS NOT NULL`, a strict equality — is
+// read by `plan-qualifiers.ts` and recorded on the origin.
+
+import { readPlanKeys } from './plan-keys.ts'
+import type { PlanKey, UniqueKeysOf } from './plan-keys.ts'
+import { qualifiedReference, readQualifiedNonNull } from './plan-qualifiers.ts'
+import type { QualifierCatalog } from './plan-qualifiers.ts'
+
+/** What the catalog answers for the plan: the keys a relation has, and the qualifiers
+ * a scan applies without printing them. */
+export interface PlanCatalog extends QualifierCatalog {
+  uniqueKeysOf: UniqueKeysOf
+}
 
 /** One plan node of `EXPLAIN (FORMAT JSON)`, as much of it as this reader uses. */
 export interface ExplainPlanNode {
@@ -53,6 +66,21 @@ export interface ExplainPlanNode {
   'Parent Relationship'?: string
   /** Present on an `Aggregate` computing `GROUPING SETS` / `ROLLUP` / `CUBE`. */
   'Grouping Sets'?: unknown
+  /** The grouping of an `Aggregate` or a `Group`, one expression per entry. */
+  'Group Key'?: string[]
+  /** `Simple`, or `Partial` / `Finalize` for an aggregate split across workers. */
+  'Partial Mode'?: string
+  /** The index an index scan reads, whose predicate may stand in for a qualifier. */
+  'Index Name'?: string
+  // The conditions a node applies, where `plan-keys.ts` and `plan-qualifiers.ts` read
+  // what they state.
+  'Hash Cond'?: string
+  'Merge Cond'?: string
+  'Join Filter'?: string
+  Filter?: string
+  'Index Cond'?: string
+  'Recheck Cond'?: string
+  'TID Cond'?: string
 }
 
 /**
@@ -71,7 +99,7 @@ export interface ViewShape {
  * Why the plan as a whole could not be read. Closed on purpose: a view that derives
  * nothing says which of these it is, so that "nothing was derived" is never confused
  * with "nothing was looked at", and so that every one of them can carry a case in
- * `test/unit/view-constraints.lab.sql`.
+ * `__tests__/PgViewConstraintsPlugin.lab.sql`.
  */
 export const PLAN_REFUSALS = {
   'unreadable-set-operation':
@@ -149,6 +177,12 @@ export interface ColumnOrigin {
    * the plan itself can hand out a NULL here whatever the base column promises.
    */
   nullExtended: boolean
+  /**
+   * A qualifier of the plan rejects a NULL in this reference in every row it reaches
+   * the view in — `IS NOT NULL`, or a strict equality; see `plan-qualifiers.ts`.
+   * Set after the reading, over every stream a union assembled the value from.
+   */
+  qualifiedNonNull: boolean
 }
 
 /**
@@ -231,6 +265,10 @@ function selectListNodeOf(root: ExplainPlanNode): ExplainPlanNode {
     const children = inputChildren(node)
     const only = children.length === 1 ? children[0] : undefined
     if (!only) return node
+    // A `Gather` can project after all: a select-list subplan a worker may not run is
+    // computed at the `Gather`, whose `Output` then carries an entry its child does
+    // not. The node that prints the select list is the one to read.
+    if (node.Output && only.Output && node.Output.length !== only.Output.length) return node
     node = only
   }
   return node
@@ -239,11 +277,6 @@ function selectListNodeOf(root: ExplainPlanNode): ExplainPlanNode {
 // Set operations other than a plain union read their input as one tagged stream and
 // are refused wherever they appear: there is no branch to read a column off.
 const UNREADABLE_SET_NODE_TYPES = new Set(['Recursive Union', 'SetOp', 'HashSetOp'])
-
-// A node that can emit more rows than its input: a set-returning function in the
-// select list. It does not make a column reference untrue, but it does break the
-// one-view-row-per-base-row count a key claim needs.
-const ROW_MULTIPLYING_NODE_TYPES = new Set(['ProjectSet'])
 
 // Which input of a join the join itself can null. `Left` keeps every row of its outer
 // input and writes NULLs into the inner one where nothing matched; `Right` is the
@@ -254,16 +287,20 @@ const ROW_MULTIPLYING_NODE_TYPES = new Set(['ProjectSet'])
 // when a strict qualifier makes the null-extended rows impossible, and then the plan
 // says `Inner` and the column is non-null however the view spelled it.
 //
-// `Semi` and `Anti` emit no column of their inner input at all; that input is listed
-// here so that an entry appearing in one all the same is read as nullable rather than
-// trusted. A join type this map does not know nulls both sides.
+// `Semi` and `Anti` emit no column of their inner input at all, and `Right Semi` and
+// `Right Anti` none of their outer one; that input is listed here so that an entry
+// appearing in one all the same is read as nullable rather than trusted, and the side
+// they emit is left alone — the planner turns one into the other by cost. A join type
+// this map does not know nulls both sides.
 const JOIN_TYPE_NULLED_SIDES = new Map<string, ReadonlySet<string>>([
   ['Inner', new Set()],
   ['Left', new Set(['Inner'])],
   ['Right', new Set(['Outer'])],
   ['Full', new Set(['Outer', 'Inner'])],
   ['Semi', new Set(['Inner'])],
-  ['Anti', new Set(['Inner'])]
+  ['Anti', new Set(['Inner'])],
+  ['Right Semi', new Set(['Outer'])],
+  ['Right Anti', new Set(['Outer'])]
 ])
 const BOTH_JOIN_SIDES: ReadonlySet<string> = new Set(['Outer', 'Inner'])
 
@@ -597,6 +634,11 @@ class OriginReader {
     return this.crossable
   }
 
+  /** The alias an unqualified column name belongs to, where there is one. */
+  get soleAlias(): string | null {
+    return this.soleRelation?.alias ?? null
+  }
+
   /**
    * The base columns one `Output` entry reads. `crossing` holds the aliases of the
    * `Subquery Scan` nodes already descended through on the way here: a plan's
@@ -643,7 +685,8 @@ class OriginReader {
           column: reference.column,
           coerced: reference.coerced,
           via: [],
-          nullExtended: this.nulled.has(alias)
+          nullExtended: this.nulled.has(alias),
+          qualifiedNonNull: false
         }
       ],
       nullValue: false,
@@ -705,20 +748,10 @@ export interface PlanOrigins {
    */
   nullIntroduced: boolean[]
   /**
-   * True when the plan reads exactly one relation, cannot emit more rows than that
-   * relation has, and cannot null-extend its columns. Only then does a column
-   * proxying a key of that relation still identify a row of the view.
+   * Every set of the requested columns the plan proves no two rows share; see
+   * `plan-keys.ts`. Whether a column of one can be NULL is `derive.ts`'s question.
    */
-  identityPreserving: boolean
-}
-
-function hasJoinOtherThanInner(root: ExplainPlanNode): boolean {
-  return (
-    countNodes(root, (node) => {
-      const joinType = node['Join Type']
-      return joinType !== undefined && joinType !== 'Inner'
-    }) > 0
-  )
+  rowIdentities: PlanKey[]
 }
 
 /**
@@ -726,6 +759,8 @@ function hasJoinOtherThanInner(root: ExplainPlanNode): boolean {
  *
  * `candidates` are the views this relation is built on, by the name a `Subquery Scan`
  * over one of them would carry — the only boundaries this reader may descend through.
+ * `catalog` answers which keys each scanned relation has, which every row identity
+ * starts from, and which qualifiers a scan applies without printing them.
  *
  * Returns a `PlanRefusal` — no column of this view gets a source — where the plan
  * cannot be read positionally at all.
@@ -733,7 +768,8 @@ function hasJoinOtherThanInner(root: ExplainPlanNode): boolean {
 export function readPlanOrigins(
   root: ExplainPlanNode,
   requestedColumnCount: number,
-  candidates: ReadonlyMap<string, ViewShape> = new Map()
+  candidates: ReadonlyMap<string, ViewShape>,
+  catalog: PlanCatalog
 ): PlanOrigins | PlanRefusal {
   if (countNodes(root, (node) => UNREADABLE_SET_NODE_TYPES.has(node['Node Type'])) > 0) {
     return 'unreadable-set-operation'
@@ -761,26 +797,6 @@ export function readPlanOrigins(
   if (TUPLE_UNIONING_NODE_TYPES.has(selectListNode['Node Type'])) readableUnions.add(selectListNode)
   if (unions.some((union) => !readableUnions.has(union))) return 'set-operation-not-a-select-list'
 
-  // A `Subquery Scan` this reader descends through is not a row source of its own: it
-  // emits the rows of its child, filtered at most. Every other alias-bearing node is
-  // one, and a key of a base relation survives only where there is exactly one.
-  const rowSources =
-    countNodes(root, (node) => node.Alias !== undefined) -
-    countNodes(
-      root,
-      (node) =>
-        node['Node Type'] === SUBQUERY_SCAN &&
-        node.Alias !== undefined &&
-        reader.crossed.has(node.Alias)
-    )
-  const identityPreserving =
-    rowSources === 1 &&
-    countNodes(root, (node) => node['Relation Name'] !== undefined) === 1 &&
-    countNodes(root, (node) => ROW_MULTIPLYING_NODE_TYPES.has(node['Node Type'])) === 0 &&
-    !hasJoinOtherThanInner(root) &&
-    !groupingSets &&
-    unions.length === 0
-
   const readings: Reading[] = []
   if (TUPLE_UNIONING_NODE_TYPES.has(selectListNode['Node Type'])) {
     const branches = inputChildren(selectListNode)
@@ -802,6 +818,27 @@ export function readPlanOrigins(
     for (const entry of output) readings.push(reader.read(entry))
   }
 
+  const context = {
+    inputs: inputChildren,
+    reference: parseReference,
+    soleAlias: reader.soleAlias,
+    passThrough: PASS_THROUGH_NODE_TYPES,
+    unioning: TUPLE_UNIONING_NODE_TYPES,
+    crossed: reader.crossed,
+    nulledSides: (joinType: string) => JOIN_TYPE_NULLED_SIDES.get(joinType) ?? BOTH_JOIN_SIDES,
+    uniqueKeysOf: catalog.uniqueKeysOf
+  }
+  // A value a union assembled is read off several streams, named together as
+  // `a∨b`; a qualifier keeps it from NULL only where it does so in every one of them.
+  const qualified = readQualifiedNonNull(root, context, catalog)
+  for (const reading of readings) {
+    for (const origin of reading.origins ?? []) {
+      origin.qualifiedNonNull = origin.alias
+        .split('∨')
+        .every((alias) => qualified.has(qualifiedReference(alias, origin.column)))
+    }
+  }
+
   return {
     columns: readings.map((reading) =>
       reading.origins && reading.origins.length > 0 ? reading.origins : null
@@ -821,6 +858,6 @@ export function readPlanOrigins(
         reading.nullValue ||
         reading.origins.some((origin) => origin.nullExtended)
     ),
-    identityPreserving
+    rowIdentities: readPlanKeys(root, selectListNode, context)
   }
 }

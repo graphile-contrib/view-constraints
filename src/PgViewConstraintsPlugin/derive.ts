@@ -17,16 +17,22 @@
 //     the base columns are NOT NULL: a unique index admits nulls, and a null key
 //     identifies nothing.
 //
+// A row identity is the plan's answer (`plan-keys.ts`) met by the catalog's: of the
+// sets of columns the plan proves no two rows share, one whose every column is never
+// NULL — because `PgFakeConstraintsPlugin` makes every `@primaryKey` column non-null,
+// and a key over a column that can be NULL would be a wrong `@notNull` in disguise.
+//
 // And one thing the plan alone cannot settle: a cast. `(route.currency_id)::text`
 // proxies the value only if the cast leaves it alone, which is a question about the
 // two types, answered here from `pg_cast` and the domain chain.
 //
 // Non-nullness is the two sides meeting over one column rather than over a key. A
-// view column is NOT NULL when it proxies a base column `pg_attribute.attnotnull`
-// calls NOT NULL and the plan puts no NULL of its own into it. Both halves are
-// structural: no expression is examined, so `COALESCE(a, b)`, `count(*)`, a constant,
-// a strict function of non-null arguments and a `col IS NOT NULL` qualifier are all
-// nullable here, each of them derivable in principle and none of them derived. The
+// view column is NOT NULL when it proxies a base column that is never NULL where it is
+// read — `pg_attribute.attnotnull` says so, or a qualifier of the plan rejects a NULL
+// in it (`plan-qualifiers.ts`) — and the plan puts no NULL of its own into it. No
+// expression is evaluated, so `COALESCE(a, b)`, `count(*)`, a constant and a strict
+// function of non-null arguments are nullable here, derivable in principle and not
+// derived. The
 // asymmetry is deliberate. A relation claimed wrongly costs an empty related object;
 // a `notNull` claimed wrongly puts a NULL in a non-null GraphQL field, and the rules
 // of GraphQL then null the whole parent object — so the answer is destroyed rather
@@ -75,6 +81,8 @@ export interface CatalogRelation {
   relation: string
   foreignKeys: CatalogForeignKey[]
   uniqueKeys: CatalogUniqueKey[]
+  /** Partial indexes, with their predicates as `pg_get_expr` prints them. */
+  partialIndexes: { name: string; predicate: string }[]
   columns: Map<string, CatalogColumn>
 }
 
@@ -109,7 +117,13 @@ export interface DerivedForeignKey {
 export interface DerivedPrimaryKey {
   kind: 'primaryKey'
   viewColumns: string[]
-  via: { schema: string; relation: string; constraintName: string }
+  /**
+   * The base relation's unique key this is, where it is one relation's key carried
+   * to the view unchanged; `null` for a key the plan makes of its own — a grouping, a
+   * de-duplication, a discriminated union, two relations together — which names no
+   * one row of any table.
+   */
+  via: { schema: string; relation: string; constraintName: string } | null
   /** The `@primaryKey` smart tag this key is equivalent to. */
   tag: string
 }
@@ -348,6 +362,12 @@ export function deriveViewConstraints(
     return sources
   })
 
+  // A base column is never NULL in the rows a value is read from when the catalog says
+  // so, or when a qualifier of the plan rejects a NULL in it there.
+  const neverNullOrigin = (origin: ColumnOrigin): boolean =>
+    origin.qualifiedNonNull ||
+    catalog.get(`${origin.schema}.${origin.relation}`)?.columns.get(origin.column)?.notNull === true
+
   // Non-nullness, column by column: the base column is NOT NULL and the plan puts no
   // NULL of its own over it. A materialized view is left out — its stored row
   // outlives the row it was copied from, and the copy is the only thing this reader
@@ -359,11 +379,7 @@ export function deriveViewConstraints(
     if (relkind !== 'v') continue
     if (!sources || sources.length === 0) continue
     if (plan.nullIntroduced[index] !== false) continue
-    const everyBranchNotNull = sources.every(
-      (origin) =>
-        catalog.get(`${origin.schema}.${origin.relation}`)?.columns.get(origin.column)?.notNull ===
-        true
-    )
+    const everyBranchNotNull = sources.every((origin) => neverNullOrigin(origin))
     if (everyBranchNotNull) notNullColumns.push(viewColumn)
   }
 
@@ -496,53 +512,64 @@ export function deriveViewConstraints(
 
   foreignKeys.sort((left, right) => left.tag.localeCompare(right.tag))
 
-  // A key of the base table identifies a row of the view only when the view emits at
-  // most one row per base row and never nulls its columns. One scan, no
-  // set-returning projection and no outer join is the only shape where the plan
-  // itself proves that; a join, even one the planner marks unique, is left to a
-  // human.
+  // A row identity is a set of columns the plan proves unique whose every column is
+  // never NULL: it proxies a NOT NULL base column and the plan puts no NULL of its own
+  // into it, or it is a union's discriminator, which every branch fills with a
+  // non-NULL literal. This is the rule of non-nullness without its exception for a
+  // materialized view, whose stored copy of a NOT NULL column holds no NULL either.
+  const neverNull = origins.map(
+    (sources, index) =>
+      sources !== null &&
+      sources.length > 0 &&
+      plan.nullIntroduced[index] === false &&
+      sources.every((origin) => neverNullOrigin(origin))
+  )
+  const candidates = plan.rowIdentities.filter((key) =>
+    key.columns.every((index) => key.discriminators.includes(index) || neverNull[index])
+  )
+  // A key that is one base relation's own comes first — it is the one a relation to a
+  // projection can point at — the primary key before a unique index, then by relation
+  // and index name, which is the order a view with one relation always had. The rest
+  // follow by size, then by name.
+  const tagOf = (key: (typeof candidates)[number]): string =>
+    key.columns.map((index) => quoteIdentifier(columns[index] ?? '')).join(',')
+  const rank = (key: (typeof candidates)[number]): string =>
+    key.carried
+      ? `0${key.carried.isPrimary ? 0 : 1}${key.carried.schema}.${key.carried.relation} ${key.carried.name}`
+      : `1${String(key.columns.length).padStart(4, '0')}${tagOf(key)}`
+  const [chosen] = [...candidates].sort((left, right) => {
+    const [a, b] = [rank(left), rank(right)]
+    return a < b ? -1 : a > b ? 1 : 0
+  })
   let primaryKey: DerivedPrimaryKey | null = null
-  const soleInstance = aliases.length === 1 ? aliases[0] : undefined
-  if (soleInstance) {
-    const base = catalog.get(`${soleInstance.schema}.${soleInstance.relation}`)
-    const candidates = (base?.uniqueKeys ?? []).filter(
-      (key) =>
-        // A unique index admits nulls where the primary key cannot; a null key
-        // identifies no row, so only an all-NOT NULL one is a row identity.
-        key.isPrimary || key.columns.every((column) => base?.columns.get(column)?.notNull === true)
-    )
-    const carriedCandidates = candidates
-      .map((key) => ({
-        key,
-        viewColumns: keyColumnsOf(origins, columns, soleInstance.alias, key.columns)
-      }))
-      .filter((candidate) => candidate.viewColumns !== null)
-    const chosen =
-      carriedCandidates.find((candidate) => candidate.key.isPrimary) ?? carriedCandidates[0]
-    if (!chosen) {
-      if (candidates.length > 0) {
-        notes.push(
-          `no key carried: none of ${candidates.map((key) => key.name).join(', ')} is proxied exactly once`
-        )
-      }
-    } else if (!plan.identityPreserving) {
-      notes.push(
-        `key ${chosen.key.name} declined: the plan does not prove one view row per ${soleInstance.schema}.${soleInstance.relation} row`
-      )
-    } else {
-      primaryKey = {
-        kind: 'primaryKey',
-        viewColumns: chosen.viewColumns ?? [],
-        via: {
-          schema: soleInstance.schema,
-          relation: soleInstance.relation,
-          constraintName: chosen.key.name
-        },
-        tag: (chosen.viewColumns ?? []).map(quoteIdentifier).join(',')
-      }
+  if (chosen) {
+    primaryKey = {
+      kind: 'primaryKey',
+      viewColumns: chosen.columns.map((index) => columns[index] ?? ''),
+      via: chosen.carried
+        ? {
+            schema: chosen.carried.schema,
+            relation: chosen.carried.relation,
+            constraintName: chosen.carried.name
+          }
+        : null,
+      tag: tagOf(chosen)
     }
-  } else if (aliases.length > 1) {
-    notes.push('key declined: the view proxies more than one relation')
+  } else if (plan.rowIdentities.length > 0) {
+    const nullable = [
+      ...new Set(
+        plan.rowIdentities.flatMap((key) =>
+          key.columns.filter((index) => !key.discriminators.includes(index) && !neverNull[index])
+        )
+      )
+    ]
+      .sort((left, right) => left - right)
+      .map((index) => columns[index] ?? '')
+    notes.push(
+      `no key: every set of columns the plan proves unique has one not known never to be NULL (${nullable.join(', ')})`
+    )
+  } else {
+    notes.push('no key: the plan proves no set of the view’s columns unique')
   }
 
   for (const [index, refusal] of columnRefusals.entries()) {
@@ -580,16 +607,17 @@ export function deriveViewConstraints(
 //   * the referencing half is a relation already derived above — a real
 //     `convalidated` foreign key on the base column a view column proxies, or the
 //     identity of a base table's own key that a view column carries;
-//   * the referenced half is a view whose **row identity** is that very key. Row
-//     identity is the claim made under `@primaryKey` above: the plan reads exactly
-//     one row source, cannot multiply its rows and cannot null-extend them, so a
-//     unique key of the base relation is unique in the view as well.
+//   * the referenced half is a view whose **row identity** is that very key,
+//     carried: every row of the base relation appears in the view at most once and
+//     is never null-extended, so a unique key of the base relation is unique in the
+//     view as well (`plan-keys.ts`).
 //
 // Proxying the key is not by itself the referenced half. A view that joins its base
-// to another relation proxies the key and repeats it, and a relation pointing at a
-// repeated key is a relation to several rows. It is the row identity, not the proxy,
-// that makes the key a key of the view — which is also what `PgFakeConstraintsPlugin`
-// demands of the referenced side, and refuses the `@foreignKey` tag without.
+// to another relation one-to-many proxies the key and repeats it, and a relation
+// pointing at a repeated key is a relation to several rows. It is the row identity,
+// not the proxy, that makes the key a key of the view — which is also what
+// `PgFakeConstraintsPlugin` demands of the referenced side, and refuses the
+// `@foreignKey` tag without.
 //
 // Both halves are read out of `pg_constraint` and `pg_index`, and the row identity
 // under the referenced key is the same derivation this reader publishes as the
@@ -729,29 +757,32 @@ function projectionsByKey(
   const index = new Map<string, KeyedProjection[]>()
   for (const derivation of derivations) {
     const identity = derivation.primaryKey
-    if (!identity) continue
+    // Only a key that is one base relation's own is a row of that relation; a key the
+    // plan makes of its own names no row anything can point at.
+    if (!identity?.via) continue
     if (publishedAsEnumeration(derivation.schema, derivation.view)) continue
     const declared = declaredRowIdentity(derivation.schema, derivation.view)
     if (declared !== null && rowIdentityColumns(declared) !== rowIdentityColumns(identity.tag)) {
       continue
     }
-    const base = catalog.get(`${identity.via.schema}.${identity.via.relation}`)
-    const key = base?.uniqueKeys.find((candidate) => candidate.name === identity.via.constraintName)
+    const via = identity.via
+    const base = catalog.get(`${via.schema}.${via.relation}`)
+    const key = base?.uniqueKeys.find((candidate) => candidate.name === via.constraintName)
     if (!key || key.columns.length !== identity.viewColumns.length) continue
     const columns = new Map<string, string>()
     key.columns.forEach((column, position) => {
       const viewColumn = identity.viewColumns[position]
       if (viewColumn !== undefined) columns.set(column, viewColumn)
     })
-    const name = keyName(identity.via.schema, identity.via.relation, key.columns)
+    const name = keyName(via.schema, via.relation, key.columns)
     const carried = index.get(name)
     const projection: KeyedProjection = {
       schema: derivation.schema,
       view: derivation.view,
       key: {
-        schema: identity.via.schema,
-        relation: identity.via.relation,
-        constraintName: identity.via.constraintName
+        schema: via.schema,
+        relation: via.relation,
+        constraintName: via.constraintName
       },
       columns
     }
