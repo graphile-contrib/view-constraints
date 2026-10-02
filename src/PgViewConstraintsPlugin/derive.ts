@@ -103,7 +103,11 @@ export interface ViewColumn {
 
 export interface DerivedForeignKey {
   kind: 'foreignKey'
-  /** View columns carrying the key, in the constraint's own key order. */
+  /**
+   * Columns of the referencing relation carrying the key, in the constraint's own key
+   * order: a view's columns, or a table's own where a table's foreign key is led to a
+   * projection.
+   */
   viewColumns: string[]
   foreignSchema: string
   foreignRelation: string
@@ -151,6 +155,25 @@ export interface ViewDerivation {
    */
   declinedViewTargets: DeclinedViewTarget[]
   /** Why something a reader might expect was not derived. */
+  notes: string[]
+}
+
+/**
+ * A table of the surface, read for the one thing a table can be missing: a relation
+ * from its own foreign key to the projection that is a row of the key it references.
+ * The foreign key itself is a `pg_constraint` row, and `PgRelationsPlugin` publishes it
+ * without any help; only the relation to a projection has to be derived.
+ */
+export interface TableDerivation {
+  schema: string
+  table: string
+  /**
+   * Relations to a projection led from the table's own foreign keys. Never the foreign
+   * keys themselves, which reach the schema as the constraints they are.
+   */
+  foreignKeys: DerivedForeignKey[]
+  /** As on a view: relations the catalog authorises and this reader declined to lead. */
+  declinedViewTargets: DeclinedViewTarget[]
   notes: string[]
 }
 
@@ -606,7 +629,9 @@ export function deriveViewConstraints(
 //
 //   * the referencing half is a relation already derived above — a real
 //     `convalidated` foreign key on the base column a view column proxies, or the
-//     identity of a base table's own key that a view column carries;
+//     identity of a base table's own key that a view column carries — or a real
+//     `convalidated` foreign key of a table of this surface, on the table's own
+//     columns, where nothing has to be proxied at all;
 //   * the referenced half is a view whose **row identity** is that very key,
 //     carried: every row of the base relation appears in the view at most once and
 //     is never null-extended, so a unique key of the base relation is unique in the
@@ -835,82 +860,131 @@ function projectionsByKey(
  * already declined is not declined a second time. One call per surface is the only
  * call there is, and a reader who writes a second one gets the same answer rather
  * than a doubled one.
+ *
+ * `tables` are the tables of the same surface, and each of their own foreign keys is
+ * led the same way, by the same count over the same projections. The foreign key
+ * stays the relation to the table it is; the relation to the projection stands
+ * beside it, for the reason given above for a view.
  */
 export function deriveProjectionRelations(
   derivations: ViewDerivation[],
   catalog: ReadonlyMap<string, CatalogRelation>,
   publishedAsEnumeration: PublishedAsEnumeration = () => false,
-  declaredRowIdentity: DeclaredRowIdentity = () => null
+  declaredRowIdentity: DeclaredRowIdentity = () => null,
+  tables: TableDerivation[] = []
 ): void {
   const index = projectionsByKey(derivations, catalog, publishedAsEnumeration, declaredRowIdentity)
   for (const derivation of derivations) {
-    const declared = new Set(derivation.foreignKeys.map((foreignKey) => foreignKey.tag))
-    const alreadyDeclined = new Set(
-      derivation.declinedViewTargets.map(
-        (target) => `${target.viewColumns.join(',')} → ${target.key}`
-      )
+    leadToProjections(
+      { schema: derivation.schema, name: derivation.view },
+      [...derivation.foreignKeys],
+      index,
+      derivation
     )
-    const declinedHere: DeclinedViewTarget[] = []
-    const led: DerivedForeignKey[] = []
-    for (const foreignKey of derivation.foreignKeys) {
-      const name = keyName(
+  }
+  // A table's own foreign keys are the referencing half as they stand: a
+  // `convalidated` `pg_constraint` row on the table's own columns, which is the very
+  // fact a view's relation is derived down to. Its identity with its own key is not
+  // one — that is the table's row, which the table already is — and the asking
+  // relation is never among the candidates, a table and a view sharing no name in
+  // one schema, so no relation of a table is dropped as its own row.
+  for (const table of tables) {
+    const base = catalog.get(`${table.schema}.${table.table}`)
+    if (!base) continue
+    const references: DerivedForeignKey[] = base.foreignKeys.map((foreignKey) => ({
+      kind: 'foreignKey',
+      viewColumns: foreignKey.columns,
+      foreignSchema: foreignKey.foreignSchema,
+      foreignRelation: foreignKey.foreignRelation,
+      foreignColumns: foreignKey.foreignColumns,
+      via: [
+        { schema: table.schema, relation: table.table, constraintName: foreignKey.constraintName }
+      ],
+      tag: foreignKeyTag(
+        foreignKey.columns,
         foreignKey.foreignSchema,
         foreignKey.foreignRelation,
         foreignKey.foreignColumns
       )
-      const candidates = index.get(name) ?? []
-      if (candidates.length === 0) continue
-      if (candidates.length > 1) {
-        if (alreadyDeclined.has(`${foreignKey.viewColumns.join(',')} → ${name}`)) continue
-        declinedHere.push({
-          viewColumns: foreignKey.viewColumns,
-          key: name,
-          refusal: 'more-than-one-projection-carries-the-key',
-          candidates: candidates.map((candidate) => `${candidate.schema}.${candidate.view}`)
-        })
-        continue
-      }
-      const [projection] = candidates
-      if (!projection) continue
-      const foreignColumns = foreignKey.foreignColumns.map((column) =>
-        projection.columns.get(column)
-      )
-      if (foreignColumns.some((column) => column === undefined)) continue
-      const carried = foreignColumns as string[]
-      // The row's identity with its own row: the asking view, reached over the very
-      // columns the relation is led from. Anything else on the asking view — a
-      // parent, a predecessor, a key spelled in another order — reaches another row.
-      if (
-        projection.schema === derivation.schema &&
-        projection.view === derivation.view &&
-        carried.every((column, position) => column === foreignKey.viewColumns[position])
-      ) {
-        continue
-      }
-      const tag = foreignKeyTag(foreignKey.viewColumns, projection.schema, projection.view, carried)
-      if (declared.has(tag)) continue
-      declared.add(tag)
-      led.push({
-        kind: 'foreignKey',
+    }))
+    leadToProjections({ schema: table.schema, name: table.table }, references, index, table)
+  }
+}
+
+/**
+ * Leads each of `references` — relations of the asking relation to a base key — to
+ * the one projection keyed by that key, and records on `into` what was led and what
+ * was declined. What `into` already carries is read back first, so a second run adds
+ * nothing.
+ */
+function leadToProjections(
+  asking: { schema: string; name: string },
+  references: readonly DerivedForeignKey[],
+  index: ReadonlyMap<string, KeyedProjection[]>,
+  into: Pick<ViewDerivation, 'foreignKeys' | 'declinedViewTargets' | 'notes'>
+): void {
+  const declared = new Set(into.foreignKeys.map((foreignKey) => foreignKey.tag))
+  const alreadyDeclined = new Set(
+    into.declinedViewTargets.map((target) => `${target.viewColumns.join(',')} → ${target.key}`)
+  )
+  const declinedHere: DeclinedViewTarget[] = []
+  const led: DerivedForeignKey[] = []
+  for (const foreignKey of references) {
+    const name = keyName(
+      foreignKey.foreignSchema,
+      foreignKey.foreignRelation,
+      foreignKey.foreignColumns
+    )
+    const candidates = index.get(name) ?? []
+    if (candidates.length === 0) continue
+    if (candidates.length > 1) {
+      if (alreadyDeclined.has(`${foreignKey.viewColumns.join(',')} → ${name}`)) continue
+      declinedHere.push({
         viewColumns: foreignKey.viewColumns,
-        foreignSchema: projection.schema,
-        foreignRelation: projection.view,
-        foreignColumns: carried,
-        // Both halves, named: the constraint that authorises the reference and the
-        // unique key of the same base relation the projection is a row of.
-        via: [...foreignKey.via, projection.key],
-        tag
+        key: name,
+        refusal: 'more-than-one-projection-carries-the-key',
+        candidates: candidates.map((candidate) => `${candidate.schema}.${candidate.view}`)
       })
+      continue
     }
-    derivation.foreignKeys.push(...led)
-    derivation.foreignKeys.sort((left, right) => left.tag.localeCompare(right.tag))
-    derivation.declinedViewTargets.push(...declinedHere)
-    for (const declined of declinedHere) {
-      derivation.notes.push(
-        `(${declined.viewColumns.join(',')}) → ${declined.key}: ` +
-          `${declined.refusal} — ${TARGET_REFUSALS[declined.refusal]}; ` +
-          `${declined.candidates.join(', ')}`
-      )
+    const [projection] = candidates
+    if (!projection) continue
+    const foreignColumns = foreignKey.foreignColumns.map((column) => projection.columns.get(column))
+    if (foreignColumns.some((column) => column === undefined)) continue
+    const carried = foreignColumns as string[]
+    // The row's identity with its own row: the asking view, reached over the very
+    // columns the relation is led from. Anything else on the asking view — a
+    // parent, a predecessor, a key spelled in another order — reaches another row.
+    if (
+      projection.schema === asking.schema &&
+      projection.view === asking.name &&
+      carried.every((column, position) => column === foreignKey.viewColumns[position])
+    ) {
+      continue
     }
+    const tag = foreignKeyTag(foreignKey.viewColumns, projection.schema, projection.view, carried)
+    if (declared.has(tag)) continue
+    declared.add(tag)
+    led.push({
+      kind: 'foreignKey',
+      viewColumns: foreignKey.viewColumns,
+      foreignSchema: projection.schema,
+      foreignRelation: projection.view,
+      foreignColumns: carried,
+      // Both halves, named: the constraint that authorises the reference and the
+      // unique key of the same base relation the projection is a row of.
+      via: [...foreignKey.via, projection.key],
+      tag
+    })
+  }
+  into.foreignKeys.push(...led)
+  into.foreignKeys.sort((left, right) => left.tag.localeCompare(right.tag))
+  into.declinedViewTargets.push(...declinedHere)
+  for (const declined of declinedHere) {
+    into.notes.push(
+      `(${declined.viewColumns.join(',')}) → ${declined.key}: ` +
+        `${declined.refusal} — ${TARGET_REFUSALS[declined.refusal]}; ` +
+        `${declined.candidates.join(', ')}`
+    )
   }
 }

@@ -8,7 +8,8 @@
 // over every view of every service once per planner regime below, and the four
 // things that reach the published schema — the foreign keys, the primary key, the
 // non-null columns, and whether the view was read at all — are compared byte for
-// byte across the regimes.
+// byte across the regimes, together with the relations a table's foreign keys are
+// led to a projection by, which stand on the views' keys.
 //
 // Fixing the planner is exactly what the plugin must not do; it is what this module
 // does, on purpose, to force the plans apart.
@@ -108,6 +109,8 @@ interface Contract {
 interface TargetContract {
   target: string
   views: Contract[]
+  /** A table's foreign keys led to a projection, which move with the views' keys. */
+  tables: { table: string; foreignKeys: string[] }[]
   failures: string[]
   skipped: string[]
 }
@@ -146,6 +149,12 @@ async function contractOf(
         primaryKey: derived.primaryKey?.tag ?? null,
         notNull: [...derived.notNullColumns].sort()
       })),
+      tables: collected.tables
+        .filter((derived) => derived.foreignKeys.length > 0)
+        .map((derived) => ({
+          table: `${derived.schema}.${derived.table}`,
+          foreignKeys: derived.foreignKeys.map((key) => key.tag).sort()
+        })),
       failures: collected.failures
         .map((failure) => `${failure.schema}.${failure.view}: ${failure.error}`)
         .sort(),
@@ -166,6 +175,9 @@ function indexed(contracts: TargetContract[]): Map<string, string> {
         `${target.target} ${view.view}`,
         `readable=${view.planReadable} fk=[${view.foreignKeys.join('; ')}] pk=${view.primaryKey ?? '-'} nn=[${view.notNull.join(',')}]`
       )
+    }
+    for (const table of target.tables) {
+      lines.set(`${target.target} ${table.table}`, `fk=[${table.foreignKeys.join('; ')}]`)
     }
     for (const failure of target.failures) {
       lines.set(`${target.target} !! ${failure.split(':')[0] ?? ''}`, `failure: ${failure}`)

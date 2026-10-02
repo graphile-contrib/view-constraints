@@ -133,6 +133,33 @@ function renderService(
     }
     for (const note of derived.notes) line(`     note: ${note}`)
   }
+  // A table is read for its foreign keys led to a projection and nothing else, so only
+  // a table that led one, declined one or states a `@foreignKey` by hand is shown.
+  for (const table of report.tables) {
+    const { derived } = table
+    const derivedKeys = new Map(
+      derived.foreignKeys.map((foreignKey) => [foreignKeyReference(foreignKey.tag), foreignKey])
+    )
+    const declaredKeys = new Map(
+      table.declaredForeignKeys.map((tag) => [foreignKeyReference(tag), tag])
+    )
+    if (derivedKeys.size === 0 && declaredKeys.size === 0 && derived.notes.length === 0) continue
+    line(`\n  ── ${derived.schema}.${derived.table}  (table)`)
+    for (const [key, foreignKey] of derivedKeys) {
+      const marker = declaredKeys.has(key) ? 'both  ' : 'DERIVED-ONLY'
+      const via = foreignKey.via
+        .map((entry) => `${entry.schema}.${entry.relation} ${entry.constraintName}`)
+        .join(' + ')
+      line(`     fk ${marker} ${foreignKey.tag}   [via ${via}]`)
+      const declared = declaredKeys.get(key)
+      if (declared && tail(declared)) line(`        hand tail: |${tail(declared)}`)
+    }
+    for (const [key, tag] of declaredKeys) {
+      if (derivedKeys.has(key)) continue
+      line(`     fk HAND-ONLY   ${tag}`)
+    }
+    for (const note of derived.notes) line(`     note: ${note}`)
+  }
   for (const declaration of report.unexamined) {
     line(
       `\n  ── ${declaration.schema}.${declaration.relation}  (relkind ${declaration.relkind}, never examined: ${declaration.reason})`
@@ -181,6 +208,20 @@ function renderService(
     if (derived.planRefusal) {
       census.set(derived.planRefusal, (census.get(derived.planRefusal) ?? 0) + 1)
     }
+    for (const target of derived.declinedViewTargets) {
+      census.set(target.refusal, (census.get(target.refusal) ?? 0) + 1)
+    }
+  }
+  for (const table of report.tables) {
+    const { derived } = table
+    if (derived.foreignKeys.length === 0 && derived.declinedViewTargets.length === 0) continue
+    const declined = [...new Set(derived.declinedViewTargets.map((target) => target.refusal))]
+      .sort()
+      .join(' + ')
+    line(
+      `     ${derived.schema}.${derived.table} [table] — ${derived.foreignKeys.length} fk led` +
+        `${declined ? ` — declined: ${declined}` : ''}`
+    )
     for (const target of derived.declinedViewTargets) {
       census.set(target.refusal, (census.get(target.refusal) ?? 0) + 1)
     }

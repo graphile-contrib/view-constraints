@@ -23,6 +23,7 @@ import {
   explainStatement,
   readCatalogRelations,
   readStrictEquality,
+  readTables,
   readTypeCoercions,
   readViews,
   readViewSources
@@ -128,6 +129,8 @@ const catalog = await readCatalogRelations(runQueryOn(lab))
 const coercions = await readTypeCoercions(runQueryOn(lab))
 const strictEquality = await readStrictEquality(runQueryOn(lab))
 const views = await readViews(runQueryOn(lab), ['lab'])
+// The tables of the lab, each a referencing half of a relation to a projection.
+const tables = await readTables(runQueryOn(lab), ['lab'])
 // The views each lab view is built on: the map a `Subquery Scan` over one of them is
 // crossed by, and a fact about the schema rather than about any plan.
 const viewSources = (await readViewSources(runQueryOn(lab))).filter((view) => view.schema === 'lab')
@@ -206,6 +209,7 @@ writeFileSync(
         )
       },
       strictEquality,
+      tables,
       viewSources,
       views: planned
     },

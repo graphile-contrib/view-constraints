@@ -294,6 +294,20 @@ create table shift (
 create view v_crew as select seat as berth, ship_code as vessel, name from crew;
 create view v_shift as select id, seat, ship_code from shift;
 
+-- Every table above is a referencing half as well: its own foreign key is the very
+-- `pg_constraint` row a view's relation is derived down to, so `invoice.merchant_id`
+-- is led to `v_merchant` exactly as `v_invoice.merchant_id` is, `parcel.carrier_id`
+-- is declined between the two projections of `carrier`, and `crate.depot_id` is led
+-- nowhere, `v_depot_joined` repeating `depot`'s key rather than being keyed by it.
+--
+-- NEGATIVE, a foreign key added NOT VALID: it promises nothing about the rows already
+-- in the table, so it is no referencing half, though `v_merchant` is the one
+-- projection of the key it names.
+create table consignment (id bigint primary key, merchant_id bigint not null);
+alter table consignment
+  add constraint consignment_merchant_id_fkey foreign key (merchant_id) references merchant (id)
+  not valid;
+
 -- ── Row identity ───────────────────────────────────────────────────────────────
 --
 -- A key is carried up the plan the way a value is, and every node answers which of
