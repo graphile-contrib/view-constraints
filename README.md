@@ -46,6 +46,23 @@ is only used to show the join does not multiply rows: whether the planner keeps 
 read across a cast. Only a key that is one base relation's own can be the target
 of a relation to a projection.
 
+## A relation to a projection
+
+Where a published view is a row of a base relation — its `@primaryKey` is that
+relation's own unique key, carried — a relation to that key is led to the view too,
+beside the relation to the table. The referencing half is either a relation derived
+for a view, or a real `convalidated` foreign key of a table of the same surface (a
+table in one of the service's schemas some column of which the role may read). The
+relation is nullable.
+
+Exactly one view of the surface may be a row of the key: with several, nothing is
+led and the view or table names the refusal `more-than-one-projection-carries-the-key`
+and the candidates. A view published as an `@enum`, and one whose hand-written
+`@primaryKey` names other columns, is no candidate. A view is not led to its own row
+over the very columns it carries. A table's foreign key itself is left to
+`PgRelationsPlugin`; only the relation to the projection is declared, and not where
+the table already states the same reference by hand.
+
 ## Non-nullness
 
 A column is `@notNull` when it proxies a base column that is never `NULL` where it

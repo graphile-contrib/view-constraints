@@ -41,9 +41,9 @@
 import type {} from 'postgraphile'
 import { collectViewConstraints } from './collect.ts'
 import type { RunQuery } from './collect.ts'
-import type { ViewDerivation } from './derive.ts'
+import type { TableDerivation, ViewDerivation } from './derive.ts'
 
-export type { ViewDerivation } from './derive.ts'
+export type { TableDerivation, ViewDerivation } from './derive.ts'
 export type { ColumnOrigin, ColumnSources } from './plan-origins.ts'
 
 /** What one view was found to declare by hand, next to what was derived for it. */
@@ -57,9 +57,18 @@ export interface ViewConstraintsComparison {
   declaredNotNullColumns: string[]
 }
 
+/** What one table's foreign keys were led to, next to the `@foreignKey` tags it carries. */
+export interface TableConstraintsComparison {
+  derived: TableDerivation
+  /** `@foreignKey` tags already on the table, from smart tags or SQL comments. */
+  declaredForeignKeys: string[]
+}
+
 /**
  * A relation that declares a key or a non-null column by hand and this plugin never
- * looked at. Reported rather than skipped silently: the diff between what
+ * looked at. A table is looked at only for its foreign keys, so a table's own
+ * `@primaryKey` and `@notNull` tags are reported here, and its `@foreignKey` tags
+ * beside what it led in `ViewConstraintsReport.tables`. Reported rather than skipped silently: the diff between what
  * is derived and what is asserted is only complete if the unreachable assertions
  * are named too.
  */
@@ -79,6 +88,7 @@ export interface ViewConstraintsReport {
   serviceName: string
   schemas: string[]
   views: ViewConstraintsComparison[]
+  tables: TableConstraintsComparison[]
   unexamined: UnexaminedDeclaration[]
   /** Views whose plan the database refused to produce, with its reason. */
   failures: { schema: string; view: string; relkind: 'v' | 'm'; error: string }[]
@@ -181,7 +191,8 @@ export function PgViewConstraintsPlugin(
       "Derives a view's foreign keys, primary key and non-null columns from the " +
       "planner's account of where its columns come from, confirmed against " +
       'pg_constraint, pg_index and pg_attribute, and states them as the smart tags ' +
-      'PgFakeConstraintsPlugin already understands.',
+      "PgFakeConstraintsPlugin already understands; and leads a view's or a " +
+      "table's foreign key to the projection of the surface keyed by the key it references.",
     after: ['smart-tags'],
     before: ['PgFakeConstraintsPlugin'],
     gather: {
@@ -288,8 +299,32 @@ export function PgViewConstraintsPlugin(
             }
           }
 
+          // A table's foreign keys led to a projection are declared the way a view's
+          // are, and on the same terms: a reference the table already states by hand is
+          // not stated a second time.
+          const tables: TableConstraintsComparison[] = []
+          for (const derived of collected.tables) {
+            const pgClass = classOf(derived.schema, derived.table)
+            if (!pgClass) continue
+            const tags = pgClass.getTagsAndDescription().tags
+            tables.push({ derived, declaredForeignKeys: asStringArray(tags['foreignKey']) })
+            if (!declare) continue
+            const alreadyDeclared = new Set(
+              asStringArray(tags['foreignKey']).map(foreignKeyReference)
+            )
+            const toDeclare = derived.foreignKeys
+              .map((foreignKey) => foreignKey.tag)
+              .filter((tag) => !alreadyDeclared.has(foreignKeyReference(tag)))
+            if (toDeclare.length > 0) {
+              tags['foreignKey'] = [...asStringArray(tags['foreignKey']), ...toDeclare]
+            }
+          }
+
           const examined = new Set(
             collected.derivations.map((derived) => `${derived.schema}.${derived.view}`)
+          )
+          const examinedTables = new Set(
+            collected.tables.map((derived) => `${derived.schema}.${derived.table}`)
           )
           const refused = new Map([
             ...collected.failures.map(
@@ -305,7 +340,10 @@ export function PgViewConstraintsPlugin(
             if (!namespace || !schemas.includes(namespace)) continue
             if (examined.has(`${namespace}.${pgClass.relname}`)) continue
             const tags = pgClass.getTags()
-            const declaredForeignKeys = asStringArray(tags['foreignKey'])
+            // A table's `@foreignKey` tags are compared beside what it led, above.
+            const declaredForeignKeys = examinedTables.has(`${namespace}.${pgClass.relname}`)
+              ? []
+              : asStringArray(tags['foreignKey'])
             const declaredPrimaryKey =
               typeof tags['primaryKey'] === 'string' ? tags['primaryKey'] : null
             const declaredNotNullColumns = declaredNotNullColumnsOf(pgClass)
@@ -338,6 +376,7 @@ export function PgViewConstraintsPlugin(
             serviceName,
             schemas: [...schemas],
             views,
+            tables,
             unexamined,
             failures: collected.failures,
             skipped: collected.skipped

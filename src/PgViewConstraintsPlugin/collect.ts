@@ -10,6 +10,7 @@ import type {
   CatalogRelation,
   DeclaredRowIdentity,
   PublishedAsEnumeration,
+  TableDerivation,
   TypeCoercions,
   ViewColumn,
   ViewDerivation
@@ -103,6 +104,26 @@ const VIEW_QUERY = `
                       AND attribute.attnum > 0
                       AND NOT attribute.attisdropped
                       AND has_column_privilege(class.oid, attribute.attnum, 'SELECT')))
+  ORDER BY 1, 2`
+
+// The tables of the schemas asked about, whose own foreign keys may be led to a
+// projection. Nothing is planned for a table — its foreign keys are `pg_constraint`
+// rows on its own columns — so the only question is whether it is this surface's
+// business at all, answered as it is for a plain view: some column of it this role
+// may read.
+const TABLE_QUERY = `
+  SELECT namespace.nspname AS schema,
+         class.relname     AS table
+  FROM pg_class class
+           JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
+  WHERE class.relkind IN ('r', 'p')
+    AND namespace.nspname = ANY ($1)
+    AND EXISTS (SELECT 1
+                FROM pg_attribute attribute
+                WHERE attribute.attrelid = class.oid
+                  AND attribute.attnum > 0
+                  AND NOT attribute.attisdropped
+                  AND has_column_privilege(class.oid, attribute.attnum, 'SELECT'))
   ORDER BY 1, 2`
 
 // `convalidated` is required: a NOT VALID constraint promises nothing about the rows
@@ -434,6 +455,14 @@ export async function readViews(query: RunQuery, schemas: string[]): Promise<rea
   return query<ViewRow>(VIEW_QUERY, [schemas])
 }
 
+/** The tables of `schemas` this role has business with; see `TABLE_QUERY`. */
+export async function readTables(
+  query: RunQuery,
+  schemas: string[]
+): Promise<readonly { schema: string; table: string }[]> {
+  return query<{ schema: string; table: string }>(TABLE_QUERY, [schemas])
+}
+
 export function explainStatement(view: {
   schema: string
   view: string
@@ -460,6 +489,8 @@ export const NO_PRIVILEGED_CONNECTION_REASON =
 
 export interface CollectResult {
   derivations: ViewDerivation[]
+  /** Every table of the schemas this role may read, with what its foreign keys led to. */
+  tables: TableDerivation[]
   /** Views whose plan could not be obtained at all, with the database's reason. */
   failures: { schema: string; view: string; relkind: 'v' | 'm'; error: string }[]
   /** Views this reader deliberately did not plan, with the reason it did not. */
@@ -539,9 +570,22 @@ export async function collectViewConstraints(
       )
     )
   }
+  const tables: TableDerivation[] = (await readTables(query, schemas)).map((table) => ({
+    schema: table.schema,
+    table: table.table,
+    foreignKeys: [],
+    declinedViewTargets: [],
+    notes: []
+  }))
   // Every view of this surface is derived before any of them is led to a projection:
   // which view is keyed by a base key is an answer over the whole surface, not over
   // one view, and the reader may not begin answering it half-read.
-  deriveProjectionRelations(derivations, catalog, publishedAsEnumeration, declaredRowIdentity)
-  return { derivations, failures, skipped }
+  deriveProjectionRelations(
+    derivations,
+    catalog,
+    publishedAsEnumeration,
+    declaredRowIdentity,
+    tables
+  )
+  return { derivations, tables, failures, skipped }
 }

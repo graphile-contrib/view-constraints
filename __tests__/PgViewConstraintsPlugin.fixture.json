@@ -117,6 +117,31 @@
     },
     {
       "schema": "lab",
+      "relation": "consignment",
+      "foreignKeys": [],
+      "uniqueKeys": [
+        {
+          "name": "consignment_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "merchant_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "crate",
       "foreignKeys": [
         {
@@ -835,7 +860,7 @@
           "notNull": true
         },
         "cur_code": {
-          "typeId": 30773249,
+          "typeId": 124895465,
           "typeMod": -1,
           "notNull": true
         }
@@ -3118,10 +3143,124 @@
   "coercions": {
     "binary": ["1043>25", "25>1043"],
     "domainBase": {
-      "30773249": 25
+      "124895465": 25
     }
   },
   "strictEquality": true,
+  "tables": [
+    {
+      "schema": "lab",
+      "table": "asset"
+    },
+    {
+      "schema": "lab",
+      "table": "bank"
+    },
+    {
+      "schema": "lab",
+      "table": "berth"
+    },
+    {
+      "schema": "lab",
+      "table": "carrier"
+    },
+    {
+      "schema": "lab",
+      "table": "consignment"
+    },
+    {
+      "schema": "lab",
+      "table": "crate"
+    },
+    {
+      "schema": "lab",
+      "table": "crew"
+    },
+    {
+      "schema": "lab",
+      "table": "currency"
+    },
+    {
+      "schema": "lab",
+      "table": "deferred_code"
+    },
+    {
+      "schema": "lab",
+      "table": "depot"
+    },
+    {
+      "schema": "lab",
+      "table": "entry"
+    },
+    {
+      "schema": "lab",
+      "table": "invoice"
+    },
+    {
+      "schema": "lab",
+      "table": "ledger"
+    },
+    {
+      "schema": "lab",
+      "table": "merchant"
+    },
+    {
+      "schema": "lab",
+      "table": "mooring"
+    },
+    {
+      "schema": "lab",
+      "table": "node"
+    },
+    {
+      "schema": "lab",
+      "table": "parcel"
+    },
+    {
+      "schema": "lab",
+      "table": "refund"
+    },
+    {
+      "schema": "lab",
+      "table": "region"
+    },
+    {
+      "schema": "lab",
+      "table": "sale"
+    },
+    {
+      "schema": "lab",
+      "table": "shift"
+    },
+    {
+      "schema": "lab",
+      "table": "slot"
+    },
+    {
+      "schema": "lab",
+      "table": "store"
+    },
+    {
+      "schema": "lab",
+      "table": "ticket"
+    },
+    {
+      "schema": "lab",
+      "table": "tx"
+    },
+    {
+      "schema": "lab",
+      "table": "tx2"
+    },
+    {
+      "schema": "lab",
+      "table": "tx3"
+    },
+    {
+      "schema": "lab",
+      "table": "wallet"
+    }
+  ],
   "viewSources": [
     {
       "schema": "lab",
