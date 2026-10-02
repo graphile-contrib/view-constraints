@@ -1,6 +1,6 @@
 {
   "name": "@graphile-contrib/view-constraints",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Derive PostGraphile view constraints from PostgreSQL plans and catalogs.",
   "type": "module",
   "main": "./dist/index.js",
