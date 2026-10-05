@@ -238,6 +238,33 @@ export interface TreeOrigin {
   attnum: number
 }
 
+/**
+ * The fields the reader takes from each node type it reads anything out of. The walk
+ * fails the whole tree on a node of one of these types that does not carry every field
+ * listed, so a field renamed or removed on a node the reader depends on is a refusal
+ * rather than a silent empty answer. The reader does not demand that a node carry
+ * *only* these fields — PostgreSQL prints a different field *set* per type and the
+ * sets move between majors (PostgreSQL 15 and 16 print a field on these nodes that 17
+ * and 18 do not), so an unknown field with a well-formed value is read past, while a
+ * missing one the reader needs fails the tree. Node types the reader only walks past
+ * (`VAR`, `CONST`, …) are not listed: nothing is taken from them.
+ */
+const REQUIRED_NODE_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['QUERY', ['cteList', 'targetList']],
+  ['TARGETENTRY', ['resorigtbl', 'resorigcol']],
+  ['COMMONTABLEEXPR', ['ctename', 'ctecolnames']],
+  ['RANGETBLENTRY', ['rtekind', 'alias']],
+  ['ALIAS', ['aliasname']]
+])
+
+/** Whether a node of the walk carries every field this reader needs of its type. */
+function hasRequiredFields(node: Extract<Dumped, { kind: 'node' }>): boolean {
+  const required = REQUIRED_NODE_FIELDS.get(node.type)
+  if (required === undefined) return true
+  for (const field of required) if (!node.fields.has(field)) return false
+  return true
+}
+
 /** Everything this reader takes from a view's stored tree. */
 export interface ViewTree {
   /** Whether the whole tree parsed. `false` means none of the rest is trusted. */
@@ -269,6 +296,13 @@ export function readViewTree(action: string): ViewTree {
   const root = parsed.value
   const top = root.kind === 'list' ? nodesOf(root)[0] : root
   if (top?.kind !== 'node' || top.type !== 'QUERY') return tree
+  // Closed by default: a node this reader takes anything from must carry only fields it
+  // knows for its type, or the format has moved and nothing here is trusted.
+  let known = true
+  walkDumped(root, (node) => {
+    if (known && !hasRequiredFields(node)) known = false
+  })
+  if (!known) return tree
   tree.ok = true
 
   // The whole tree, so a `WITH` query nested in another query's body is reached: a name

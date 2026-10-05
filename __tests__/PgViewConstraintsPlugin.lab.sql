@@ -788,3 +788,55 @@ create view v_cte_name_shadowed_fk as
 create view v_cte_where_false as
   with live as materialized (select id, cur_code from tx)
   select live.id, live.cur_code from live where false;
+
+-- ── A `WITH` name shared across the views a query goes through ──────────────────
+--
+-- The plan spells a `CTE Scan` with the `WITH` query's own name and never says which
+-- view's query it is. A name the analysed view and one of its source views both define
+-- — the source's materialized, so it leaves a `CTE live` subplan, the analysed view's
+-- inlined, so its own tree shows no clash — cannot be pinned to either, and reading it
+-- off the analysed view's map puts the source's columns behind the wrong names. The
+-- data is here so a case that crossed the wrong query would emit a tag the rows
+-- contradict.
+
+create table parent (id int primary key);
+create table child (id int primary key, ref int not null references parent(id), plain int not null);
+insert into parent values (1);
+insert into child values (1, 1, 5);
+
+-- NEGATIVE: `v_cte_cross_view.sx` is `v_cte_cross_src.x`, a nullable `need.nul`, but the
+-- source's own `live` computes `need.nn` at the position `x` stands at in the analysed
+-- view's `live`.
+create view v_cte_cross_src as
+  with live as materialized (select id as k, nn as y, nul as x from need)
+  select a.k, a.x from live a join live b using (k);
+create view v_cte_cross_view as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.x as sx from live o join v_cte_cross_src s on s.k = o.y;
+
+-- NEGATIVE: the same with a key in play. `sx` is `child.plain`, no key, but the source's
+-- `live` computes `child.ref` at that position, which references `parent`.
+create view v_cte_cross_src_fk as
+  with live as materialized (select id as k, ref as y, plain as x from child)
+  select a.k, a.x from live a join live b using (k);
+create view v_cte_cross_view_fk as
+  with live as (select id as y, ref as x from child)
+  select o.y as oy, s.x as sx from live o join v_cte_cross_src_fk s on s.k = o.y;
+
+-- NEGATIVE: a source reached through two views, so the clash is not direct.
+create view v_cte_cross_mid as
+  with live as materialized (select id as k, nn as y, nul as x from need)
+  select a.k, a.x from live a join live b using (k);
+create view v_cte_cross_src2 as select k, x from v_cte_cross_mid;
+create view v_cte_cross_view_two as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.x as sx from live o join v_cte_cross_src2 s on s.k = o.y;
+
+-- NEGATIVE: both `live` queries inlined, so the plan carries no subplan of that name and
+-- the source's `live` leaves no trace; the clash is still refused rather than read.
+create view v_cte_cross_src_once as
+  with live as (select id as k, nul as x from need)
+  select k, x from live;
+create view v_cte_cross_view_inlined as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.x as sx from live o join v_cte_cross_src_once s on s.k = o.y;

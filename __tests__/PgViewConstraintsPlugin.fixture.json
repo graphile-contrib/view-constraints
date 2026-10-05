@@ -117,6 +117,44 @@
     },
     {
       "schema": "lab",
+      "relation": "child",
+      "foreignKeys": [
+        {
+          "constraintName": "child_ref_fkey",
+          "columns": ["ref"],
+          "foreignSchema": "lab",
+          "foreignRelation": "parent",
+          "foreignColumns": ["id"]
+        }
+      ],
+      "uniqueKeys": [
+        {
+          "name": "child_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "ref": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "plain": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "consignment",
       "foreignKeys": [],
       "uniqueKeys": [
@@ -608,6 +646,26 @@
     },
     {
       "schema": "lab",
+      "relation": "parent",
+      "foreignKeys": [],
+      "uniqueKeys": [
+        {
+          "name": "parent_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "refund",
       "foreignKeys": [
         {
@@ -958,7 +1016,7 @@
           "notNull": true
         },
         "cur_code": {
-          "typeId": 152345678,
+          "typeId": 152483511,
           "typeMod": -1,
           "notNull": true
         }
@@ -1498,7 +1556,7 @@
           "notNull": false
         },
         "mystery_id": {
-          "typeId": 152346555,
+          "typeId": 152484388,
           "typeMod": -1,
           "notNull": false
         }
@@ -1661,6 +1719,177 @@
         },
         "n": {
           "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cte_cross_mid",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "k": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "x": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cte_cross_src",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "k": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "x": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cte_cross_src_fk",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "k": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "x": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cte_cross_src_once",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "k": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "x": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cte_cross_src2",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "k": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "x": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cte_cross_view",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "oy": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "sx": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cte_cross_view_fk",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "oy": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "sx": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cte_cross_view_inlined",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "oy": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "sx": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cte_cross_view_two",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "oy": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "sx": {
+          "typeId": 23,
           "typeMod": -1,
           "notNull": false
         }
@@ -4096,7 +4325,7 @@
           "notNull": false
         },
         "ii": {
-          "typeId": 152346587,
+          "typeId": 152484421,
           "typeMod": -1,
           "notNull": false
         }
@@ -4201,8 +4430,8 @@
   "coercions": {
     "binary": ["1043>25", "25>1043"],
     "domainBase": {
-      "152345678": 25,
-      "152346587": 20
+      "152483511": 25,
+      "152484421": 20
     }
   },
   "strictEquality": true,
@@ -4228,6 +4457,10 @@
     {
       "schema": "lab",
       "table": "carrier"
+    },
+    {
+      "schema": "lab",
+      "table": "child"
     },
     {
       "schema": "lab",
@@ -4292,6 +4525,10 @@
     {
       "schema": "lab",
       "table": "parcel"
+    },
+    {
+      "schema": "lab",
+      "table": "parent"
     },
     {
       "schema": "lab",
@@ -4542,6 +4779,60 @@
       "name": "v_cte_aggregate",
       "columns": ["cur_code", "n"],
       "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_cte_cross_mid",
+      "columns": ["k", "x"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_cte_cross_src",
+      "columns": ["k", "x"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_cte_cross_src2",
+      "columns": ["k", "x"],
+      "sources": ["lab.v_cte_cross_mid"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_cte_cross_src_fk",
+      "columns": ["k", "x"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_cte_cross_src_once",
+      "columns": ["k", "x"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_cte_cross_view",
+      "columns": ["oy", "sx"],
+      "sources": ["lab.v_cte_cross_src"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_cte_cross_view_fk",
+      "columns": ["oy", "sx"],
+      "sources": ["lab.v_cte_cross_src_fk"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_cte_cross_view_inlined",
+      "columns": ["oy", "sx"],
+      "sources": ["lab.v_cte_cross_src_once"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_cte_cross_view_two",
+      "columns": ["oy", "sx"],
+      "sources": ["lab.v_cte_cross_src2"]
     },
     {
       "schema": "lab",
@@ -6623,7 +6914,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152346555,
+          "typeId": 152484388,
           "typeMod": -1
         }
       ],
@@ -7108,6 +7399,793 @@
                 "Schema": "lab",
                 "Relation Name": "tx",
                 "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_mid",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src2",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "k",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "v_cte_cross_mid": "v_cte_cross_mid"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_fk",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "plain",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "child": "child"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["child.id", "child.ref", "child.plain"],
+            "Schema": "lab",
+            "Relation Name": "child",
+            "Alias": "child",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_once",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["need.id", "need.nul"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_fk",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_fk",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "child": "child",
+        "s": "v_cte_cross_src_fk"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["child.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = child.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child_1.id", "child_1.ref", "child_1.plain"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["child.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child.id"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_inlined",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_once",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src_once"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "need_1.nul"],
+        "Join Type": "Inner",
+        "Hash Cond": "(need_1.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need_1.id", "need_1.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_two",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src2",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src2"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
                 "Parent Relationship": "Outer"
               }
             ]
@@ -14275,7 +15353,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152346587,
+          "typeId": 152484421,
           "typeMod": -1
         }
       ],
@@ -14318,7 +15396,7 @@
           "typeMod": -1
         }
       ],
-      "treeOk": true,
+      "treeOk": false,
       "cteColumns": {},
       "cteAmbiguous": [],
       "treeColumns": {},
@@ -15743,7 +16821,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152346555,
+          "typeId": 152484388,
           "typeMod": -1
         }
       ],
@@ -16228,6 +17306,793 @@
                 "Schema": "lab",
                 "Relation Name": "tx",
                 "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_mid",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src2",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "k",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "v_cte_cross_mid": "v_cte_cross_mid"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_fk",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "plain",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "child": "child"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["child.id", "child.ref", "child.plain"],
+            "Schema": "lab",
+            "Relation Name": "child",
+            "Alias": "child",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_once",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["need.id", "need.nul"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_fk",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_fk",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "child": "child",
+        "s": "v_cte_cross_src_fk"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["child.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = child.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child_1.id", "child_1.ref", "child_1.plain"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["child.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child.id"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_inlined",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_once",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src_once"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "need_1.nul"],
+        "Join Type": "Inner",
+        "Hash Cond": "(need_1.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need_1.id", "need_1.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_two",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src2",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src2"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
                 "Parent Relationship": "Outer"
               }
             ]
@@ -23395,7 +25260,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152346587,
+          "typeId": 152484421,
           "typeMod": -1
         }
       ],
@@ -23438,7 +25303,7 @@
           "typeMod": -1
         }
       ],
-      "treeOk": true,
+      "treeOk": false,
       "cteColumns": {},
       "cteAmbiguous": [],
       "treeColumns": {},
@@ -25048,7 +26913,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152346555,
+          "typeId": 152484388,
           "typeMod": -1
         }
       ],
@@ -25587,6 +27452,877 @@
                     "Schema": "lab",
                     "Relation Name": "tx",
                     "Alias": "tx",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_mid",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Gather",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id", "need.nn", "need.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Gather",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id", "need.nn", "need.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src2",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "k",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "v_cte_cross_mid": "v_cte_cross_mid"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Gather",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id", "need.nn", "need.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_fk",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "plain",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "child": "child"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Gather",
+            "Output": ["child.id", "child.ref", "child.plain"],
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child.id", "child.ref", "child.plain"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_once",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["need.id", "need.nul"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Gather",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                    "Schema": "lab",
+                    "Relation Name": "need",
+                    "Alias": "need_1",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Gather",
+                "Output": ["need.id"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["need.id"],
+                    "Schema": "lab",
+                    "Relation Name": "need",
+                    "Alias": "need",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_fk",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_fk",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "child": "child",
+        "s": "v_cte_cross_src_fk"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["child.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = child.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Gather",
+                "Output": ["child_1.id", "child_1.ref", "child_1.plain"],
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["child_1.id", "child_1.ref", "child_1.plain"],
+                    "Schema": "lab",
+                    "Relation Name": "child",
+                    "Alias": "child_1",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["child.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Gather",
+                "Output": ["child.id"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["child.id"],
+                    "Schema": "lab",
+                    "Relation Name": "child",
+                    "Alias": "child",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_inlined",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_once",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src_once"
+      },
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["need.id", "need_1.nul"],
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["need.id", "need_1.nul"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(need_1.id = need.id)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["need.id"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["need.id"],
+                    "Schema": "lab",
+                    "Relation Name": "need",
+                    "Alias": "need",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_two",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src2",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src2"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Gather",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                    "Schema": "lab",
+                    "Relation Name": "need",
+                    "Alias": "need_1",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Gather",
+                "Output": ["need.id"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["need.id"],
+                    "Schema": "lab",
+                    "Relation Name": "need",
+                    "Alias": "need",
                     "Parent Relationship": "Outer"
                   }
                 ]
@@ -33716,7 +36452,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152346587,
+          "typeId": 152484421,
           "typeMod": -1
         }
       ],
@@ -33766,7 +36502,7 @@
           "typeMod": -1
         }
       ],
-      "treeOk": true,
+      "treeOk": false,
       "cteColumns": {},
       "cteAmbiguous": [],
       "treeColumns": {},
@@ -35198,7 +37934,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152346555,
+          "typeId": 152484388,
           "typeMod": -1
         }
       ],
@@ -35698,6 +38434,793 @@
                     "Parent Relationship": "Outer"
                   }
                 ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_mid",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src2",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "k",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "v_cte_cross_mid": "v_cte_cross_mid"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_fk",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "plain",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "child": "child"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["child.id", "child.ref", "child.plain"],
+            "Schema": "lab",
+            "Relation Name": "child",
+            "Alias": "child",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_once",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["need.id", "need.nul"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_fk",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_fk",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "child": "child",
+        "s": "v_cte_cross_src_fk"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["child.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = child.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child_1.id", "child_1.ref", "child_1.plain"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["child.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child.id"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_inlined",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_once",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src_once"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "need_1.nul"],
+        "Join Type": "Inner",
+        "Hash Cond": "(need_1.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need_1.id", "need_1.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_two",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src2",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src2"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
               }
             ]
           }
@@ -42999,7 +46522,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152346587,
+          "typeId": 152484421,
           "typeMod": -1
         }
       ],
@@ -43042,7 +46565,7 @@
           "typeMod": -1
         }
       ],
-      "treeOk": true,
+      "treeOk": false,
       "cteColumns": {},
       "cteAmbiguous": [],
       "treeColumns": {},
@@ -44467,7 +47990,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152346555,
+          "typeId": 152484388,
           "typeMod": -1
         }
       ],
@@ -44952,6 +48475,744 @@
                 "Schema": "lab",
                 "Relation Name": "tx",
                 "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_mid",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["a.k", "a.y", "a.x"],
+            "Alias": "a",
+            "Parent Relationship": "Outer",
+            "CTE Name": "live"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["a.k", "a.y", "a.x"],
+            "Alias": "a",
+            "Parent Relationship": "Outer",
+            "CTE Name": "live"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src2",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "k",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "v_cte_cross_mid": "v_cte_cross_mid"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["a.k", "a.y", "a.x"],
+            "Alias": "a",
+            "Parent Relationship": "Outer",
+            "CTE Name": "live"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_fk",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "plain",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "child": "child"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["child.id", "child.ref", "child.plain"],
+            "Schema": "lab",
+            "Relation Name": "child",
+            "Alias": "child",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["a.k", "a.y", "a.x"],
+            "Alias": "a",
+            "Parent Relationship": "Outer",
+            "CTE Name": "live"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_once",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["need.id", "need.nul"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.y", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_fk",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_fk",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "child": "child",
+        "s": "v_cte_cross_src_fk"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["child.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = child.id)",
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child_1.id", "child_1.ref", "child_1.plain"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.y", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["child.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child.id"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_inlined",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_once",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src_once"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "need_1.nul"],
+        "Join Type": "Inner",
+        "Hash Cond": "(need_1.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need_1.id", "need_1.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_two",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src2",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src2"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.y", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
                 "Parent Relationship": "Outer"
               }
             ]
@@ -52070,7 +56331,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152346587,
+          "typeId": 152484421,
           "typeMod": -1
         }
       ],
@@ -52113,7 +56374,7 @@
           "typeMod": -1
         }
       ],
-      "treeOk": true,
+      "treeOk": false,
       "cteColumns": {},
       "cteAmbiguous": [],
       "treeColumns": {},
@@ -53554,7 +57815,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152346555,
+          "typeId": 152484388,
           "typeMod": -1
         }
       ],
@@ -54050,6 +58311,797 @@
                 "Relation Name": "tx",
                 "Alias": "tx",
                 "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_mid",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src2",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "k",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "v_cte_cross_mid": "v_cte_cross_mid"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_fk",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "plain",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "child": "child"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["child.id", "child.ref", "child.plain"],
+            "Schema": "lab",
+            "Relation Name": "child",
+            "Alias": "child",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_once",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["need.id", "need.nul"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer",
+                "Index Name": "need_pkey"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_fk",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_fk",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "child": "child",
+        "s": "v_cte_cross_src_fk"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["child.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = child.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child_1.id", "child_1.ref", "child_1.plain"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["child.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["child.id"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child",
+                "Parent Relationship": "Outer",
+                "Index Name": "child_pkey"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_inlined",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_once",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src_once"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "need_1.nul"],
+        "Join Type": "Inner",
+        "Hash Cond": "(need_1.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need_1.id", "need_1.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer",
+                "Index Name": "need_pkey"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_two",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src2",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src2"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer",
+                "Index Name": "need_pkey"
               }
             ]
           }
@@ -61442,7 +66494,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152346587,
+          "typeId": 152484421,
           "typeMod": -1
         }
       ],
@@ -61485,7 +66537,7 @@
           "typeMod": -1
         }
       ],
-      "treeOk": true,
+      "treeOk": false,
       "cteColumns": {},
       "cteAmbiguous": [],
       "treeColumns": {},
@@ -62898,7 +67950,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152346555,
+          "typeId": 152484388,
           "typeMod": -1
         }
       ],
@@ -63367,6 +68419,671 @@
                 "Parent Relationship": "Outer"
               }
             ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_mid",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Join Filter": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["a.k", "a.y", "a.x"],
+            "Alias": "a",
+            "Parent Relationship": "Outer",
+            "CTE Name": "live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["b.k", "b.y", "b.x"],
+            "Alias": "b",
+            "Parent Relationship": "Inner",
+            "CTE Name": "live"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Join Filter": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["a.k", "a.y", "a.x"],
+            "Alias": "a",
+            "Parent Relationship": "Outer",
+            "CTE Name": "live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["b.k", "b.y", "b.x"],
+            "Alias": "b",
+            "Parent Relationship": "Inner",
+            "CTE Name": "live"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src2",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "k",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "v_cte_cross_mid": "v_cte_cross_mid"
+      },
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Join Filter": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["a.k", "a.y", "a.x"],
+            "Alias": "a",
+            "Parent Relationship": "Outer",
+            "CTE Name": "live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["b.k", "b.y", "b.x"],
+            "Alias": "b",
+            "Parent Relationship": "Inner",
+            "CTE Name": "live"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_fk",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "plain",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "child": "child"
+      },
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Join Filter": "(a.k = b.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["child.id", "child.ref", "child.plain"],
+            "Schema": "lab",
+            "Relation Name": "child",
+            "Alias": "child",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["a.k", "a.y", "a.x"],
+            "Alias": "a",
+            "Parent Relationship": "Outer",
+            "CTE Name": "live"
+          },
+          {
+            "Node Type": "CTE Scan",
+            "Output": ["b.k", "b.y", "b.x"],
+            "Alias": "b",
+            "Parent Relationship": "Inner",
+            "CTE Name": "live"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_once",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["need.id", "need.nul"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src"
+      },
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Plans": [
+          {
+            "Node Type": "Nested Loop",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Join Filter": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.y", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              },
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k", "b.y", "b.x"],
+                "Alias": "b",
+                "Parent Relationship": "Inner",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Index Only Scan",
+            "Output": ["need.id"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Inner",
+            "Index Name": "need_pkey",
+            "Index Cond": "(need.id = a.k)"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_fk",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_fk",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "child": "child",
+        "s": "v_cte_cross_src_fk"
+      },
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["child.id", "a.x"],
+        "Join Type": "Inner",
+        "Plans": [
+          {
+            "Node Type": "Nested Loop",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Join Filter": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child_1.id", "child_1.ref", "child_1.plain"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.y", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              },
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k", "b.y", "b.x"],
+                "Alias": "b",
+                "Parent Relationship": "Inner",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Index Only Scan",
+            "Output": ["child.id"],
+            "Schema": "lab",
+            "Relation Name": "child",
+            "Alias": "child",
+            "Parent Relationship": "Inner",
+            "Index Name": "child_pkey",
+            "Index Cond": "(child.id = a.k)"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_inlined",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_once",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src_once"
+      },
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["need.id", "need_1.nul"],
+        "Join Type": "Inner",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need_1.id", "need_1.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Index Only Scan",
+            "Output": ["need.id"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Inner",
+            "Index Name": "need_pkey",
+            "Index Cond": "(need.id = need_1.id)"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_two",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src2",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src2"
+      },
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Plans": [
+          {
+            "Node Type": "Nested Loop",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Join Filter": "(a.k = b.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.y", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              },
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k", "b.y", "b.x"],
+                "Alias": "b",
+                "Parent Relationship": "Inner",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Index Only Scan",
+            "Output": ["need.id"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Inner",
+            "Index Name": "need_pkey",
+            "Index Cond": "(need.id = a.k)"
           }
         ]
       }
@@ -70357,7 +76074,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152346587,
+          "typeId": 152484421,
           "typeMod": -1
         }
       ],
@@ -70400,7 +76117,7 @@
           "typeMod": -1
         }
       ],
-      "treeOk": true,
+      "treeOk": false,
       "cteColumns": {},
       "cteAmbiguous": [],
       "treeColumns": {},
@@ -71825,7 +77542,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152346555,
+          "typeId": 152484388,
           "typeMod": -1
         }
       ],
@@ -72310,6 +78027,793 @@
                 "Schema": "lab",
                 "Relation Name": "tx",
                 "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_mid",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(b.k = a.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(b.k = a.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src2",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "k",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_mid",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "v_cte_cross_mid": "v_cte_cross_mid"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(b.k = a.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need.id", "need.nn", "need.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_fk",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "plain",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "child": "child"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.k", "a.x"],
+        "Join Type": "Inner",
+        "Merge Cond": "(b.k = a.k)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["child.id", "child.ref", "child.plain"],
+            "Schema": "lab",
+            "Relation Name": "child",
+            "Alias": "child",
+            "Parent Relationship": "InitPlan",
+            "Subplan Name": "CTE live"
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["b.k"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["b.k"],
+                "Alias": "b",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["a.k", "a.x"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "CTE Scan",
+                "Output": ["a.k", "a.x"],
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "CTE Name": "live"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_src_once",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "k",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "x",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["k", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "nul",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["need.id", "need.nul"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(b.k = a.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_fk",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "child",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_fk",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "child": "child",
+        "s": "v_cte_cross_src_fk"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["child.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = child.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(b.k = a.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child_1.id", "child_1.ref", "child_1.plain"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["child.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["child.id"],
+                "Schema": "lab",
+                "Relation Name": "child",
+                "Alias": "child",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_inlined",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src_once",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src_once"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "need_1.nul"],
+        "Join Type": "Inner",
+        "Hash Cond": "(need_1.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["need_1.id", "need_1.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cte_cross_view_two",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "oy",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "sx",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "live": ["y", "x"]
+      },
+      "cteAmbiguous": [],
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_cte_cross_src2",
+          "column": "x",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "need": "need",
+        "s": "v_cte_cross_src2"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["need.id", "a.x"],
+        "Join Type": "Inner",
+        "Hash Cond": "(a.k = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Merge Join",
+            "Output": ["a.k", "a.x"],
+            "Join Type": "Inner",
+            "Parent Relationship": "Outer",
+            "Merge Cond": "(b.k = a.k)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need_1.id", "need_1.nn", "need_1.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "InitPlan",
+                "Subplan Name": "CTE live"
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["b.k"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["b.k"],
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Sort",
+                "Output": ["a.k", "a.x"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "CTE Scan",
+                    "Output": ["a.k", "a.x"],
+                    "Alias": "a",
+                    "Parent Relationship": "Outer",
+                    "CTE Name": "live"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
                 "Parent Relationship": "Outer"
               }
             ]
@@ -79477,7 +85981,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152346587,
+          "typeId": 152484421,
           "typeMod": -1
         }
       ],
@@ -79520,7 +86024,7 @@
           "typeMod": -1
         }
       ],
-      "treeOk": true,
+      "treeOk": false,
       "cteColumns": {},
       "cteAmbiguous": [],
       "treeColumns": {},

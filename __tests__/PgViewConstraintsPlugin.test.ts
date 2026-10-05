@@ -38,6 +38,7 @@ import type {
 } from '../src/PgViewConstraintsPlugin/derive.ts'
 import {
   collectViewConstraints,
+  cteColumnsWithoutSourceCollisions,
   NO_PRIVILEGED_CONNECTION_REASON,
   ruleSpellingsShadowedFor,
   subqueryViewCandidates,
@@ -122,6 +123,22 @@ const viewObjects = new Map<string, Set<string>>(
 const shadowedFor = (schema: string, view: string): Set<string> =>
   ruleSpellingsShadowedFor(fixture.viewSources as ViewSourceRow[], viewObjects, schema, view)
 
+/** Every lab view's `WITH` column map, so a name two sources share is seen. */
+const fixtureTrees = new Map<string, { cteColumns: Map<string, string[]> }>()
+for (const view of fixture.views) {
+  fixtureTrees.set(`${view.schema}.${view.view}`, {
+    cteColumns: new Map(Object.entries(view.cteColumns ?? {}))
+  })
+}
+/** The `WITH` names the reader may cross for this view, with cross-view clashes dropped. */
+const cteColumnsFor = (schema: string, view: string): Map<string, string[]> =>
+  cteColumnsWithoutSourceCollisions(
+    fixture.viewSources as ViewSourceRow[],
+    fixtureTrees,
+    schema,
+    view
+  )
+
 const coercions: TypeCoercions = {
   binary: new Set(fixture.coercions.binary),
   domainBase: new Map(
@@ -163,7 +180,7 @@ function derive(
     (candidate) => candidate.view === name && candidate.regime === regime
   )
   assert.ok(view, `no fixture for lab.${name} under ${regime}`)
-  const cteColumns = new Map(Object.entries(view.cteColumns ?? {}))
+  const cteColumns = cteColumnsFor(view.schema, view.view)
   const treeColumns = new Map(
     Object.entries(view.treeColumns ?? {}).map(([position, column]) => [Number(position), column])
   )
@@ -1776,6 +1793,90 @@ const CASES: Case[] = [
     notNull: [],
     foreignKeys: ['(cur_code) references lab.currency (code)', '(id) references lab.tx (id)'],
     primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_src',
+    about: 'the source view of the cross-view clash: its own `live` reads as usual',
+    origins: ['k=need.id', 'x=need.nul'],
+    notNull: ['k'],
+    foreignKeys: ['(k) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_src_fk',
+    about: 'and the source of the key variant: `x` is `child.plain`, no key',
+    origins: ['k=child.id', 'x=child.plain'],
+    notNull: ['k', 'x'],
+    foreignKeys: ['(k) references lab.child (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_view',
+    about:
+      'the analysed view and its source both define `live`; the plan spells the ' +
+      'source’s `CTE Scan` `live` and never says which view’s query it is, so `sx` is ' +
+      'refused rather than read off the source’s subplan — really `need.nul`, the wrong ' +
+      '`live` would call it never NULL',
+    origins: ['oy=need.id', 'sx=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_view_fk',
+    about:
+      'the same with a key in play: the wrong `live` would lead `sx` — really ' +
+      '`child.plain` — to `parent` over `child.ref`’s foreign key',
+    origins: ['oy=child.id', 'sx=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.child (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_mid',
+    about: 'a source reached through two views, so the clash is not direct to the asked one',
+    origins: ['k=need.id', 'x=need.nul'],
+    notNull: ['k'],
+    foreignKeys: ['(k) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_src2',
+    about:
+      'a view over a materialized `WITH` query it does not define reads no column off ' +
+      'it: its own tree names no such query, and the source’s is not its to read',
+    origins: ['k=—', 'x=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_view_two',
+    about:
+      'the clash reached through two views: the name is dropped from the closure, so the ' +
+      'column is refused all the same',
+    origins: ['oy=need.id', 'sx=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_src_once',
+    about: 'a source whose `live` is inlined reads its base column directly',
+    origins: ['k=need.id', 'x=need.nul'],
+    notNull: ['k'],
+    foreignKeys: ['(k) references lab.need (id)'],
+    primaryKey: 'k'
+  },
+  {
+    view: 'v_cte_cross_view_inlined',
+    about:
+      'both `live` queries inlined: the plan carries no subplan of that name, so `sx` is ' +
+      'the base `need.nul` read directly and stays nullable',
+    origins: ['oy=need.id', 'sx=need.nul'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.need (id)'],
+    primaryKey: 'oy'
   }
 ]
 
@@ -1937,7 +2038,8 @@ test('a view’s stored tree is read by field name, and a format it does not kno
   assert.deepEqual(
     Object.fromEntries(
       readViewTree(
-        '({QUERY :rtable ({RANGETBLENTRY :alias {ALIAS :aliasname bank_range :colnames <>}' +
+        '({QUERY :cteList <> :targetList <> :rtable' +
+          ' ({RANGETBLENTRY :alias {ALIAS :aliasname bank_range :colnames <>}' +
           ' :rtekind 0 :relid 42} {RANGETBLENTRY :alias {ALIAS :aliasname s :colnames <>}' +
           ' :rtekind 1 :relid 0})})'
       ).relationAliases
@@ -1947,24 +2049,35 @@ test('a view’s stored tree is read by field name, and a format it does not kno
   // An identifier with a space is one escaped token, not two.
   assert.deepEqual(
     Object.fromEntries(
-      readViewTree('({QUERY :cteList ({COMMONTABLEEXPR :ctename *S*\\ 1 :ctecolnames ("x")})})')
-        .cteColumns
+      readViewTree(
+        '({QUERY :targetList <> :cteList ({COMMONTABLEEXPR :ctename *S*\\ 1 :ctecolnames ("x")})})'
+      ).cteColumns
     ),
     { '*S* 1': ['x'] }
   )
   // A `WITH` name at two query levels is ambiguous: the plan spells both by it and
   // cannot say which a `CTE Scan` reads, so neither is taken.
   const shadowed = readViewTree(
-    '({QUERY :cteList ({COMMONTABLEEXPR :ctename live :ctecolnames ("a")})' +
-      ' :rtable ({RANGETBLENTRY :rtekind 6 :ctequery {QUERY :cteList' +
-      ' ({COMMONTABLEEXPR :ctename live :ctecolnames ("b")})}})})'
+    '({QUERY :targetList <> :cteList ({COMMONTABLEEXPR :ctename live :ctecolnames ("a")})' +
+      ' :rtable ({RANGETBLENTRY :rtekind 1 :alias <> :subquery {QUERY :cteList' +
+      ' ({COMMONTABLEEXPR :ctename live :ctecolnames ("b")}) :targetList <>}})})'
   )
   assert.deepEqual(Object.fromEntries(shadowed.cteColumns), {})
   assert.deepEqual([...shadowed.cteAmbiguous], ['live'])
   // A constant array (`:constvalue […]`) is read, not treated as a format break.
   assert.equal(
-    readViewTree('({QUERY :jointree {FROMEXPR :quals {CONST :constvalue 1 [ 0 0 ]}}})').ok,
+    readViewTree(
+      '({QUERY :cteList <> :targetList <> :jointree {FROMEXPR :quals {CONST :constvalue 1 [ 0 0 ]}}})'
+    ).ok,
     true
+  )
+  // A field the reader needs on a node it reads, missing, is a format change: the whole
+  // tree fails rather than hand back a partial answer.
+  assert.equal(readViewTree('({QUERY :cteList <> :targetList <>})').ok, true)
+  assert.equal(readViewTree('({QUERY :nonesuch 1})').ok, false)
+  assert.equal(
+    readViewTree('({QUERY :cteList ({COMMONTABLEEXPR :ctename live}) :targetList <>})').ok,
+    false
   )
   for (const garbage of ['', 'not a tree', '({QUERY])', '({QUERY :x (unclosed}']) {
     const broken = readViewTree(garbage)

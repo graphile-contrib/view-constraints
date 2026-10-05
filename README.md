@@ -167,11 +167,14 @@ where each of the view's own columns was written from, is in the view's stored r
 tree (`pg_rewrite.ev_action`), read field by field and not parsed as SQL: the tree names
 every `WITH` query's columns in order (`:ctename`, `:ctecolnames`), so a `cte.col` is
 read at that column's position in the subplan the plan computes it by. A name two `WITH`
-queries share — the same name at two query levels, which the plan spells identically and
-never tells apart — is dropped, so neither is read: reading the wrong level's subplan
-would put a false `@notNull` or `@foreignKey` on a column. Where the plan could not read
-a column at all — a scan a constant qualifier removed, a `WITH` query whose tree is out
-of reach — the tree's own record of the base column the view column was written from
+queries share — the same name at two query levels, or a name the analysed view and a
+view it is built on both define (the source's materialized so it leaves a subplan, the
+analysed view's inlined so its own tree shows no clash) — is dropped, so no column is
+read through it: the plan spells every `CTE Scan` by the name alone and never says which
+view's query it is, so reading one off the analysed view's map would put the wrong
+columns, a false `@notNull` or `@foreignKey`, behind the names. Where the plan could not
+read a column at all — a scan a constant qualifier removed, a `WITH` query whose tree is
+out of reach — the tree's own record of the base column the view column was written from
 (`:resorigtbl`, `:resorigcol`) is taken as a fallback source for a relation, and for
 nothing else: it says nothing of a column's nullness, and a column the plan did read is
 judged by the plan. Where both name a base column for the same view column and they are
@@ -184,14 +187,16 @@ does not. The tree also names every range-table alias of the view's relations (`
 such a subquery's node with the alias, not the view's name, and the tree is what turns
 the alias back into the view.
 
-The tree is read **closed by default**: the walk takes a fixed set of fields by name and
-fails the whole tree on anything it does not place, and a failed tree yields nothing
-rather than a partial answer — the view's `WITH` queries are then not crossed, no origin
-is taken from it, and a note names the reason instead of leaving an empty map to look
-like a view with no `WITH` at all. Its format is PostgreSQL-internal and carries no
-cross-version promise, so the lab is read against every supported major in CI (the
-`lab` job builds the fixture from a real database of each) and a change to the format
-fails a run.
+The tree is read **closed by default**: the walk fails the whole tree on a character it
+cannot place, on an unbalanced bracket, and on a node it reads that is missing a field
+it needs (the fields per node type are one list in `view-tree.ts`, and a field renamed
+or removed there is the failure this catches). A failed tree yields nothing rather than
+a partial answer — the view's `WITH` queries are then not crossed, no origin is taken
+from it, and a note names the reason instead of leaving an empty map to look like a view
+with no `WITH` at all. Its format is PostgreSQL-internal and carries no cross-version
+promise, so the lab is read against every supported major in CI (the `lab` job builds the
+fixture from a real database of each), and a field the reader needs that a major no
+longer prints fails that run.
 
 Beyond the expression shapes above, the plan reader itself knows a closed set of node
 forms and refuses the rest rather than guess. It reads: relation scans; blocks of

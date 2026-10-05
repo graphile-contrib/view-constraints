@@ -664,6 +664,52 @@ export async function readViewTrees(
 }
 
 /**
+ * A view's `WITH` column map, with every name dropped that any view the query goes
+ * through also defines.
+ *
+ * The plan spells a `CTE Scan` with the `WITH` query's own name and never says which
+ * view's query it is. A name the analysed view and one of its source views both define —
+ * the source's `WITH` materialized, the analysed view's inlined, so its own tree shows
+ * no clash — leaves the plan with one `CTE live` subplan whose owner nothing names, and
+ * reading it off the analysed view's map would put the wrong columns behind every
+ * `CTE Scan`. So the names are taken over the analysed view and its transitive sources
+ * (from `pg_depend`), and a name more than one of them defines is dropped: the columns
+ * read through it are refused rather than read off a query that may not be the one.
+ *
+ * A source referenced through several views is reached by the closure, and a `WITH`
+ * query both views inlined leaves no subplan here but is still dropped: the analysed
+ * view's tree names it, and a subplan of that name could come from the source.
+ */
+export function cteColumnsWithoutSourceCollisions(
+  views: readonly ViewSourceRow[],
+  trees: ReadonlyMap<string, { cteColumns: ReadonlyMap<string, string[]> }>,
+  schema: string,
+  name: string
+): Map<string, string[]> {
+  const facts = trees.get(`${schema}.${name}`)
+  if (!facts) return new Map()
+  const byKey = new Map(views.map((view) => [`${view.schema}.${view.name}`, view]))
+  const reached = new Set<string>()
+  const queue = [...(byKey.get(`${schema}.${name}`)?.sources ?? [])]
+  while (queue.length > 0) {
+    const key = queue.pop()
+    if (key === undefined || reached.has(key)) continue
+    reached.add(key)
+    queue.push(...(byKey.get(key)?.sources ?? []))
+  }
+  const sourceNames = new Set<string>()
+  for (const key of reached) {
+    for (const sourceName of trees.get(key)?.cteColumns.keys() ?? []) sourceNames.add(sourceName)
+  }
+  const effective = new Map<string, string[]>()
+  for (const [cteName, columns] of facts.cteColumns) {
+    if (sourceNames.has(cteName)) continue
+    effective.set(cteName, columns)
+  }
+  return effective
+}
+
+/**
  * The views a `Subquery Scan` may be pinned to, by the name it carries: the source
  * views of this relation by their own names, and — for a source the defining query
  * referred to by an explicit alias (`FROM deposit.v bank_range`) — by that alias, read
@@ -867,7 +913,7 @@ export async function collectViewConstraints(
           catalog,
           strictEquality,
           ruleSpellingsShadowedFor(viewSources, viewObjects, view.schema, view.view),
-          facts?.cteColumns ?? new Map()
+          cteColumnsWithoutSourceCollisions(viewSources, viewTrees, view.schema, view.view)
         )
       ),
       catalog,
