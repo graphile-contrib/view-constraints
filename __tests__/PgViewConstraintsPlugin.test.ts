@@ -93,6 +93,8 @@ interface Fixture {
     cteOrigins: Record<string, ({ schema: string; relation: string; column: string } | null)[]>
     /** `WITH` names the tree defines at more than one query level. */
     cteAmbiguous: string[]
+    /** The `WITH` query each range-table alias of the view reads, by alias. */
+    cteRefAliases: Record<string, string>
     /** Each view column's traced base column, by position, from the stored tree. */
     treeColumns: Record<
       string,
@@ -167,6 +169,7 @@ function derive(
   assert.ok(view, `no fixture for lab.${name} under ${regime}`)
   const cteColumns = new Map(Object.entries(view.cteColumns ?? {}))
   const cteOrigins = new Map(Object.entries(view.cteOrigins ?? {}))
+  const cteRefAliases = new Map(Object.entries(view.cteRefAliases ?? {}))
   const treeColumns = new Map(
     Object.entries(view.treeColumns ?? {}).map(([position, column]) => [Number(position), column])
   )
@@ -190,7 +193,8 @@ function derive(
         fixture.strictEquality,
         shadowedFor(view.schema, view.view),
         cteColumns,
-        cteOrigins
+        cteOrigins,
+        cteRefAliases
       )
     ),
     catalog,
@@ -1889,11 +1893,49 @@ const CASES: Case[] = [
   {
     view: 'v_cte_coinciding',
     about:
-      'a foreign subplan whose every column’s origin lines up with the analysed view’s own ' +
-      '`live` is proved and read: `sx` is the real `need.nn`, never NULL, not refused',
-    origins: ['oy=need.id', 'sx=need.nn'],
-    notNull: ['oy', 'sx'],
+      'a foreign subplan whose every column’s origin lines up is still another query’s: ' +
+      'its scan carries that query’s range-table alias, not this view’s, so `sx` is refused',
+    origins: ['oy=need.id', 'sx=—'],
+    notNull: ['oy'],
     foreignKeys: ['(oy) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_swap_src',
+    about: 'the source of the swap: its own `live` reads as usual',
+    origins: ['q=need.nul', 'p=need.nn'],
+    notNull: ['p'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_swap',
+    about:
+      'the foreign `live` matches the view’s own by origin — `[nul, nn]` both ways — but ' +
+      'carries its columns as `q, p` where the view’s are `p, q`: the foreign scan is not ' +
+      'this view’s range-table entry, so `sq` and `sp` are refused, not read off the wrong ' +
+      'positions',
+    origins: ['op=need.nul', 'sq=—', 'sp=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_swap_src_fk',
+    about: 'the swap’s key variant source: its own `live` reads as usual',
+    origins: ['q=child.plain', 'p=child.ref'],
+    notNull: ['q', 'p'],
+    foreignKeys: ['(p) references lab.parent (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_swap_fk',
+    about:
+      'and with a key: the swapped foreign scan would read `ref` where the view means ' +
+      '`plain`, leading a foreign key the rows do not carry — refused',
+    origins: ['op=child.plain', 'sq=—', 'sp=—'],
+    notNull: ['op'],
+    foreignKeys: [],
     primaryKey: null
   },
   {
@@ -2721,8 +2763,9 @@ test('a CTE Scan is read only where the stored tree names the query’s columns 
   const without = readPlanOrigins(plan, 1, new Map(), planCatalog)
   assert.ok(typeof without !== 'string')
   assert.deepEqual(without.refusals, ['through-a-materialized-with'])
-  // The query's own columns are `lab.tx.id` and `lab.tx.cur_code`, which the subplan
-  // prints position for position: it is proved and read.
+  // The query's own columns are `lab.tx.id` and `lab.tx.cur_code`, the scan is this
+  // view's own range-table entry, and the subplan prints those origins position for
+  // position: it is proved and read.
   const withMap = planCatalogFrom(
     catalog,
     fixture.strictEquality,
@@ -2736,7 +2779,8 @@ test('a CTE Scan is read only where the stored tree names the query’s columns 
           { schema: 'lab', relation: 'tx', column: 'cur_code' }
         ]
       ]
-    ])
+    ]),
+    new Map([['live', 'live']])
   )
   const origins = readPlanOrigins(plan, 1, new Map(), withMap)
   assert.ok(typeof origins !== 'string')
@@ -2753,11 +2797,34 @@ test('a CTE Scan is read only where the stored tree names the query’s columns 
     new Set(),
     new Map([['live', ['id', 'cur_code']]]),
     // The query's second column is an expression where the subplan names a base column.
-    new Map([['live', [{ schema: 'lab', relation: 'tx', column: 'id' }, null]]])
+    new Map([['live', [{ schema: 'lab', relation: 'tx', column: 'id' }, null]]]),
+    new Map([['live', 'live']])
   )
   const refused = readPlanOrigins(plan, 1, new Map(), mismatched)
   assert.ok(typeof refused !== 'string')
   assert.deepEqual(refused.refusals, ['through-a-materialized-with'])
+  // And a scan whose alias is not this view's own range-table entry is refused even
+  // where the map and the origins both fit: the column names a foreign scan prints need
+  // not line up with this view's map, so the name-to-position step would be a guess.
+  const foreignScan = planCatalogFrom(
+    catalog,
+    fixture.strictEquality,
+    new Set(),
+    new Map([['live', ['id', 'cur_code']]]),
+    new Map([
+      [
+        'live',
+        [
+          { schema: 'lab', relation: 'tx', column: 'id' },
+          { schema: 'lab', relation: 'tx', column: 'cur_code' }
+        ]
+      ]
+    ]),
+    new Map()
+  )
+  const foreignRefused = readPlanOrigins(plan, 1, new Map(), foreignScan)
+  assert.ok(typeof foreignRefused !== 'string')
+  assert.deepEqual(foreignRefused.refusals, ['through-a-materialized-with'])
 })
 
 // ── A relation led to a projection ──────────────────────────────────────────────

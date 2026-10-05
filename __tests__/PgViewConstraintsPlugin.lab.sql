@@ -899,3 +899,32 @@ create function f_live_fk() returns table (x int, y int) language sql stable as 
 create view v_cte_function_fk as
   with live as (select id as y, ref as x from child)
   select o.y as oy, s.x as sx from live o cross join lateral f_live_fk() s;
+
+-- ── A foreign `WITH` whose columns are swapped ──────────────────────────────────
+--
+-- A subplan can match the analysed view's own `WITH` query by every column's origin and
+-- still be another query's, whose columns carry other names in another order. The
+-- column's position is looked up by name in the analysed view's own map, so the scan is
+-- read only where it is this view's own range-table entry reading its `WITH` query
+-- (`cteRefAliases`, from the tree's `RTE_CTE`). Here the origins line up as `[nul, nn]`
+-- both ways, but the source's names are `[q, p]` where the view's are `[p, q]`.
+
+create view v_cte_swap_src as
+  with live as materialized (select nul as q, nn as p from need)
+  select a.q, a.p from live a join live b on a.q is not distinct from b.q;
+create view v_cte_swap as
+  with live as (select nul as p, nn as q from need)
+  select o.p as op, s.q as sq, s.p as sp
+  from live o join v_cte_swap_src s on s.p = o.q;
+
+-- NEGATIVE: the same with a key. The source's `live` computes `[plain, ref]`; the view's
+-- own `live` computes `[plain, ref]` too, so the origins line up, but the foreign names
+-- are `[q, p]` where the view's are `[p, q]` and `sq` — really `plain` — must not be led
+-- to `parent` over a `ref` read from the wrong position.
+create view v_cte_swap_src_fk as
+  with live as materialized (select plain as q, ref as p from child)
+  select a.q, a.p from live a join live b on a.q is not distinct from b.q;
+create view v_cte_swap_fk as
+  with live as (select plain as p, ref as q from child)
+  select o.p as op, s.q as sq, s.p as sp
+  from live o join v_cte_swap_src_fk s on s.p = o.q;

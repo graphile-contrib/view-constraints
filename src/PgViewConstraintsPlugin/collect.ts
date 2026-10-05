@@ -503,7 +503,8 @@ export function planCatalogFrom(
   strictEquality: boolean,
   shadowedNames: ReadonlySet<string> = new Set(),
   cteColumns: ReadonlyMap<string, string[]> = new Map(),
-  cteOrigins: ReadonlyMap<string, (CteColumnOrigin | null)[]> = new Map()
+  cteOrigins: ReadonlyMap<string, (CteColumnOrigin | null)[]> = new Map(),
+  cteRefAliases: ReadonlyMap<string, string> = new Map()
 ): PlanCatalog {
   return {
     uniqueKeysOf: (schema, relation) => catalog.get(`${schema}.${relation}`)?.uniqueKeys ?? [],
@@ -516,7 +517,8 @@ export function planCatalogFrom(
       catalog.get(`${schema}.${relation}`)?.columns.get(column)?.notNull,
     shadowedNames,
     cteColumns,
-    cteOrigins
+    cteOrigins,
+    cteRefAliases
   }
 }
 
@@ -586,6 +588,8 @@ export interface ViewTreeFacts {
   treeOrigins: Map<number, TreeOrigin>
   /** The relation each range-table alias of the view names, by alias. */
   relationAliases: Map<string, number>
+  /** The `WITH` query each range-table alias of the view reads, by alias. */
+  cteRefAliases: Map<string, string>
 }
 
 /** One base column a view column's stored tree traced it to. */
@@ -690,7 +694,8 @@ export async function readViewTrees(
       cteOrigins: tree.cteOrigins,
       cteAmbiguous: tree.cteAmbiguous,
       treeOrigins: tree.treeOrigins,
-      relationAliases: tree.relationAliases
+      relationAliases: tree.relationAliases,
+      cteRefAliases: tree.cteRefAliases
     })
   }
   return trees
@@ -901,7 +906,8 @@ export async function collectViewConstraints(
           strictEquality,
           ruleSpellingsShadowedFor(viewSources, viewObjects, view.schema, view.view),
           facts?.cteColumns ?? new Map(),
-          resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map())
+          resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map()),
+          facts?.cteRefAliases ?? new Map()
         )
       ),
       catalog,

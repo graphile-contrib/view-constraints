@@ -184,6 +184,7 @@ for (const regime of REGIMES) {
         resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map())
       ),
       cteAmbiguous: [...(facts?.cteAmbiguous ?? [])].sort(),
+      cteRefAliases: Object.fromEntries(facts?.cteRefAliases ?? new Map()),
       treeColumns: Object.fromEntries(
         resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map())
       ),

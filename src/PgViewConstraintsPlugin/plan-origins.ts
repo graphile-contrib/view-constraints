@@ -73,6 +73,13 @@ export interface PlanCatalog extends QualifierCatalog {
    * matching these, position for position.
    */
   cteOrigins: ReadonlyMap<string, ({ schema: string; relation: string; column: string } | null)[]>
+  /**
+   * The `WITH` query each range-table alias of this view's own query reads, by alias
+   * (`RTE_CTE`). A plan's `CTE Scan` carries its range-table alias, so an alias in here
+   * names this view's own query and one that is not is another query's — through which
+   * no column is read.
+   */
+  cteRefAliases: ReadonlyMap<string, string>
 }
 
 /** One plan node of `EXPLAIN (FORMAT JSON)`, as much of it as this reader uses. */
@@ -1003,7 +1010,14 @@ class OriginReader {
     const cte = this.cteOfAlias.get(alias)
     const columns = cte === undefined ? undefined : this.catalog.cteColumns.get(cte)
     const subplan = cte === undefined ? null : this.provedSubplan(cte)
-    if (cte === undefined || !columns || !subplan || this.cteStack.has(cte)) {
+    // The scan must be this view's own: its alias is a range-table entry of this view's
+    // query reading the `WITH` query. A scan of another query's `WITH` query — a source
+    // view's or a function's, inlined here — carries that query's alias, which this view
+    // never wrote, and its column names need not line up with this view's map.
+    if (cte === undefined || this.catalog.cteRefAliases.get(alias) !== cte) {
+      return unknown('through-a-materialized-with')
+    }
+    if (!columns || !subplan || this.cteStack.has(cte)) {
       return unknown('through-a-materialized-with')
     }
     const position = columns.indexOf(column)
@@ -1179,7 +1193,8 @@ class OriginReader {
     const cte = this.cteOfAlias.get(alias)
     const columns = cte === undefined ? undefined : this.catalog.cteColumns.get(cte)
     const subplan = cte === undefined ? null : this.provedSubplan(cte)
-    if (cte === undefined || !columns || !subplan || this.cteStack.has(cte)) return 'unknown'
+    if (cte === undefined || this.catalog.cteRefAliases.get(alias) !== cte) return 'unknown'
+    if (!columns || !subplan || this.cteStack.has(cte)) return 'unknown'
     const position = columns.indexOf(column)
     if (position < 0) return 'unknown'
     // An outer join nulls the `CTE Scan` instance even though the subplan beside the

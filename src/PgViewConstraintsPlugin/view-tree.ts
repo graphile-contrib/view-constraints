@@ -284,6 +284,13 @@ export interface ViewTree {
   treeOrigins: Map<number, TreeOrigin>
   /** Range-table alias → the relation oid it names. */
   relationAliases: Map<string, number>
+  /**
+   * The aliases this view's own query reads a `WITH` query by: `alias → ctename` from
+   * the range table's `RTE_CTE` entries. A plan's `CTE Scan` carries its range-table
+   * alias, so an alias in here is a scan of this view's own `WITH` query, and one that
+   * is not is some other query's.
+   */
+  cteRefAliases: Map<string, string>
 }
 
 /**
@@ -297,7 +304,8 @@ export function readViewTree(action: string): ViewTree {
     cteOrigins: new Map(),
     cteAmbiguous: new Set(),
     treeOrigins: new Map(),
-    relationAliases: new Map()
+    relationAliases: new Map(),
+    cteRefAliases: new Map()
   }
   const parsed = new DumpReader(action).parse()
   if (!parsed.ok || parsed.value === null) return tree
@@ -373,6 +381,24 @@ export function readViewTree(action: string): ViewTree {
     tree.relationAliases.set(alias, relid)
   })
   for (const alias of ambiguousAliases) tree.relationAliases.delete(alias)
+
+  // The `WITH` queries this view's own query reads, by the range-table alias it gave
+  // them (`RTE_CTE`), so a plan's `CTE Scan` can be told from one of another query's.
+  const ambiguousRefs = new Set<string>()
+  walkDumped(root, (node) => {
+    if (node.type !== 'RANGETBLENTRY') return
+    if (textOf(node.fields.get('rtekind')) !== '6') return
+    const ctename = textOf(node.fields.get('ctename'))
+    const alias = aliasOf(node)
+    if (ctename === null || alias === null) return
+    const seen = tree.cteRefAliases.get(alias)
+    if (seen !== undefined && seen !== ctename) {
+      ambiguousRefs.add(alias)
+      return
+    }
+    tree.cteRefAliases.set(alias, ctename)
+  })
+  for (const alias of ambiguousRefs) tree.cteRefAliases.delete(alias)
 
   return tree
 }
