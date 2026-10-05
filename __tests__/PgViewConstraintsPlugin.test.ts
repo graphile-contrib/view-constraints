@@ -1563,6 +1563,70 @@ const CASES: Case[] = [
     notNull: [],
     foreignKeys: [],
     primaryKey: null
+  },
+  {
+    view: 'v_oj_expr_src',
+    about:
+      'the source of the outer-join cases: a literal, a cast, an `IS` test, a `CASE` and a ' +
+      '`COALESCE` over a NOT NULL column are all never NULL where they are computed',
+    origins: ['id=oj_need.id', 'c=—', 'n=—', 'f=—', 'g=—', 'cs=—', 'co=—', 'gr=—'],
+    notNull: ['id', 'c', 'n', 'f', 'g', 'cs', 'co', 'gr'],
+    foreignKeys: ['(id) references lab.oj_need (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_oj_expr',
+    about:
+      'a LEFT join nulls its inner side in every padded row, so each computed column of ' +
+      'that side — literal, cast, `IS NULL`, `IS DISTINCT FROM`, `CASE`, `COALESCE`, ' +
+      '`GREATEST` — is refused, not claimed never NULL',
+    origins: ['oid=oj_need.id', 'c=—', 'n=—', 'f=—', 'g=—', 'cs=—', 'co=—', 'gr=—'],
+    notNull: ['oid'],
+    foreignKeys: ['(oid) references lab.oj_need (id)'],
+    primaryKey: 'oid'
+  },
+  {
+    view: 'v_oj_full',
+    about: 'and a FULL join leaves either side nullable the same way',
+    origins: ['oid=oj_need.id', 'c=—', 'n=—'],
+    notNull: [],
+    foreignKeys: ['(oid) references lab.oj_need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_oj_above',
+    about: 'a literal computed at the join, above the nulling of its inputs, is not nulled by it',
+    origins: ['oid=oj_need.id', 'lit=—'],
+    notNull: ['oid', 'lit'],
+    foreignKeys: ['(oid) references lab.oj_need (id)'],
+    primaryKey: 'oid'
+  },
+  {
+    view: 'v_oj_preserved',
+    about: 'so is an expression over a column of the preserved side',
+    origins: ['oid=oj_need.id', 'preserved=—'],
+    notNull: ['oid', 'preserved'],
+    foreignKeys: ['(oid) references lab.oj_need (id)'],
+    primaryKey: 'oid'
+  },
+  {
+    view: 'v_oj_union_src',
+    about: 'the discrimination source: its `UNION ALL` discriminator is a key of its rows',
+    origins: ['src=—', 'id=oj_need.id', 'nn=oj_need.nn'],
+    notNull: ['src', 'id', 'nn'],
+    foreignKeys: ['(id) references lab.oj_need (id)'],
+    primaryKey: 'src,id'
+  },
+  {
+    view: 'v_oj_union',
+    about:
+      'a `UNION ALL` under a join is refused whole by this reader, so no discriminator of ' +
+      'its nulled side is read; where such a union is read the discriminator rule of this ' +
+      'change refuses it too',
+    origins: null,
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
   }
 ]
 

@@ -666,3 +666,42 @@ create view v_expr_is_tests as
 -- so an aggregate over it answers NULL when the input is empty.
 create view v_expr_group_by_empty as
   select min(amount) as lo, avg(amount) as mean from tx group by ();
+
+-- ── A computed value from the nulled side of an outer join ──────────────────────
+--
+-- A relation with no base column — a literal, a `CAST`, a `CASE`, a `COALESCE`, an
+-- `IS` test — is printed by the join that nulls its input, and the join nulls it in
+-- every padded row. The expression rules must not claim it never NULL there, and a
+-- `UNION ALL` discriminator read from a nulled side is no discriminator. The rows make
+-- `oj_need` row 2 (`fk = 3`) match nothing, so every such column is NULL there.
+
+create table oj_need (id int primary key, fk int, nn int not null);
+insert into oj_need values (1, 1, 10), (2, 3, 20);
+
+create view v_oj_expr_src as
+  select id, 'x'::text as c, '5'::int as n, (id is null) as f, (id is distinct from 0) as g,
+         case when id > 0 then 'y' else 'z' end as cs, coalesce(id, 7) as co, greatest(id, 1) as gr
+  from oj_need;
+-- NEGATIVE: every computed column of the nulled side is NULL wherever the join pads.
+create view v_oj_expr as
+  select t.id as oid, s.c, s.n, s.f, s.g, s.cs, s.co, s.gr
+  from oj_need t left join v_oj_expr_src s on s.id = t.fk;
+-- NEGATIVE: a FULL join leaves either side nullable.
+create view v_oj_full as
+  select t.id as oid, s.c, s.n from oj_need t full join v_oj_expr_src s on s.id = t.fk;
+-- POSITIVE: a literal computed above the join is not nulled by it.
+create view v_oj_above as
+  select t.id as oid, 'z'::text as lit from oj_need t left join v_oj_expr_src s on s.id = t.fk;
+-- POSITIVE: an expression over the preserved side is not nulled.
+create view v_oj_preserved as
+  select t.id as oid, coalesce(t.nn, 0) as preserved
+  from oj_need t left join v_oj_expr_src s on s.id = t.fk;
+
+-- NEGATIVE: a `UNION ALL` discriminator on the nulled side is no discriminator, and its
+-- column is NULL wherever the join pads.
+create view v_oj_union_src as
+  select 'a'::text as src, id, nn from oj_need
+  union all
+  select 'b'::text, id, nn from oj_need;
+create view v_oj_union as
+  select t.id as oid, u.src from oj_need t left join v_oj_union_src u on u.id = t.fk;

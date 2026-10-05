@@ -507,6 +507,36 @@
     },
     {
       "schema": "lab",
+      "relation": "oj_need",
+      "foreignKeys": [],
+      "uniqueKeys": [
+        {
+          "name": "oj_need_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "fk": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "nn": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": true
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "parcel",
       "foreignKeys": [
         {
@@ -890,7 +920,7 @@
           "notNull": true
         },
         "cur_code": {
-          "typeId": 151152883,
+          "typeId": 152759858,
           "typeMod": -1,
           "notNull": true
         }
@@ -1430,7 +1460,7 @@
           "notNull": false
         },
         "mystery_id": {
-          "typeId": 151153738,
+          "typeId": 152760713,
           "typeMod": -1,
           "notNull": false
         }
@@ -2787,6 +2817,209 @@
     },
     {
       "schema": "lab",
+      "relation": "v_oj_above",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "oid": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "lit": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_expr",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "oid": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "c": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "n": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "f": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "g": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "cs": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "co": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "gr": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_expr_src",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "c": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "n": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "f": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "g": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "cs": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "co": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "gr": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_full",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "oid": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "c": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "n": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_preserved",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "oid": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "preserved": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_union",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "oid": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "src": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_union_src",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "src": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "id": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "nn": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_over_barrier",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -3833,7 +4066,7 @@
   "coercions": {
     "binary": ["1043>25", "25>1043"],
     "domainBase": {
-      "151152883": 25
+      "152759858": 25
     }
   },
   "strictEquality": true,
@@ -3906,6 +4139,10 @@
     {
       "schema": "lab",
       "table": "node"
+    },
+    {
+      "schema": "lab",
+      "table": "oj_need"
     },
     {
       "schema": "lab",
@@ -4515,6 +4752,48 @@
       "schema": "lab",
       "name": "v_nullable_unique",
       "columns": ["tag"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_above",
+      "columns": ["oid", "lit"],
+      "sources": ["lab.v_oj_expr_src"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_expr",
+      "columns": ["oid", "c", "n", "f", "g", "cs", "co", "gr"],
+      "sources": ["lab.v_oj_expr_src"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_expr_src",
+      "columns": ["id", "c", "n", "f", "g", "cs", "co", "gr"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_full",
+      "columns": ["oid", "c", "n"],
+      "sources": ["lab.v_oj_expr_src"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_preserved",
+      "columns": ["oid", "preserved"],
+      "sources": ["lab.v_oj_expr_src"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_union",
+      "columns": ["oid", "src"],
+      "sources": ["lab.v_oj_union_src"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_union_src",
+      "columns": ["src", "id", "nn"],
       "sources": []
     },
     {
@@ -5691,7 +5970,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151153738,
+          "typeId": 152760713,
           "typeMod": -1
         }
       ],
@@ -8301,6 +8580,383 @@
         "Schema": "lab",
         "Relation Name": "slot",
         "Alias": "slot"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": [
+          "t.id",
+          "('x'::text)",
+          "(5)",
+          "((oj_need.id IS NULL))",
+          "((oj_need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(oj_need.id, 7))",
+          "(GREATEST(oj_need.id, 1))"
+        ],
+        "Join Type": "Left",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": [
+              "oj_need.id",
+              "('x'::text)",
+              "(5)",
+              "((oj_need.id IS NULL))",
+              "((oj_need.id IS DISTINCT FROM 0))",
+              "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+              "(COALESCE(oj_need.id, 7))",
+              "(GREATEST(oj_need.id, 1))"
+            ],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": [
+                  "oj_need.id",
+                  "'x'::text",
+                  "5",
+                  "(oj_need.id IS NULL)",
+                  "(oj_need.id IS DISTINCT FROM 0)",
+                  "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+                  "COALESCE(oj_need.id, 7)",
+                  "GREATEST(oj_need.id, 1)"
+                ],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "oj_need.id",
+          "'x'::text",
+          "5",
+          "(oj_need.id IS NULL)",
+          "(oj_need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(oj_need.id, 7)",
+          "GREATEST(oj_need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "oj_need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["t.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["oj_need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["oj_need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "COALESCE(t.nn, 0)"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["t.id", "('a'::text)"],
+        "Join Type": "Left",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'a'::text", "oj_need.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need.id = t.fk)"
+              },
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'b'::text", "oj_need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need_1",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need_1.id = t.fk)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "oj_need.id", "oj_need.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "oj_need_1.id", "oj_need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
       }
     },
     {
@@ -11519,7 +12175,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151153738,
+          "typeId": 152760713,
           "typeMod": -1
         }
       ],
@@ -14129,6 +14785,383 @@
         "Schema": "lab",
         "Relation Name": "slot",
         "Alias": "slot"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": [
+          "t.id",
+          "('x'::text)",
+          "(5)",
+          "((oj_need.id IS NULL))",
+          "((oj_need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(oj_need.id, 7))",
+          "(GREATEST(oj_need.id, 1))"
+        ],
+        "Join Type": "Left",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": [
+              "oj_need.id",
+              "('x'::text)",
+              "(5)",
+              "((oj_need.id IS NULL))",
+              "((oj_need.id IS DISTINCT FROM 0))",
+              "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+              "(COALESCE(oj_need.id, 7))",
+              "(GREATEST(oj_need.id, 1))"
+            ],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": [
+                  "oj_need.id",
+                  "'x'::text",
+                  "5",
+                  "(oj_need.id IS NULL)",
+                  "(oj_need.id IS DISTINCT FROM 0)",
+                  "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+                  "COALESCE(oj_need.id, 7)",
+                  "GREATEST(oj_need.id, 1)"
+                ],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "oj_need.id",
+          "'x'::text",
+          "5",
+          "(oj_need.id IS NULL)",
+          "(oj_need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(oj_need.id, 7)",
+          "GREATEST(oj_need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "oj_need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["t.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["oj_need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["oj_need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "COALESCE(t.nn, 0)"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["t.id", "('a'::text)"],
+        "Join Type": "Left",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'a'::text", "oj_need.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need.id = t.fk)"
+              },
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'b'::text", "oj_need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need_1",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need_1.id = t.fk)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "oj_need.id", "oj_need.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "oj_need_1.id", "oj_need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
       }
     },
     {
@@ -17532,7 +18565,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151153738,
+          "typeId": 152760713,
           "typeMod": -1
         }
       ],
@@ -20669,6 +21702,454 @@
             "Relation Name": "slot",
             "Alias": "slot",
             "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["t.id", "'z'::text"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "'z'::text"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": [
+          "t.id",
+          "('x'::text)",
+          "(5)",
+          "((oj_need.id IS NULL))",
+          "((oj_need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(oj_need.id, 7))",
+          "(GREATEST(oj_need.id, 1))"
+        ],
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": [
+              "t.id",
+              "('x'::text)",
+              "(5)",
+              "((oj_need.id IS NULL))",
+              "((oj_need.id IS DISTINCT FROM 0))",
+              "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+              "(COALESCE(oj_need.id, 7))",
+              "(GREATEST(oj_need.id, 1))"
+            ],
+            "Join Type": "Left",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(t.fk = oj_need.id)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.fk", "t.nn"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "t",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": [
+                  "oj_need.id",
+                  "('x'::text)",
+                  "(5)",
+                  "((oj_need.id IS NULL))",
+                  "((oj_need.id IS DISTINCT FROM 0))",
+                  "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+                  "(COALESCE(oj_need.id, 7))",
+                  "(GREATEST(oj_need.id, 1))"
+                ],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": [
+                      "oj_need.id",
+                      "'x'::text",
+                      "5",
+                      "(oj_need.id IS NULL)",
+                      "(oj_need.id IS DISTINCT FROM 0)",
+                      "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+                      "COALESCE(oj_need.id, 7)",
+                      "GREATEST(oj_need.id, 1)"
+                    ],
+                    "Schema": "lab",
+                    "Relation Name": "oj_need",
+                    "Alias": "oj_need",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": [
+          "oj_need.id",
+          "'x'::text",
+          "5",
+          "((oj_need.id IS NULL))",
+          "((oj_need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(oj_need.id, 7))",
+          "(GREATEST(oj_need.id, 1))"
+        ],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": [
+              "oj_need.id",
+              "'x'::text",
+              "5",
+              "(oj_need.id IS NULL)",
+              "(oj_need.id IS DISTINCT FROM 0)",
+              "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+              "COALESCE(oj_need.id, 7)",
+              "GREATEST(oj_need.id, 1)"
+            ],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["t.id", "('x'::text)", "(5)"],
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["t.id", "('x'::text)", "(5)"],
+            "Join Type": "Full",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(t.fk = oj_need.id)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.fk", "t.nn"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "t",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["oj_need.id", "('x'::text)", "(5)"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["oj_need.id", "'x'::text", "5"],
+                    "Schema": "lab",
+                    "Relation Name": "oj_need",
+                    "Alias": "oj_need",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["t.id", "(COALESCE(t.nn, 0))"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "COALESCE(t.nn, 0)"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["t.id", "('a'::text)"],
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["t.id", "('a'::text)"],
+            "Join Type": "Right",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(oj_need.id = t.fk)",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["'a'::text", "oj_need.id"],
+                    "Schema": "lab",
+                    "Relation Name": "oj_need",
+                    "Alias": "oj_need",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["'b'::text", "oj_need_1.id"],
+                    "Schema": "lab",
+                    "Relation Name": "oj_need",
+                    "Alias": "oj_need_1",
+                    "Parent Relationship": "Member"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["t.id", "t.fk"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["t.id", "t.fk"],
+                    "Schema": "lab",
+                    "Relation Name": "oj_need",
+                    "Alias": "t",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["('a'::text)", "oj_need.id", "oj_need.nn"],
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'a'::text", "oj_need.id", "oj_need.nn"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'b'::text", "oj_need_1.id", "oj_need_1.nn"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need_1",
+                "Parent Relationship": "Member"
+              }
+            ]
           }
         ]
       }
@@ -24276,7 +25757,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151153738,
+          "typeId": 152760713,
           "typeMod": -1
         }
       ],
@@ -26988,6 +28469,383 @@
         "Schema": "lab",
         "Relation Name": "slot",
         "Alias": "slot"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": [
+          "t.id",
+          "('x'::text)",
+          "(5)",
+          "((oj_need.id IS NULL))",
+          "((oj_need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(oj_need.id, 7))",
+          "(GREATEST(oj_need.id, 1))"
+        ],
+        "Join Type": "Left",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": [
+              "oj_need.id",
+              "('x'::text)",
+              "(5)",
+              "((oj_need.id IS NULL))",
+              "((oj_need.id IS DISTINCT FROM 0))",
+              "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+              "(COALESCE(oj_need.id, 7))",
+              "(GREATEST(oj_need.id, 1))"
+            ],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": [
+                  "oj_need.id",
+                  "'x'::text",
+                  "5",
+                  "(oj_need.id IS NULL)",
+                  "(oj_need.id IS DISTINCT FROM 0)",
+                  "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+                  "COALESCE(oj_need.id, 7)",
+                  "GREATEST(oj_need.id, 1)"
+                ],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "oj_need.id",
+          "'x'::text",
+          "5",
+          "(oj_need.id IS NULL)",
+          "(oj_need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(oj_need.id, 7)",
+          "GREATEST(oj_need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "oj_need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["t.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["oj_need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["oj_need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "COALESCE(t.nn, 0)"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["t.id", "('a'::text)"],
+        "Join Type": "Left",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'a'::text", "oj_need.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need.id = t.fk)"
+              },
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'b'::text", "oj_need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need_1",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need_1.id = t.fk)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "oj_need.id", "oj_need.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "oj_need_1.id", "oj_need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
       }
     },
     {
@@ -30217,7 +32075,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151153738,
+          "typeId": 152760713,
           "typeMod": -1
         }
       ],
@@ -32812,6 +34670,383 @@
         "Schema": "lab",
         "Relation Name": "slot",
         "Alias": "slot"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": [
+          "t.id",
+          "('x'::text)",
+          "(5)",
+          "((oj_need.id IS NULL))",
+          "((oj_need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(oj_need.id, 7))",
+          "(GREATEST(oj_need.id, 1))"
+        ],
+        "Join Type": "Left",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": [
+              "oj_need.id",
+              "('x'::text)",
+              "(5)",
+              "((oj_need.id IS NULL))",
+              "((oj_need.id IS DISTINCT FROM 0))",
+              "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+              "(COALESCE(oj_need.id, 7))",
+              "(GREATEST(oj_need.id, 1))"
+            ],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": [
+                  "oj_need.id",
+                  "'x'::text",
+                  "5",
+                  "(oj_need.id IS NULL)",
+                  "(oj_need.id IS DISTINCT FROM 0)",
+                  "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+                  "COALESCE(oj_need.id, 7)",
+                  "GREATEST(oj_need.id, 1)"
+                ],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "oj_need.id",
+          "'x'::text",
+          "5",
+          "(oj_need.id IS NULL)",
+          "(oj_need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(oj_need.id, 7)",
+          "GREATEST(oj_need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "oj_need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["t.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["oj_need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["oj_need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "COALESCE(t.nn, 0)"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["t.id", "('a'::text)"],
+        "Join Type": "Left",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'a'::text", "oj_need.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need.id = t.fk)"
+              },
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'b'::text", "oj_need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need_1",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need_1.id = t.fk)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "oj_need.id", "oj_need.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "oj_need_1.id", "oj_need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
       }
     },
     {
@@ -36034,7 +38269,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151153738,
+          "typeId": 152760713,
           "typeMod": -1
         }
       ],
@@ -38730,6 +40965,392 @@
             "Node Type": "Bitmap Index Scan",
             "Parent Relationship": "Outer",
             "Index Name": "slot_tag_key"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": [
+          "t.id",
+          "('x'::text)",
+          "(5)",
+          "((oj_need.id IS NULL))",
+          "((oj_need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(oj_need.id, 7))",
+          "(GREATEST(oj_need.id, 1))"
+        ],
+        "Join Type": "Left",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": [
+              "oj_need.id",
+              "('x'::text)",
+              "(5)",
+              "((oj_need.id IS NULL))",
+              "((oj_need.id IS DISTINCT FROM 0))",
+              "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+              "(COALESCE(oj_need.id, 7))",
+              "(GREATEST(oj_need.id, 1))"
+            ],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": [
+                  "oj_need.id",
+                  "'x'::text",
+                  "5",
+                  "(oj_need.id IS NULL)",
+                  "(oj_need.id IS DISTINCT FROM 0)",
+                  "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+                  "COALESCE(oj_need.id, 7)",
+                  "GREATEST(oj_need.id, 1)"
+                ],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer",
+                "Index Name": "oj_need_pkey"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Bitmap Heap Scan",
+        "Output": [
+          "oj_need.id",
+          "'x'::text",
+          "5",
+          "(oj_need.id IS NULL)",
+          "(oj_need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(oj_need.id, 7)",
+          "GREATEST(oj_need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "oj_need",
+        "Plans": [
+          {
+            "Node Type": "Bitmap Index Scan",
+            "Parent Relationship": "Outer",
+            "Index Name": "oj_need_pkey"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["t.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["oj_need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["oj_need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer",
+                "Index Name": "oj_need_pkey"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "COALESCE(t.nn, 0)"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["t.id", "('a'::text)"],
+        "Join Type": "Left",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'a'::text", "oj_need.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need.id = t.fk)"
+              },
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'b'::text", "oj_need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need_1",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need_1.id = t.fk)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "oj_need.id", "oj_need.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "oj_need_1.id", "oj_need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need_1",
+            "Parent Relationship": "Member"
           }
         ]
       }
@@ -42077,7 +44698,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151153738,
+          "typeId": 152760713,
           "typeMod": -1
         }
       ],
@@ -44578,6 +47199,368 @@
         "Schema": "lab",
         "Relation Name": "slot",
         "Alias": "slot"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": [
+          "t.id",
+          "('x'::text)",
+          "(5)",
+          "((oj_need.id IS NULL))",
+          "((oj_need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(oj_need.id, 7))",
+          "(GREATEST(oj_need.id, 1))"
+        ],
+        "Join Type": "Left",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Index Only Scan",
+            "Output": [
+              "oj_need.id",
+              "'x'::text",
+              "5",
+              "(oj_need.id IS NULL)",
+              "(oj_need.id IS DISTINCT FROM 0)",
+              "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+              "COALESCE(oj_need.id, 7)",
+              "GREATEST(oj_need.id, 1)"
+            ],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need",
+            "Parent Relationship": "Inner",
+            "Index Name": "oj_need_pkey",
+            "Index Cond": "(oj_need.id = t.fk)"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "oj_need.id",
+          "'x'::text",
+          "5",
+          "(oj_need.id IS NULL)",
+          "(oj_need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(oj_need.id, 7)",
+          "GREATEST(oj_need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "oj_need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["t.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["oj_need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["oj_need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "COALESCE(t.nn, 0)"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["t.id", "('a'::text)"],
+        "Join Type": "Left",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'a'::text", "oj_need.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need.id = t.fk)"
+              },
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'b'::text", "oj_need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need_1",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need_1.id = t.fk)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "oj_need.id", "oj_need.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "oj_need_1.id", "oj_need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
       }
     },
     {
@@ -47726,7 +50709,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151153738,
+          "typeId": 152760713,
           "typeMod": -1
         }
       ],
@@ -50336,6 +53319,383 @@
         "Schema": "lab",
         "Relation Name": "slot",
         "Alias": "slot"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": [
+          "t.id",
+          "('x'::text)",
+          "(5)",
+          "((oj_need.id IS NULL))",
+          "((oj_need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(oj_need.id, 7))",
+          "(GREATEST(oj_need.id, 1))"
+        ],
+        "Join Type": "Left",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": [
+              "oj_need.id",
+              "('x'::text)",
+              "(5)",
+              "((oj_need.id IS NULL))",
+              "((oj_need.id IS DISTINCT FROM 0))",
+              "(CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+              "(COALESCE(oj_need.id, 7))",
+              "(GREATEST(oj_need.id, 1))"
+            ],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": [
+                  "oj_need.id",
+                  "'x'::text",
+                  "5",
+                  "(oj_need.id IS NULL)",
+                  "(oj_need.id IS DISTINCT FROM 0)",
+                  "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+                  "COALESCE(oj_need.id, 7)",
+                  "GREATEST(oj_need.id, 1)"
+                ],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "oj_need.id",
+          "'x'::text",
+          "5",
+          "(oj_need.id IS NULL)",
+          "(oj_need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (oj_need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(oj_need.id, 7)",
+          "GREATEST(oj_need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "oj_need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["t.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(t.fk = oj_need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["oj_need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["oj_need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["t.id", "COALESCE(t.nn, 0)"],
+        "Schema": "lab",
+        "Relation Name": "oj_need",
+        "Alias": "t"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "oid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["t.id", "('a'::text)"],
+        "Join Type": "Left",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["t.id", "t.fk", "t.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "t",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'a'::text", "oj_need.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need.id = t.fk)"
+              },
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'b'::text", "oj_need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "oj_need",
+                "Alias": "oj_need_1",
+                "Parent Relationship": "Member",
+                "Index Name": "oj_need_pkey",
+                "Index Cond": "(oj_need_1.id = t.fk)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "oj_need.id", "oj_need.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "oj_need_1.id", "oj_need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "oj_need",
+            "Alias": "oj_need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
       }
     },
     {

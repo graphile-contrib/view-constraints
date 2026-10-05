@@ -15,3 +15,40 @@ jobs:
       - run: yarn build
       - run: yarn test
       - run: yarn prettier:check
+
+  # The plan's `Output` text and the view's stored rewrite tree (`pg_node_tree`) are
+  # PostgreSQL-internal and carry no cross-version promise. The lab is therefore read
+  # against every supported major: the fixture is rebuilt from a real database of that
+  # version and the same cases must hold, so a change to either format fails a run.
+  lab:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        postgres: ['15', '16', '17', '18']
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres }}
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+      - run: corepack enable
+      - run: yarn install --immutable
+      - run: yarn build
+      - run: yarn fixture
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+      - run: yarn test

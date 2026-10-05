@@ -484,6 +484,10 @@ export function deriveViewConstraints(
       continue
     }
     if (plan.groupingSets) continue
+    // A computed column is read by the same rule a base one is: an outer join nulling
+    // the side the value comes from puts a NULL in every padded row, whatever the
+    // expression promises about the rows it computed over.
+    if (plan.entryNullExtended[index] !== false) continue
     if (plan.expressionNotNull[index] === true) notNullColumns.push(viewColumn)
   }
 
@@ -629,7 +633,13 @@ export function deriveViewConstraints(
       sources.every((origin) => neverNullOrigin(origin))
   )
   const candidates = plan.rowIdentities.filter((key) =>
-    key.columns.every((index) => key.discriminators.includes(index) || neverNull[index])
+    // A key column the plan can null from an outer join is no row identity, its
+    // discriminator no discriminator: a NULL cannot tell a row it pads.
+    key.columns.every(
+      (index) =>
+        plan.entryNullExtended[index] !== true &&
+        (key.discriminators.includes(index) || neverNull[index])
+    )
   )
   // A key that is one base relation's own comes first — it is the one a relation to a
   // projection can point at — the primary key before a unique index, then by relation
