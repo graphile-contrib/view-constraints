@@ -105,7 +105,7 @@ interface Fixture {
       { schema: string; relation: string; column: string; relkind: string }
     >
     /** Columns the view reads from a `WITH` query it inlines, refused whatever the plan. */
-    inlinedWithColumns: number[]
+    optionallyFlattenedColumns: number[]
     /** Each range-table alias of the view, resolved to the relation it names. */
     viewAliases: Record<string, string>
     plan: ExplainPlanNode
@@ -207,7 +207,7 @@ function derive(
     coercions,
     true,
     treeColumns,
-    new Set(view.inlinedWithColumns ?? [])
+    new Set(view.optionallyFlattenedColumns ?? [])
   )
   return {
     origins:
@@ -406,6 +406,45 @@ const CASES: Case[] = [
   {
     view: 'v_inlined_with_direct',
     about: 'and the same query read directly, with no wrapper in between',
+    origins: ['id=sale.id', 'n=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_group_sub_inner',
+    about:
+      'no WITH at all: a column read from an ordinary FROM (SELECT …) grouping is refused ' +
+      'too, since a plan may pull the grouping up into the join or keep it behind a ' +
+      'subquery of its own',
+    origins: ['id=sale.id', 'n=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_over_group_sub',
+    about:
+      'a simple WITH query reading a grouped subquery: the doubt is the subquery level’s ' +
+      'and travels through the query in between',
+    origins: ['id=sale.id', 'doubled=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_group_sub_over_group_sub',
+    about: 'a subquery over a subquery, the grouping two levels down',
+    origins: ['id=sale.id', 'doubled=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_group_sub_over_cte',
+    about:
+      'and the other way: a subquery reading a grouped WITH query, so the level read is ' +
+      'the WITH and the reading level is the subquery',
     origins: ['id=sale.id', 'n=—'],
     notNull: ['id'],
     foreignKeys: ['(id) references lab.sale (id)'],
@@ -2431,7 +2470,7 @@ test('a view’s stored tree is read by field name, and a format it does not kno
         '({QUERY :cteList <> :targetList <> :rtable' +
           ' ({RANGETBLENTRY :alias {ALIAS :aliasname bank_range :colnames <>}' +
           ' :rtekind 0 :relid 42} {RANGETBLENTRY :alias {ALIAS :aliasname s :colnames <>}' +
-          ' :rtekind 1 :relid 0})})'
+          ' :rtekind 1 :subquery {QUERY :cteList <> :targetList <>}})})'
       ).relationAliases
     ),
     { bank_range: 42 }
@@ -2470,7 +2509,7 @@ test('a view’s stored tree is read by field name, and a format it does not kno
           ' :targetList ({TARGETENTRY :expr {VAR :varno 1 :varattno 1 :varlevelsup 0}' +
           ' :resorigtbl 0 :resorigcol 0})' +
           ' :rtable ({RANGETBLENTRY :alias <> :rtekind 6 :ctename live})})'
-      ).inlinedWithColumns
+      ).optionallyFlattenedColumns
     ],
     [0]
   )
@@ -2484,6 +2523,18 @@ test('a view’s stored tree is read by field name, and a format it does not kno
   // A field the reader needs on a node it reads, missing, is a format change: the whole
   // tree fails rather than hand back a partial answer.
   assert.equal(readViewTree('({QUERY :cteList <> :targetList <>})').ok, true)
+  // A range-table entry carries what its kind is read by — a `WITH` entry its name, a
+  // subquery entry its query, a `GROUP` entry its expressions — and an entry missing it
+  // fails the tree the same way.
+  for (const kind of ['1', '6', '9']) {
+    assert.equal(
+      readViewTree(
+        `({QUERY :cteList <> :targetList <> :rtable ({RANGETBLENTRY :alias <> :rtekind ${kind}})})`
+      ).ok,
+      false,
+      `rtekind ${kind}`
+    )
+  }
   assert.equal(readViewTree('({QUERY :nonesuch 1})').ok, false)
   assert.equal(
     readViewTree('({QUERY :cteList ({COMMONTABLEEXPR :ctename live}) :targetList <>})').ok,
@@ -3006,7 +3057,7 @@ const REFUSAL_CASES: Record<PlanRefusal | ColumnRefusal, string> = {
   'through-a-row-source-the-catalog-does-not-name': 'v_function_scan',
   'cast-not-value-preserving': 'v_over_barrier_narrowing',
   'plan-and-tree-disagree': 'a plan and a tree built by hand, below',
-  'through-an-inlined-with': 'v_inlined_with'
+  'through-an-optionally-flattened-query': 'v_inlined_with'
 }
 
 test('the closed list of refusals is exactly the list with cases', () => {

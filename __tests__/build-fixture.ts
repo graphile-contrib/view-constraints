@@ -224,7 +224,7 @@ for (const state of STATISTICS_STATES) {
         treeColumns: Object.fromEntries(
           resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map())
         ),
-        inlinedWithColumns: [...(facts?.inlinedWithColumns ?? [])].sort(
+        optionallyFlattenedColumns: [...(facts?.optionallyFlattenedColumns ?? [])].sort(
           (left, right) => left - right
         ),
         viewAliases,

@@ -406,7 +406,7 @@ export function deriveViewConstraints(
     number,
     { schema: string; relation: string; column: string; relkind: string }
   > = new Map(),
-  inlinedWithColumns: ReadonlySet<number> = new Set()
+  optionallyFlattenedColumns: ReadonlySet<number> = new Set()
 ): ViewDerivation {
   const notes: string[] = []
   const columns = viewColumns.map((column) => column.name)
@@ -483,26 +483,26 @@ export function deriveViewConstraints(
     return sources
   })
 
-  // A column this view reads from a `WITH` query whose columns a plan may spell either
-  // way is refused its plan reading — no non-nullness and no key — whatever this plan
-  // happens to print for it. A `WITH` query this view inlines that groups, aggregates,
-  // de-duplicates, limits or windows is pulled up into the query above only where the
-  // planner chooses to merge that work, and where it does not the columns are printed
-  // behind a `Subquery Scan` this reader does not pin: the same view of the same query,
-  // read differently by two plans, so an answer taken from either alone would move with
-  // the planner's choice. Its relation is not refused with it: that comes from the view's
-  // stored tree (`resorigtbl`), which no plan writes, so the foreign keys the tree
-  // carries stand below as they do for any column the plan left without a source. Nothing
-  // the plan proved is compared with the tree here, and nothing needs to be: the refusal
-  // is the tree's own — a shape of the view's defining query, not a reading of it — so the
-  // tree it falls back on is the one side of the comparison that was never in doubt.
-  for (const index of inlinedWithColumns) {
+  // A column whose value stands on a query a plan may print two ways is refused its plan
+  // reading — no non-nullness and no key — whatever this plan happens to print for it. A
+  // `WITH` query this view inlines that groups, aggregates, de-duplicates, limits or
+  // windows, and a `FROM (SELECT …)` subquery that does, are pulled up into the query above
+  // only where the planner chooses to merge that work, and where it does not the columns
+  // are printed behind a subquery this reader does not pin: the same view of the same query,
+  // read differently by two plans, so an answer taken from either alone would move with the
+  // planner's choice. Its relation is not refused with it: that comes from the view's stored
+  // tree (`resorigtbl`), which no plan writes, so the foreign keys the tree carries stand
+  // below as they do for any column the plan left without a source. Nothing the plan proved
+  // is compared with the tree here, and nothing needs to be: the refusal is the tree's own —
+  // a shape of the view's defining query, not a reading of it — so the tree it falls back on
+  // is the one side of the comparison that was never in doubt.
+  for (const index of optionallyFlattenedColumns) {
     if (index < 0 || index >= columns.length) continue
     // A column the plan refused already keeps the plan's own reason: it is the sharper
     // one, and the column is refused either way.
     if (columnRefusals[index] !== null) continue
     origins[index] = null
-    columnRefusals[index] = 'through-an-inlined-with'
+    columnRefusals[index] = 'through-an-optionally-flattened-query'
   }
 
   // The plan and the view's stored rewrite tree each say where a column came from. Where
@@ -561,7 +561,7 @@ export function deriveViewConstraints(
     const viewColumn = columns[index]
     if (viewColumn === undefined) continue
     if (disagreed.has(index)) continue
-    if (inlinedWithColumns.has(index)) continue
+    if (optionallyFlattenedColumns.has(index)) continue
     const sources = plan.columns[index]
     if (sources && sources.length > 0) {
       if (plan.nullIntroduced[index] !== false) continue
@@ -764,7 +764,7 @@ export function deriveViewConstraints(
   // is never NULL is exactly what this plan cannot say, so neither tag may stand on it.
   const rowIdentities = plan.rowIdentities.filter((key) =>
     key.columns.every(
-      (index) => plan.entryNullExtended[index] !== true && !inlinedWithColumns.has(index)
+      (index) => plan.entryNullExtended[index] !== true && !optionallyFlattenedColumns.has(index)
     )
   )
   const candidates = rowIdentities.filter((key) =>

@@ -523,6 +523,39 @@ create view v_inlined_with_direct as
   select s.id, totals.n
   from sale s
        join totals on totals.store_id = s.store_id;
+-- NEGATIVE, and with no `WITH` at all: the select list reads an ordinary `FROM (SELECT …)`
+-- grouping, which a plan may pull up into the join or keep behind a subquery of its own.
+-- This is the inner join beside `v_sale_store_totals`, whose left join nulls the same
+-- column and puts the doubt behind a refusal that holds on every plan.
+create view v_group_sub_inner as
+  select s.id, tot.n
+  from sale s
+       join (select store_id, count(*) as n from sale group by store_id) tot
+         on tot.store_id = s.store_id;
+-- NEGATIVE: the grouping stands in a subquery a *simple* `WITH` query reads, so the doubt
+-- is the subquery level's, and it travels through the query in between.
+create view v_cte_over_group_sub as
+  with scaled as (
+    select tot.store_id, tot.n * 2 as doubled
+    from (select store_id, count(*) as n from sale group by store_id) tot
+  )
+  select s.id, scaled.doubled
+  from sale s
+       join scaled on scaled.store_id = s.store_id;
+-- NEGATIVE: a subquery over a subquery: the grouping stands two levels down.
+create view v_group_sub_over_group_sub as
+  select s.id, outer_tot.doubled
+  from sale s
+       join (select inner_tot.store_id, inner_tot.n * 2 as doubled
+             from (select store_id, count(*) as n from sale group by store_id) inner_tot) outer_tot
+         on outer_tot.store_id = s.store_id;
+-- NEGATIVE: and the doubt travels the other way: a subquery reads a `WITH` query that
+-- groups, so the level read is the `WITH` and the reading level is the subquery.
+create view v_group_sub_over_cte as
+  with totals as (select store_id, count(*) as n from sale group by store_id)
+  select s.id, wrap.n
+  from sale s
+       join (select store_id, n from totals) wrap on wrap.store_id = s.store_id;
 
 -- NEGATIVE: a lateral grouping that reaches out to another relation. Once the grouping
 -- is pinned, what stood inside it — the filter tying it to `st` — holds of the rows

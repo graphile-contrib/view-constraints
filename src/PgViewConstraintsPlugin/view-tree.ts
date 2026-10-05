@@ -241,12 +241,42 @@ function emptyField(value: Dumped | undefined): boolean {
 }
 
 /**
- * How far the walk follows an expression into the queries it reads before it stands down.
- * The chain an ordinary view builds is a handful of levels deep; a chain longer than this
- * is refused by the walk rather than followed, so a shape nobody has seen is a refusal
+ * How far the walk follows a value into the query levels it stands on before it stands
+ * down. The chain an ordinary view builds is a handful of levels deep; a chain longer than
+ * this is refused by the walk rather than followed, so a shape nobody has seen is a refusal
  * rather than a silent "nothing to see".
  */
-const WITH_TRACE_DEPTH = 8
+const LEVEL_TRACE_DEPTH = 8
+
+/**
+ * Whether pulling a query into the query above it is a rule rather than a choice. It is a
+ * rule for a projection: a bare projection is pulled up wherever it stands. It is not for a
+ * query that groups, aggregates, de-duplicates, limits, windows or spreads a set-returning
+ * call, because pulling one of those up means merging that work into the query above, and
+ * the planner does that only where it chooses to — the plan then prints the query's columns
+ * flattened above or behind a subquery it kept. A field the dump does not carry is read as
+ * the work being done: the doubt is taken on rather than the query trusted with what the
+ * reader cannot see.
+ *
+ * A set operation is deliberately not on the list. Pulling a `UNION ALL` up is a rule of its
+ * own (`is_simple_union_all`, decided before any cost), a `UNION` is never pulled up, and
+ * the reader reads every set operation where it stands — so a union level's columns are
+ * printed the same way whatever the plan costs, and refusing them here would take back the
+ * set operations this reader was built to read.
+ */
+function simpleQuery(query: Extract<Dumped, { kind: 'node' }> | undefined): boolean {
+  return !(
+    saysTrue(query, 'hasAggs') ||
+    saysTrue(query, 'hasWindowFuncs') ||
+    saysTrue(query, 'hasTargetSRFs') ||
+    saysTrue(query, 'hasDistinctOn') ||
+    saysTrue(query, 'hasModifyingCTE') ||
+    saysSomething(query, 'groupClause') ||
+    saysSomething(query, 'distinctClause') ||
+    saysSomething(query, 'limitCount') ||
+    saysSomething(query, 'limitOffset')
+  )
+}
 
 /** Whether a boolean field of a query is `true`, a field the dump does not carry included. */
 function saysTrue(query: Extract<Dumped, { kind: 'node' }> | undefined, field: string): boolean {
@@ -289,11 +319,29 @@ const REQUIRED_NODE_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
   ['VAR', ['varno', 'varlevelsup']]
 ])
 
+/**
+ * The fields a range-table entry must carry for the kind it says it is (`:rtekind`): the
+ * reader takes a `WITH` query's name from one, a subquery's query from another, a `GROUP`
+ * entry's expressions from a third and a relation's oid from a fourth, and a field renamed
+ * or removed on any of them fails the tree rather than leaving a column read past.
+ */
+const REQUIRED_RTE_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
+  ['0', ['relid']],
+  ['1', ['subquery']],
+  ['6', ['ctename']],
+  ['9', ['groupexprs']]
+])
+
 /** Whether a node of the walk carries every field this reader needs of its type. */
 function hasRequiredFields(node: Extract<Dumped, { kind: 'node' }>): boolean {
   const required = REQUIRED_NODE_FIELDS.get(node.type)
-  if (required === undefined) return true
-  for (const field of required) if (!node.fields.has(field)) return false
+  if (required !== undefined) {
+    for (const field of required) if (!node.fields.has(field)) return false
+  }
+  if (node.type !== 'RANGETBLENTRY') return true
+  const byKind = REQUIRED_RTE_FIELDS.get(textOf(node.fields.get('rtekind')) ?? '')
+  if (byKind === undefined) return true
+  for (const field of byKind) if (!node.fields.has(field)) return false
   return true
 }
 
@@ -315,13 +363,14 @@ export interface ViewTree {
   /** View column position → the base relation oid and attribute number it came from. */
   treeOrigins: Map<number, TreeOrigin>
   /**
-   * View column positions whose value this view reads from a `WITH` query a plan may
-   * spell either way: one it inlines that is not simple — it groups, aggregates,
+   * View column positions whose value stands on a query a plan may spell either way: a
+   * `WITH` query this view inlines that is not simple — one that groups, aggregates,
    * de-duplicates, limits or windows, so pulling it up means merging that work into the
-   * query above, which the planner does only where it chooses to — or one that reads
-   * another such query. Such a column is refused rather than read (`derive.ts`).
+   * query above, which the planner does only where it chooses to — or a `FROM (SELECT …)`
+   * subquery that is, or either of those read through another. Such a column is refused
+   * rather than read (`derive.ts`).
    */
-  inlinedWithColumns: Set<number>
+  optionallyFlattenedColumns: Set<number>
   /** Range-table alias → the relation oid it names. */
   relationAliases: Map<string, number>
   /**
@@ -352,7 +401,7 @@ export function readViewTree(action: string): ViewTree {
     cteOrigins: new Map(),
     cteAmbiguous: new Set(),
     treeOrigins: new Map(),
-    inlinedWithColumns: new Set(),
+    optionallyFlattenedColumns: new Set(),
     relationAliases: new Map(),
     cteMaterialized: new Map(),
     cteRefCount: new Map()
@@ -376,7 +425,7 @@ export function readViewTree(action: string): ViewTree {
   // say which a `CTE Scan` reads.
   const cteDefinitions = new Map<
     string,
-    { simple: boolean; inlined: boolean; reads: Set<string> }[]
+    { query: Extract<Dumped, { kind: 'node' }> | undefined; simple: boolean; inlined: boolean }[]
   >()
   walkDumped(root, (node) => {
     for (const cte of nodesOf(node.fields.get('cteList'))) {
@@ -393,43 +442,11 @@ export function readViewTree(action: string): ViewTree {
       const refCount = numberOf(cte.fields.get('cterefcount')) ?? 0
       const recursive = textOf(cte.fields.get('cterecursive')) === 'true'
       const inlined = !(keyword === 1 || (keyword === 0 && (refCount > 1 || recursive)))
-      // Whether PostgreSQL pulls the query up into the query above it in every plan. The
-      // pull-up is a rule for a projection: it happens wherever the query stands. It is
-      // not for a query that groups, aggregates, de-duplicates, limits, windows or
-      // spreads a set-returning call, because pulling one of those up means merging that
-      // work into the query above, and the planner does that only where it chooses to —
-      // the plan then prints the query's columns flattened above or behind a subquery it
-      // kept. A field the dump does not carry is read as the work being done: the doubt
-      // is taken on rather than the query trusted with what the reader cannot see.
-      const works =
-        saysTrue(cteQuery, 'hasAggs') ||
-        saysTrue(cteQuery, 'hasWindowFuncs') ||
-        saysTrue(cteQuery, 'hasTargetSRFs') ||
-        saysTrue(cteQuery, 'hasDistinctOn') ||
-        saysTrue(cteQuery, 'hasModifyingCTE') ||
-        saysSomething(cteQuery, 'groupClause') ||
-        saysSomething(cteQuery, 'distinctClause') ||
-        saysSomething(cteQuery, 'limitCount') ||
-        saysSomething(cteQuery, 'limitOffset') ||
-        saysSomething(cteQuery, 'setOperations')
-      // The `WITH` queries this one's own query reads: a `WITH` query is named at an
-      // outer level (`:ctelevelsup` counts up from the reading query), so any range-table
-      // entry of that kind inside this query's body is a read of one, and the doubt it
-      // carries is the doubt of the query that reads it.
-      const reads = new Set<string>()
-      if (cteQuery !== undefined) {
-        walkDumped(cteQuery, (node) => {
-          if (node.type !== 'RANGETBLENTRY') return
-          if (textOf(node.fields.get('rtekind')) !== '6') return
-          const referenced = textOf(node.fields.get('ctename'))
-          if (referenced !== null) reads.add(referenced)
-        })
-      }
       // Every definition of the name, the ones the plan cannot tell apart included: the
       // same name at two query levels is one spelling for two queries, and no plan says
       // which a scan reads, so the doubt of either definition is the doubt of the name.
       const definitions = cteDefinitions.get(name) ?? []
-      definitions.push({ simple: !works, inlined, reads })
+      definitions.push({ query: cteQuery, simple: simpleQuery(cteQuery), inlined })
       cteDefinitions.set(name, definitions)
       if (tree.cteColumns.has(name)) {
         tree.cteAmbiguous.add(name)
@@ -461,20 +478,161 @@ export function readViewTree(action: string): ViewTree {
     tree.cteMaterialized.delete(name)
     tree.cteRefCount.delete(name)
   }
-  // The `WITH` queries whose columns a plan may spell either way: one this view inlines
-  // (a materialized one is read off its own subplan, and must be printed as a `CTE Scan`)
-  // that is not simple, or that reads another such query. Resolved to a fixpoint, since a
-  // query reads only queries declared before it but the walk meets them in no order.
+  // Which query levels a plan may spell either way. Two kinds stand between a view's column
+  // and the value it holds: a `WITH` query this view inlines (a materialized one is read off
+  // its own subplan, and must be printed as a `CTE Scan`), and a `FROM (SELECT …)` subquery
+  // (`:rtekind 1`). Neither has a boundary a plan must show: PostgreSQL pulls either of them
+  // up into the query above where the pull-up is a rule — a bare projection is pulled up
+  // wherever it stands — and where the level groups, aggregates, de-duplicates, limits,
+  // windows or spreads a set-returning call, only where it chooses to, so the plan then
+  // prints the level's columns flattened above or behind a subquery it kept. A level that is
+  // not simple, or that reads a level that is not, is one whose columns a plan may spell
+  // either way, and a column read from it carries no answer that holds.
+  const subqueryKeys = new Map<Extract<Dumped, { kind: 'node' }>, string>()
+  walkDumped(root, (node) => {
+    if (node.type !== 'RANGETBLENTRY') return
+    if (textOf(node.fields.get('rtekind')) !== '1') return
+    subqueryKeys.set(node, `subquery:${subqueryKeys.size}`)
+  })
+  interface Level {
+    /** Whether a plan must print this level's columns under a boundary of its own. */
+    stable: boolean
+    /** Whether pulling the level up into the query above is a rule rather than a choice. */
+    simple: boolean
+    query: Extract<Dumped, { kind: 'node' }> | undefined
+    /** The levels this level's own query reads; filled in below. */
+    reads: Set<string>
+  }
+  const levels = new Map<string, Level[]>()
+  const addLevel = (key: string, level: Omit<Level, 'reads'>): void => {
+    const found = levels.get(key) ?? []
+    found.push({ ...level, reads: new Set() })
+    levels.set(key, found)
+  }
+  for (const [name, definitions] of cteDefinitions) {
+    for (const definition of definitions) {
+      addLevel(`with:${name}`, {
+        stable: !definition.inlined,
+        simple: definition.simple,
+        query: definition.query
+      })
+    }
+  }
+  for (const [entry, key] of subqueryKeys) {
+    const subquery = entry.fields.get('subquery')
+    const query = subquery?.kind === 'node' ? subquery : undefined
+    addLevel(key, { stable: false, simple: query !== undefined && simpleQuery(query), query })
+  }
+
+  /**
+   * The query levels a value stands on, as far as it can be followed: a `Var` at the
+   * expression's own level, resolved against that level's range table (`:varno`, and
+   * `:varattno` within the entry), through whatever the entry is made of — a `GROUP`
+   * entry's `:groupexprs` — until a level or a base relation is reached. A `SUBLINK` is not
+   * followed: it stands over a query of its own whose value the plan prints as a subplan,
+   * which the reader refuses there. A path the walk cannot follow says so instead of
+   * answering.
+   */
+  interface Trace {
+    keys: Set<string>
+    unfollowed: boolean
+  }
+  const trace = (value: Dumped, rtable: Dumped[], depth: number): Trace => {
+    const result: Trace = { keys: new Set(), unfollowed: false }
+    const merge = (inner: Trace): void => {
+      for (const key of inner.keys) result.keys.add(key)
+      result.unfollowed = result.unfollowed || inner.unfollowed
+    }
+    if (depth > LEVEL_TRACE_DEPTH) {
+      result.unfollowed = true
+      return result
+    }
+    if (value.kind === 'list') {
+      for (const item of value.items) merge(trace(item, rtable, depth))
+      return result
+    }
+    if (value.kind !== 'node') return result
+    // A query of its own, or the table that holds one: its reads belong to it, not here.
+    if (
+      value.type === 'SUBLINK' ||
+      value.type === 'QUERY' ||
+      value.type === 'COMMONTABLEEXPR' ||
+      value.type === 'RANGETBLENTRY'
+    ) {
+      return result
+    }
+    if (value.type === 'VAR') {
+      if (numberOf(value.fields.get('varlevelsup')) !== 0) {
+        result.unfollowed = true
+        return result
+      }
+      const varno = numberOf(value.fields.get('varno'))
+      const attno = numberOf(value.fields.get('varattno'))
+      if (varno === null || attno === null) {
+        result.unfollowed = true
+        return result
+      }
+      const entry = rtable[varno - 1]
+      if (entry?.kind !== 'node') {
+        result.unfollowed = true
+        return result
+      }
+      const kind = textOf(entry.fields.get('rtekind'))
+      // A base relation: the value is a column of a table, and no query stands behind it.
+      if (kind === '0') return result
+      if (kind === '6') {
+        const name = textOf(entry.fields.get('ctename'))
+        if (name === null) result.unfollowed = true
+        else result.keys.add(`with:${name}`)
+        return result
+      }
+      if (kind === '1') {
+        const key = subqueryKeys.get(entry)
+        if (key === undefined) result.unfollowed = true
+        else result.keys.add(key)
+        return result
+      }
+      if (kind === '9') {
+        const grouped = nodesOf(entry.fields.get('groupexprs'))[attno - 1]
+        if (grouped === undefined) {
+          result.unfollowed = true
+          return result
+        }
+        return trace(grouped, rtable, depth + 1)
+      }
+      // A function, a `VALUES` list, a join, a table function, a kind the reader does not
+      // know: the value comes from something this walk can say nothing about.
+      result.unfollowed = true
+      return result
+    }
+    for (const field of value.fields.values()) merge(trace(field, rtable, depth))
+    return result
+  }
+  const readsOf = (query: Extract<Dumped, { kind: 'node' }> | undefined): Set<string> => {
+    const keys = new Set<string>()
+    if (query === undefined) return keys
+    const rtable = nodesOf(query.fields.get('rtable'))
+    for (const [field, value] of query.fields) {
+      // The `WITH` list holds queries of their own, whose reads are their own too.
+      if (field === 'cteList') continue
+      for (const key of trace(value, rtable, 0).keys) keys.add(key)
+    }
+    return keys
+  }
+  for (const found of levels.values()) {
+    for (const level of found) level.reads = readsOf(level.query)
+  }
+  // Resolved to a fixpoint: a level reads another that may itself read one, and the walk
+  // meets them in no order.
   const uncertain = new Set<string>()
-  for (let pass = 0; pass < cteDefinitions.size + 1; pass++) {
-    for (const [name, definitions] of cteDefinitions) {
-      if (uncertain.has(name)) continue
-      const spellsEitherWay = definitions.some(
-        (definition) =>
-          definition.inlined &&
-          (!definition.simple || [...definition.reads].some((read) => uncertain.has(read)))
+  for (let pass = 0; pass < levels.size + 1; pass++) {
+    for (const [key, found] of levels) {
+      if (uncertain.has(key)) continue
+      const spellsEitherWay = found.some(
+        (level) =>
+          (!level.stable && !level.simple) || [...level.reads].some((read) => uncertain.has(read))
       )
-      if (spellsEitherWay) uncertain.add(name)
+      if (spellsEitherWay) uncertain.add(key)
     }
   }
 
@@ -486,67 +644,17 @@ export function readViewTree(action: string): ViewTree {
     tree.treeOrigins.set(position, { tableId, attnum })
   }
 
-  // A column this view reads from a `WITH` query whose columns a plan may spell either
-  // way (`uncertain`, above) has no answer that holds across plans: PostgreSQL may print
-  // them flattened into the query above — where they resolve to base columns — or behind
-  // a subquery it kept, which is a `Subquery Scan` this reader does not pin.
-  // The predicate: whether the value an expression spells is one a plan may spell either
-  // way. A `Var` is followed to the range-table entry it stands on (`:varno`, and
-  // `:varattno` within it), through whatever the entry is made of — a `GROUP` entry's
-  // `:groupexprs`, a subquery's own select list and its own range table — until a `WITH`
-  // query is reached, at any depth and at any level of the tree. A path the reader cannot
-  // follow is refused rather than passed: an entry of a kind that carries no expression
-  // (a function or a `VALUES` list), a name no definition here answers, a reference to an
-  // outer level, and a chain deeper than the walk goes are all the same answer — this
-  // column is not read. A `SUBLINK` is the one exception: it stands over a query of its
-  // own whose value the plan prints as a subplan, which the reader refuses there.
-  const readsEitherWay = (value: Dumped, level: Dumped[], depth: number): boolean => {
-    if (depth > WITH_TRACE_DEPTH) return true
-    if (value.kind === 'list') {
-      return value.items.some((item) => readsEitherWay(item, level, depth))
-    }
-    if (value.kind !== 'node') return false
-    if (value.type === 'SUBLINK') return false
-    if (value.type !== 'VAR') {
-      return [...value.fields.values()].some((field) => readsEitherWay(field, level, depth))
-    }
-    if (numberOf(value.fields.get('varlevelsup')) !== 0) return true
-    const varno = numberOf(value.fields.get('varno'))
-    const attno = numberOf(value.fields.get('varattno'))
-    if (varno === null || attno === null) return true
-    const entry = level[varno - 1]
-    if (entry?.kind !== 'node') return true
-    const kind = textOf(entry.fields.get('rtekind'))
-    // A base relation: the value is a column of a table, and no `WITH` query stands behind it.
-    if (kind === '0') return false
-    if (kind === '6') {
-      const name = textOf(entry.fields.get('ctename'))
-      return name === null || uncertain.has(name)
-    }
-    if (kind === '9') {
-      const expr = nodesOf(entry.fields.get('groupexprs'))[attno - 1]
-      return expr === undefined || readsEitherWay(expr, level, depth + 1)
-    }
-    if (kind === '1') {
-      const subquery = entry.fields.get('subquery')
-      if (subquery?.kind !== 'node') return true
-      const entries = nodesOf(subquery.fields.get('targetList'))
-      const column = entries[attno - 1]
-      if (column?.kind !== 'node') return true
-      const expr = column.fields.get('expr')
-      if (expr === undefined) return true
-      return readsEitherWay(expr, nodesOf(subquery.fields.get('rtable')), depth + 1)
-    }
-    // A function, a `VALUES` list, a join, a table function, a kind the reader does not
-    // know: the value comes from something this walk can say nothing about.
-    return true
-  }
+  // A column whose value stands on a level a plan may spell either way — or on a path the
+  // walk cannot follow at all — has no answer that holds across plans, and is named here to
+  // be refused rather than read (`derive.ts`).
+  const ownRtable = nodesOf(top.fields.get('rtable'))
   for (const [position, entry] of nodesOf(top.fields.get('targetList')).entries()) {
     if (entry.kind !== 'node') continue
     const expr = entry.fields.get('expr')
     if (expr === undefined) continue
-    if (readsEitherWay(expr, nodesOf(top.fields.get('rtable')), 0)) {
-      tree.inlinedWithColumns.add(position)
+    const traced = trace(expr, ownRtable, 0)
+    if (traced.unfollowed || [...traced.keys].some((key) => uncertain.has(key))) {
+      tree.optionallyFlattenedColumns.add(position)
     }
   }
 

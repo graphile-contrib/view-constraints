@@ -183,18 +183,20 @@ query's select list in order — with no map between the two in the plan. That m
 where each of the view's own columns was written from, is in the view's stored rewrite
 tree (`pg_rewrite.ev_action`), read field by field and not parsed as SQL: the tree names
 every `WITH` query's columns in order (`:ctename`, `:ctecolnames`), so a `cte.col` is
-read at that column's position in the subplan the plan computes it by. Where the view's
-own query reads a column from a `WITH` query it **inlines** that is not simple — one that
-groups, aggregates, de-duplicates, limits or windows, or that reads one of those — the
-column is refused its non-nullness and its key: pulling such a query up into the query above
-means merging that work into it, which PostgreSQL does only where it chooses to, and the plan
-then prints the column flattened (where it resolves to a base column) or behind a subquery of
-the kept query, which this reader does not pin. The relation is not refused with it: that
-comes from the tree (`resorigtbl`), which no plan writes, so a `@foreignKey` on such a column
-stands. A simple inlined query — a bare projection — is pulled up wherever it stands, and its
-columns are read as usual. Which fields say a query is not simple is listed in
-`view-tree.ts`, and the list is one the reader has been checked against on PostgreSQL 15
-through 18: a field the dump no longer carries is read as the work being done. The stored tree
+read at that column's position in the subplan the plan computes it by. Where a column's
+value stands on a query a plan may print two ways — a `WITH` query the view **inlines**, or
+a `FROM (SELECT …)` subquery, that is not simple (it groups, aggregates, de-duplicates, limits
+or windows), or that reads one of those — the column is refused its non-nullness and its key:
+pulling such a query up into the query above means merging that work into it, which PostgreSQL
+does only where it chooses to, and the plan then prints the column flattened (where it resolves
+to a base column) or behind a subquery of the kept query, which this reader does not pin. The
+relation is not refused with it: that comes from the tree (`resorigtbl`), which no plan writes,
+so a `@foreignKey` on such a column stands. A simple query — a bare projection — is pulled up
+wherever it stands, and its columns are read as usual, and so are a set operation's, whose
+pull-up is a rule of its own rather than a matter of cost. Which fields say a query is not
+simple is listed in `view-tree.ts`, and the list is one the reader has been checked against on
+PostgreSQL 15 through 18: a field the dump no longer carries is read as the work being done.
+The stored tree
 is read only on a PostgreSQL major whose format this reader has been checked against
 (15 through 18): on any other major it is left unread — the plan's own refusals stand
 where its facts would have, and each view's notes say why — so a format that moved
@@ -268,6 +270,12 @@ of every target under each of `PLANNER_REGIMES`, with the statistics as found, a
 differs. `open` opens a session with your driver. The lab's own matrix carries the
 same two axes — its regimes, read again from production-scale row counts — since the
 statistics are the planner's other input and a shape can move with them alone.
+
+What the proof holds is the **tags**: `@notNull`, `@foreignKey`, `@primaryKey` and
+`@unique`, and whether the plan was read at all. A refusal's **reason** is a diagnostic
+and may differ between plans for the same outcome — a column with no source either way
+is the same published answer whichever shape of plan named it — so the reasons are
+compared in the report and not in the proof.
 
 This proof is the plugin's own gate on its shape of reading, and a consumer should run
 it in its own CI: the plans it derives from are the ones that consumer's database

@@ -514,11 +514,12 @@ export interface ViewTreeFacts {
   cteAmbiguous: Set<string>
   treeOrigins: Map<number, TreeOrigin>
   /**
-   * The view's columns whose value it reads from a `WITH` query it inlines: refused,
-   * because the plan may print such a query's columns flattened or behind a kept
-   * subquery, and the two are read differently (see `view-tree.ts` and `derive.ts`).
+   * The view's columns whose value stands on a query a plan may spell either way — a `WITH`
+   * query it inlines that is not simple, or a subquery that is, or either read through
+   * another: refused, because the plan may print such a query's columns flattened or behind
+   * a kept subquery, and the two are read differently (see `view-tree.ts` and `derive.ts`).
    */
-  inlinedWithColumns: Set<number>
+  optionallyFlattenedColumns: Set<number>
   /** The relation each range-table alias of the view names, by alias. */
   relationAliases: Map<string, number>
   /** Whether each `WITH` query of the view is materialized (see `view-tree.ts`). */
@@ -646,7 +647,7 @@ export async function readViewTrees(query: RunQuery, schemas: string[]): Promise
       cteOrigins: tree.cteOrigins,
       cteAmbiguous: tree.cteAmbiguous,
       treeOrigins: tree.treeOrigins,
-      inlinedWithColumns: tree.inlinedWithColumns,
+      optionallyFlattenedColumns: tree.optionallyFlattenedColumns,
       relationAliases: tree.relationAliases,
       cteMaterialized: tree.cteMaterialized,
       cteRefCount: tree.cteRefCount
@@ -889,7 +890,7 @@ export async function collectViewConstraints(
       coercions,
       deriveUnique,
       resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map()),
-      facts?.inlinedWithColumns ?? new Set()
+      facts?.optionallyFlattenedColumns ?? new Set()
     )
     // A tree the walk could not place is said out loud: its CTE map is empty, so a
     // `WITH` query reads as refused, and the reason the map is empty is named here
