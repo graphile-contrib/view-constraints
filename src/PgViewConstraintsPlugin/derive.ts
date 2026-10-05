@@ -29,10 +29,13 @@
 // Non-nullness is the two sides meeting over one column rather than over a key. A
 // view column is NOT NULL when it proxies a base column that is never NULL where it is
 // read — `pg_attribute.attnotnull` says so, or a qualifier of the plan rejects a NULL
-// in it (`plan-qualifiers.ts`) — and the plan puts no NULL of its own into it. No
-// expression is evaluated, so `COALESCE(a, b)`, `count(*)`, a constant and a strict
-// function of non-null arguments are nullable here, derivable in principle and not
-// derived. The
+// in it (`plan-qualifiers.ts`) — and the plan puts no NULL of its own into it. A
+// column the select list spells as an expression has no base column to ask, and what
+// it has instead is the expression's own shape: a literal, `count`, a `COALESCE` over
+// a never-NULL argument prove non-nullness on their own (`plan-expressions.ts`), and
+// everything else stays nullable rather than guessed. No expression is computed and
+// no function's strictness is trusted; only the shapes whose SQL definition is the
+// claim are read. The
 // asymmetry is deliberate. A relation claimed wrongly costs an empty related object;
 // a `notNull` claimed wrongly puts a NULL in a non-null GraphQL field, and the rules
 // of GraphQL then null the whole parent object — so the answer is destroyed rather
@@ -392,18 +395,25 @@ export function deriveViewConstraints(
     catalog.get(`${origin.schema}.${origin.relation}`)?.columns.get(origin.column)?.notNull === true
 
   // Non-nullness, column by column: the base column is NOT NULL and the plan puts no
-  // NULL of its own over it. A materialized view is left out — its stored row
+  // NULL of its own over it; or the entry is no reference at all and the expression
+  // it spells proves the value never NULL. A materialized view is left out — its stored row
   // outlives the row it was copied from, and the copy is the only thing this reader
-  // ever sees of it.
+  // ever sees of it. A `GROUPING SETS` superaggregate row is all-NULL grouping
+  // columns, and nothing says this column is not one of them, so it stands over the
+  // expression's own answer too.
   const notNullColumns: string[] = []
   for (const [index, sources] of origins.entries()) {
     const viewColumn = columns[index]
     if (viewColumn === undefined) continue
     if (relkind !== 'v') continue
-    if (!sources || sources.length === 0) continue
-    if (plan.nullIntroduced[index] !== false) continue
-    const everyBranchNotNull = sources.every((origin) => neverNullOrigin(origin))
-    if (everyBranchNotNull) notNullColumns.push(viewColumn)
+    if (sources && sources.length > 0) {
+      if (plan.nullIntroduced[index] !== false) continue
+      const everyBranchNotNull = sources.every((origin) => neverNullOrigin(origin))
+      if (everyBranchNotNull) notNullColumns.push(viewColumn)
+      continue
+    }
+    if (plan.groupingSets) continue
+    if (plan.expressionNotNull[index] === true) notNullColumns.push(viewColumn)
   }
 
   // Scan instances the columns actually came from, in first-appearance order. Only

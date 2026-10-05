@@ -526,3 +526,102 @@ create view v_union_one_filtered as
   select id, bank_id from tx where bank_id is not null
   union all
   select id, bank_id from tx where amount > 0;
+
+-- ── Non-nullness of computed columns ───────────────────────────────────────────
+--
+-- An entry that is not a column reference has no base column to ask about, but its
+-- own shape answers a lot: a literal is never NULL, `count` never is, a `COALESCE`
+-- with one never-NULL arm never is (plan-expressions.ts). The rules are recursive —
+-- any depth of the shapes that carry them — and every other shape stays nullable
+-- rather than guessed: a strict function, a window function, an aggregate over a
+-- nullable column or over no group.
+
+-- POSITIVE: a literal is never NULL, however cast.
+create view v_expr_literal as select id, 'usdt'::text as code, 0::numeric as zero from tx;
+-- POSITIVE: one never-NULL arm of a COALESCE is enough — here the literal at the end
+-- of an arm that is itself a COALESCE over a NULL literal and a nullable column.
+create view v_expr_coalesce as
+  select id,
+         coalesce(bank_id, 0::bigint) as bank_id,
+         coalesce(bank_id, coalesce(null::bigint, 0)) as nested
+  from tx;
+-- NEGATIVE: every arm nullable is a nullable COALESCE.
+create view v_expr_coalesce_nullable as select id, coalesce(bank_id, bank_id) as b from tx;
+-- POSITIVE: a complete CASE over never-NULL arms, nested one in another.
+create view v_expr_case_else as
+  select id,
+         case when bank_id is null then case when amount > 0 then 1 else 2 end
+              else coalesce(bank_id, 3)
+         end as filled
+  from tx;
+-- NEGATIVE: a CASE without ELSE answers NULL on its last arm.
+create view v_expr_case_no_else as
+  select id, case when bank_id is null then 0 end as filled from tx;
+-- NEGATIVE: an ELSE over a nullable column does not repair the CASE.
+create view v_expr_case_nullable_arm as
+  select id, case when bank_id is null then 0 else bank_id end as filled from tx;
+-- POSITIVE: count answers 0 over what it counted, however it counted.
+create view v_expr_group_count as
+  select cur_code, count(*) as n, count(bank_id) as nb, count(distinct bank_id) as nd
+  from tx group by cur_code;
+-- POSITIVE: min/max/sum/avg over a NOT NULL column answer a value in every row of
+-- a grouping: each row stands for a non-empty group.
+create view v_expr_group_values as
+  select cur_code, min(amount) as lo, max(amount) as hi, sum(amount) as total, avg(amount) as mean
+  from tx group by cur_code;
+-- NEGATIVE: over the whole input they answer NULL when it is empty; count does not.
+create view v_expr_aggregate_whole_input as
+  select max(amount) as hi, sum(amount) as total, count(*) as n from tx;
+-- NEGATIVE: so do they over a nullable column, group or no group.
+create view v_expr_group_nullable_argument as
+  select cur_code, max(bank_id) as hi from tx group by cur_code;
+-- NEGATIVE: a FILTER can drop every row of the group the aggregate would have seen.
+create view v_expr_group_filtered as
+  select cur_code, max(amount) filter (where id < 0) as hi from tx group by cur_code;
+-- POSITIVE: the whitelisted operators over never-NULL operands are a value or an
+-- error, never NULL; the IS forms are a boolean whatever the operand.
+create view v_expr_operators as
+  select id, amount + 1 as plus, amount * 2 as twice, cur_code || 'x' as glued,
+         bank_id is null as absent, cur_code is distinct from 'usdt' as other
+  from tx;
+-- NEGATIVE: a nullable operand is a NULL result for the same operators.
+create view v_expr_operator_nullable as select id, bank_id + 1 as plus from tx;
+-- NEGATIVE: a function's strictness proves nothing — lower of an empty range is
+-- NULL from a non-NULL argument.
+create view v_expr_function as select id, upper(cur_code) as loud from tx;
+-- NEGATIVE: a window function runs per frame, and a frame can be empty.
+create view v_expr_window as select id, row_number() over (order by id) as rn from tx;
+-- POSITIVE: a cast hands its operand's answer on. The value it preserves is another
+-- question, which is why this column has no origins, only non-nullness.
+create view v_expr_cast as select id, cur_code::varchar(4) as code from tx;
+-- NEGATIVE: NULLIF answers NULL whenever its arguments compare equal.
+create view v_expr_nullif as select id, nullif(cur_code, 'usdt') as code from tx;
+-- POSITIVE: a computed branch proves non-nullness the way a single entry does, and
+-- a union column is never NULL only where every branch proves it.
+create view v_expr_union_literal as
+  select id, coalesce(bank_id, 0::bigint) as bank_id from tx where amount > 0
+  union all
+  select id, 0::bigint from tx where amount <= 0;
+-- NEGATIVE: one branch that can be NULL makes the union column nullable.
+create view v_expr_union_nullable_branch as
+  select id, coalesce(bank_id, 0::bigint) as bank_id from tx where amount > 0
+  union all
+  select id, bank_id from tx where amount <= 0;
+-- POSITIVE, across a boundary: a computed column of a crossed view is the same
+-- expression one step down.
+create view v_barrier_expr with (security_barrier = true) as
+  select id, cur_code, coalesce(bank_id, 0::bigint) as bank_filled from tx;
+create view v_over_barrier_expr as select id, bank_filled from v_barrier_expr;
+-- NEGATIVE: an outer join over a grouping pads the computed column with NULL the
+-- same way it pads a base column.
+create view v_expr_group_under_outer_join as
+  select r.id, v_group.n from refund r left join v_group on v_group.cur_code = r.id::text;
+-- POSITIVE: an inner join over the same grouping pads nothing.
+create view v_expr_group_over_join as
+  select r.id, v_group.n from refund r join v_group on v_group.cur_code = r.id::text;
+-- POSITIVE: an aggregate call with ORDER BY inside is still a call, and the
+-- literal arm of the COALESCE around it answers never-NULL on its own —
+-- wherever the planner prints the expression from.
+create view v_expr_ordered_aggregate as
+  select cur_code, coalesce(string_agg(cur_code, ',' order by id), ''::text) as glued
+  from tx group by cur_code;

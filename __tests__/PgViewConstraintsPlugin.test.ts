@@ -65,6 +65,8 @@ interface Fixture {
   coercions: { binary: string[]; domainBase: Record<string, number> }
   /** Every `=` operator of the lab database is strict. */
   strictEquality: boolean
+  /** Built-in spellings a user-defined function or operator of the lab took over. */
+  shadowedNames: string[]
   /** Every lab table, each a referencing half of a relation to a projection. */
   tables: { schema: string; table: string }[]
   /** Every lab view's select-list order and the views it is built on. */
@@ -91,7 +93,11 @@ const catalog = new Map<string, CatalogRelation>(
   ])
 )
 
-const planCatalog = planCatalogFrom(catalog, fixture.strictEquality)
+const planCatalog = planCatalogFrom(
+  catalog,
+  fixture.strictEquality,
+  new Set(fixture.shadowedNames ?? [])
+)
 
 const coercions: TypeCoercions = {
   binary: new Set(fixture.coercions.binary),
@@ -206,7 +212,8 @@ const CASES: Case[] = [
     view: 'v_group',
     about: 'a grouping key proxies; the aggregate beside it does not',
     origins: ['cur_code=tx.cur_code', 'n=—'],
-    notNull: ['cur_code'],
+    // `count` answers 0 over whatever rows there are, grouped or not.
+    notNull: ['cur_code', 'n'],
     foreignKeys: ['(cur_code) references lab.currency (code)'],
     // The group key is a key, and a key the plan makes of its own names no row of
     // `tx`: no relation is led to it.
@@ -323,7 +330,8 @@ const CASES: Case[] = [
     view: 'v_coalesce',
     about: 'COALESCE takes the value from here or from there: it proxies neither',
     origins: ['id=tx.id', 'cur_code=—'],
-    notNull: ['id'],
+    // `tx.cur_code` is never NULL, and one never-NULL arm is what `COALESCE` needs.
+    notNull: ['id', 'cur_code'],
     foreignKeys: ['(id) references lab.tx (id)'],
     // What COALESCE computes is no column; the join under it is still by `wallet`'s
     // key, so `tx`'s key is the view's.
@@ -331,17 +339,19 @@ const CASES: Case[] = [
   },
   {
     view: 'v_constant',
-    about: 'a literal is nobody’s column',
+    about: 'a literal is nobody’s column, and never NULL either',
     origins: ['id=tx.id', 'cur_code=—'],
-    notNull: ['id'],
+    notNull: ['id', 'cur_code'],
     foreignKeys: ['(id) references lab.tx (id)'],
     primaryKey: 'id'
   },
   {
     view: 'v_cast_truncating',
-    about: 'text to varchar(4) is binary-coercible and still truncates',
+    about:
+      'text to varchar(4) is binary-coercible and still truncates: no origins — ' +
+      'but the value is the never-NULL column’s value or an error, never NULL',
     origins: ['id=tx.id', 'cur_code=—'],
-    notNull: ['id'],
+    notNull: ['id', 'cur_code'],
     foreignKeys: ['(id) references lab.tx (id)'],
     primaryKey: 'id'
   },
@@ -590,7 +600,9 @@ const CASES: Case[] = [
       'a UNION ALL inside a barrier view is pulled up into the query above all the ' +
       'same, and reads as the union it is',
     origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code', 'amount=—'],
-    notNull: ['id', 'cur_code'],
+    // `amount` is `tx.amount` in one branch and `0::numeric` in the other: each
+    // branch proves it never NULL its own way.
+    notNull: ['id', 'cur_code', 'amount'],
     foreignKeys: ['(cur_code) references lab.currency (code)'],
     primaryKey: null
   },
@@ -608,7 +620,7 @@ const CASES: Case[] = [
       'an ORDER BY of its own stops the union being pulled up, so the boundary stays ' +
       'and the union stays under it',
     origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code', 'amount=—'],
-    notNull: ['id', 'cur_code'],
+    notNull: ['id', 'cur_code', 'amount'],
     foreignKeys: ['(cur_code) references lab.currency (code)'],
     primaryKey: null
   },
@@ -640,9 +652,11 @@ const CASES: Case[] = [
   },
   {
     view: 'v_barrier_narrowing',
-    about: 'the inner view truncates the value, so it is not the base column’s any more',
+    about:
+      'the inner view truncates the value, so it is not the base column’s any more — ' +
+      'the value and the nullability are separate questions',
     origins: ['id=tx.id', 'cur_code=—', 'amount=tx.amount'],
-    notNull: ['id', 'amount'],
+    notNull: ['id', 'cur_code', 'amount'],
     foreignKeys: ['(id) references lab.tx (id)'],
     primaryKey: 'id'
   },
@@ -652,7 +666,7 @@ const CASES: Case[] = [
       'and the outer view casting it back to the base type does not undo that: each ' +
       'step is binary-coercible on its own, and the chain of them is not',
     origins: ['id=tx.id', 'cur_code=—'],
-    notNull: ['id'],
+    notNull: ['id', 'cur_code'],
     foreignKeys: ['(id) references lab.tx (id)'],
     primaryKey: 'id'
   },
@@ -1118,9 +1132,11 @@ const CASES: Case[] = [
   },
   {
     view: 'v_group_store',
-    about: 'a group key of column references is a key',
+    about:
+      'a group key of column references is a key, and the aggregate beside it is a ' +
+      'value in every row of it: `sum` over a never-NULL column, grouped',
     origins: ['store_id=sale.store_id', 'code=store.code', 'amount=—'],
-    notNull: ['store_id', 'code'],
+    notNull: ['store_id', 'code', 'amount'],
     foreignKeys: ['(store_id) references lab.store (id)'],
     primaryKey: 'store_id,code'
   },
@@ -1136,7 +1152,7 @@ const CASES: Case[] = [
     view: 'v_group_nullable',
     about: 'a group key over a column that can be NULL is no row identity',
     origins: ['cur_code=tx.cur_code', 'bank_id=tx.bank_id', 'n=—'],
-    notNull: ['cur_code'],
+    notNull: ['cur_code', 'n'],
     foreignKeys: [
       '(bank_id) references lab.bank (id)',
       '(cur_code) references lab.currency (code)'
@@ -1155,7 +1171,7 @@ const CASES: Case[] = [
     view: 'v_group_expression',
     about: 'a group key over an expression is a key of nothing the view can name',
     origins: ['loud=—', 'n=—'],
-    notNull: [],
+    notNull: ['n'],
     foreignKeys: [],
     primaryKey: null
   },
@@ -1165,7 +1181,7 @@ const CASES: Case[] = [
       'a union whose branches each write their own text literal into one column: that ' +
       'column with a key of every branch is a key',
     origins: ['source=—', 'id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
-    notNull: ['id', 'cur_code'],
+    notNull: ['source', 'id', 'cur_code'],
     foreignKeys: ['(cur_code) references lab.currency (code)'],
     primaryKey: 'source,id'
   },
@@ -1173,7 +1189,7 @@ const CASES: Case[] = [
     view: 'v_union_discriminated_joined',
     about: 'a branch keyed through a many-to-one join is keyed all the same',
     origins: ['source=—', 'id=sale.id|tx.id', 'code=store.code|tx.cur_code'],
-    notNull: ['id', 'code'],
+    notNull: ['source', 'id', 'code'],
     foreignKeys: [],
     primaryKey: 'source,id'
   },
@@ -1181,7 +1197,7 @@ const CASES: Case[] = [
     view: 'v_barrier_discriminated',
     about: 'the discriminated union inside a barrier view',
     origins: ['source=—', 'id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code', 'amount=—'],
-    notNull: ['id', 'cur_code'],
+    notNull: ['source', 'id', 'cur_code', 'amount'],
     foreignKeys: ['(cur_code) references lab.currency (code)'],
     primaryKey: 'source,id'
   },
@@ -1189,7 +1205,7 @@ const CASES: Case[] = [
     view: 'v_over_barrier_discriminated',
     about: 'and across its boundary, branch by branch',
     origins: ['source=—', 'id=tx.id|wallet.id'],
-    notNull: ['id'],
+    notNull: ['source', 'id'],
     foreignKeys: [],
     primaryKey: 'source,id'
   },
@@ -1197,7 +1213,7 @@ const CASES: Case[] = [
     view: 'v_barrier_discriminated_ordered',
     about: 'a discriminated union in a barrier view whose ORDER BY keeps its boundary',
     origins: ['source=—', 'id=tx.id|wallet.id'],
-    notNull: ['id'],
+    notNull: ['source', 'id'],
     foreignKeys: [],
     primaryKey: 'source,id'
   },
@@ -1205,7 +1221,7 @@ const CASES: Case[] = [
     view: 'v_over_barrier_discriminated_cast',
     about: 'a cast over the discriminator across that boundary can make two literals one',
     origins: ['source=—', 'id=tx.id|wallet.id'],
-    notNull: ['id'],
+    notNull: ['source', 'id'],
     foreignKeys: [],
     primaryKey: null
   },
@@ -1213,7 +1229,7 @@ const CASES: Case[] = [
     view: 'v_union_varchar_lengths',
     about: 'one text in two lengths is one value, not two discriminators',
     origins: ['source=—', 'id=tx.id|wallet.id'],
-    notNull: ['id'],
+    notNull: ['source', 'id'],
     foreignKeys: [],
     primaryKey: null
   },
@@ -1221,7 +1237,7 @@ const CASES: Case[] = [
     view: 'v_union_same_literal',
     about: 'one literal in two branches tells them apart no more than none',
     origins: ['source=—', 'id=tx.id|wallet.id'],
-    notNull: ['id'],
+    notNull: ['source', 'id'],
     foreignKeys: [],
     primaryKey: null
   },
@@ -1229,7 +1245,7 @@ const CASES: Case[] = [
     view: 'v_union_numeric_literal',
     about: 'a numeric literal is no discriminator: two spellings can be one number',
     origins: ['source=—', 'id=tx.id|wallet.id'],
-    notNull: ['id'],
+    notNull: ['source', 'id'],
     foreignKeys: [],
     primaryKey: null
   },
@@ -1245,8 +1261,220 @@ const CASES: Case[] = [
     view: 'v_union_discriminated_unkeyed',
     about: 'the branches are told apart, and the rows of one branch are not',
     origins: ['source=—', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['source', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: null
+  },
+
+  // ── Non-nullness of computed columns: what a select-list expression proves ────
+  {
+    view: 'v_expr_literal',
+    about: 'a literal is never NULL, however cast',
+    origins: ['id=tx.id', 'code=—', 'zero=—'],
+    notNull: ['id', 'code', 'zero'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_coalesce',
+    about:
+      'a COALESCE with one never-NULL arm never is — a literal, or a nested COALESCE ' +
+      'over a NULL literal and a literal',
+    origins: ['id=tx.id', 'bank_id=—', 'nested=—'],
+    notNull: ['id', 'bank_id', 'nested'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_coalesce_nullable',
+    about: 'every arm nullable is a nullable COALESCE',
+    origins: ['id=tx.id', 'b=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_case_else',
+    about:
+      'a complete CASE over never-NULL arms, the arms themselves CASE and COALESCE — ' +
+      'the rules compose at any depth',
+    origins: ['id=tx.id', 'filled=—'],
+    notNull: ['id', 'filled'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_case_no_else',
+    about: 'a CASE without ELSE answers NULL on its last arm',
+    origins: ['id=tx.id', 'filled=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_case_nullable_arm',
+    about: 'an ELSE over a nullable column does not repair the CASE',
+    origins: ['id=tx.id', 'filled=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_group_count',
+    about: 'count answers 0 over what it counted, however it counted',
+    origins: ['cur_code=tx.cur_code', 'n=—', 'nb=—', 'nd=—'],
+    notNull: ['cur_code', 'n', 'nb', 'nd'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'cur_code'
+  },
+  {
+    view: 'v_expr_group_values',
+    about:
+      'min/max/sum/avg over a NOT NULL column answer a value in every row of a ' +
+      'grouping: each row stands for a non-empty group',
+    origins: ['cur_code=tx.cur_code', 'lo=—', 'hi=—', 'total=—', 'mean=—'],
+    notNull: ['cur_code', 'lo', 'hi', 'total', 'mean'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'cur_code'
+  },
+  {
+    view: 'v_expr_aggregate_whole_input',
+    about: 'over the whole input they answer NULL when it is empty; count does not',
+    origins: ['hi=—', 'total=—', 'n=—'],
+    notNull: ['n'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_expr_group_nullable_argument',
+    about: 'so do they over a nullable column, group or no group',
+    origins: ['cur_code=tx.cur_code', 'hi=—'],
     notNull: ['cur_code'],
     foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'cur_code'
+  },
+  {
+    view: 'v_expr_group_filtered',
+    about: 'a FILTER can drop every row of the group the aggregate would have seen',
+    origins: ['cur_code=tx.cur_code', 'hi=—'],
+    notNull: ['cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'cur_code'
+  },
+  {
+    view: 'v_expr_operators',
+    about:
+      'the whitelisted operators over never-NULL operands are a value or an error; ' +
+      'the IS forms are a boolean whatever the operand',
+    origins: ['id=tx.id', 'plus=—', 'twice=—', 'glued=—', 'absent=—', 'other=—'],
+    notNull: ['id', 'plus', 'twice', 'glued', 'absent', 'other'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_operator_nullable',
+    about: 'a nullable operand is a NULL result for the same operators',
+    origins: ['id=tx.id', 'plus=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_function',
+    about: 'a function’s name proves nothing, however strict the function',
+    origins: ['id=tx.id', 'loud=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_window',
+    about: 'a window function runs per frame, and a frame can be empty',
+    origins: ['id=tx.id', 'rn=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_cast',
+    about:
+      'a cast hands its operand’s answer on — here the cast truncates, so the column ' +
+      'has no origins at all, and is still never NULL',
+    origins: ['id=tx.id', 'code=—'],
+    notNull: ['id', 'code'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_nullif',
+    about: 'NULLIF answers NULL whenever its arguments compare equal',
+    origins: ['id=tx.id', 'code=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_union_literal',
+    about:
+      'a union column is never NULL only where every branch proves it — here a ' +
+      'COALESCE in one and a literal in the other',
+    origins: ['id=tx.id', 'bank_id=—'],
+    notNull: ['id', 'bank_id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_expr_union_nullable_branch',
+    about: 'one branch that can be NULL makes the union column nullable',
+    origins: ['id=tx.id', 'bank_id=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_barrier_expr',
+    about: 'a computed column asked for with the barrier’s whole list reads like the scan',
+    origins: ['id=tx.id', 'cur_code=tx.cur_code', 'bank_filled=—'],
+    notNull: ['id', 'cur_code', 'bank_filled'],
+    foreignKeys: ['(cur_code) references lab.currency (code)', '(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_over_barrier_expr',
+    about: 'and across the boundary: the expression one step down proves it there',
+    origins: ['id=tx.id', 'bank_filled=—'],
+    notNull: ['id', 'bank_filled'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_ordered_aggregate',
+    about:
+      'an aggregate call with ORDER BY inside is still a call, and the literal arm ' +
+      'of the COALESCE around it answers on its own',
+    origins: ['cur_code=tx.cur_code', 'glued=—'],
+    notNull: ['cur_code', 'glued'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'cur_code'
+  },
+  {
+    view: 'v_expr_group_under_outer_join',
+    about:
+      'an outer join over a grouping pads the computed column with NULL the same way ' +
+      'it pads a base column — the join equates a cast, so no key is carried either',
+    origins: ['id=refund.id', 'n=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.refund (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_expr_group_over_join',
+    about:
+      'an inner join over the same grouping pads nothing: the count crosses the ' +
+      'boundary and is never NULL here',
+    origins: ['id=refund.id', 'n=—'],
+    notNull: ['id', 'n'],
+    foreignKeys: ['(id) references lab.refund (id)'],
     primaryKey: null
   }
 ]
