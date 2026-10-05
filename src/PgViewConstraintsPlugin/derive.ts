@@ -121,8 +121,7 @@ export interface DerivedForeignKey {
   tag: string
 }
 
-export interface DerivedPrimaryKey {
-  kind: 'primaryKey'
+export interface DerivedKey {
   viewColumns: string[]
   /**
    * The base relation's unique key this is, where it is one relation's key carried
@@ -131,8 +130,27 @@ export interface DerivedPrimaryKey {
    * one row of any table.
    */
   via: { schema: string; relation: string; constraintName: string } | null
-  /** The `@primaryKey` smart tag this key is equivalent to. */
+  /**
+   * The smart tag this key is equivalent to: `@primaryKey` for the key
+   * `PgFakeConstraintsPlugin` makes every column of non-null, `@unique` for a key
+   * whose columns may be NULL.
+   */
   tag: string
+}
+
+export interface DerivedPrimaryKey extends DerivedKey {
+  kind: 'primaryKey'
+}
+
+/**
+ * A key of the view whose columns are allowed to be NULL. `PgFakeConstraintsPlugin`
+ * does not make a `@unique` column non-null, and PostgreSQL's own uniqueness lets a
+ * NULL sit beside anything — a `UNIQUE` index admits any number of NULLs — so the
+ * plan's proof that no two rows share the tuple is what is declared, and nothing about
+ * the columns' nullness.
+ */
+export interface DerivedUniqueKey extends DerivedKey {
+  kind: 'unique'
 }
 
 export interface ViewDerivation {
@@ -152,6 +170,13 @@ export interface ViewDerivation {
   notNullColumns: string[]
   foreignKeys: DerivedForeignKey[]
   primaryKey: DerivedPrimaryKey | null
+  /**
+   * A proven set of the view's columns no two rows share, where no such set is also
+   * never-NULL — a `@unique` tag rather than a `@primaryKey`. `null` where a
+   * `primaryKey` already carries a key, where no key can be NULL, or where uniqueness
+   * derivation is turned off.
+   */
+  unique: DerivedUniqueKey | null
   /**
    * Relations to a projection of this surface the catalog authorises and this reader
    * declined to lead, with the reason. Filled by `deriveProjectionRelations`.
@@ -375,7 +400,12 @@ export function deriveViewConstraints(
   viewColumns: ViewColumn[],
   plan: PlanOrigins | PlanRefusal,
   catalog: ReadonlyMap<string, CatalogRelation>,
-  coercions: TypeCoercions
+  coercions: TypeCoercions,
+  deriveUnique = true,
+  treeColumns: ReadonlyMap<
+    number,
+    { schema: string; relation: string; column: string; relkind: string }
+  > = new Map()
 ): ViewDerivation {
   const notes: string[] = []
   const columns = viewColumns.map((column) => column.name)
@@ -391,6 +421,7 @@ export function deriveViewConstraints(
       notNullColumns: [],
       foreignKeys: [],
       primaryKey: null,
+      unique: null,
       declinedViewTargets: [],
       notes: [`plan not read — ${plan}: ${PLAN_REFUSALS[plan]}`]
     }
@@ -451,6 +482,34 @@ export function deriveViewConstraints(
     return sources
   })
 
+  // The plan and the view's stored rewrite tree each say where a column came from. Where
+  // both name a base column and they are not the same, the column is refused rather than
+  // either trusted — the tree is read only where the plan named nothing (below), so the
+  // two are never mixed. The tree names a view rather than a base table where the column
+  // came through one, and is left out of the comparison then: a view boundary is exactly
+  // the step the plan crosses to the base column and the tree does not.
+  // A column the plan and the tree name differently is refused whole below — no
+  // non-nullness, no key and no relation — so the tree, which may be the side in the
+  // wrong, is not read for it in any of those passes.
+  const disagreed = new Set<number>()
+  for (let index = 0; index < columns.length; index++) {
+    const sources = origins[index]
+    const tree = treeColumns.get(index)
+    if (!tree || sources === null || sources.length !== 1) continue
+    if (tree.relkind !== 'r' && tree.relkind !== 'p' && tree.relkind !== 'f') continue
+    const origin = sources[0]
+    if (!origin) continue
+    if (
+      origin.schema !== tree.schema ||
+      origin.relation !== tree.relation ||
+      origin.column !== tree.column
+    ) {
+      origins[index] = null
+      columnRefusals[index] = 'plan-and-tree-disagree'
+      disagreed.add(index)
+    }
+  }
+
   // A base column is never NULL in the rows a value is read from when the catalog says
   // so, or when a qualifier of the plan rejects a NULL in it there.
   const neverNullOrigin = (origin: ColumnOrigin): boolean =>
@@ -460,10 +519,13 @@ export function deriveViewConstraints(
   // Non-nullness, column by column: the base column is NOT NULL where it is read and
   // every cast over it may only answer that value or NULL it cannot; or the entry is
   // no reference at all and the expression it spells proves the value never NULL. A
-  // materialized view is left out — its stored row outlives the row it was copied
-  // from, and the copy is the only thing this reader ever sees of it. A `GROUPING
-  // SETS` superaggregate row is all-NULL grouping columns, and nothing says this
-  // column is not one of them, so it stands over the expression's own answer too.
+  // materialized view is read by the same rule: its stored copy of an entry that was
+  // never NULL holds no NULL either, which is the same reading its key is taken by
+  // (below), so the two answers about one column cannot disagree. A `GROUPING SETS`
+  // superaggregate row is all-NULL grouping columns; the expression rules already read
+  // every column reference under one as nullable, so a shape they still answer
+  // never-NULL for — a literal, a `count` — holds in every row, superaggregate rows
+  // included, and is kept.
   //
   // The origin path reads the raw sources, not the origins a value-preserving cast
   // leaves: a cast that refuses the proxy (a truncation) is still read for
@@ -475,7 +537,7 @@ export function deriveViewConstraints(
   for (let index = 0; index < columns.length; index++) {
     const viewColumn = columns[index]
     if (viewColumn === undefined) continue
-    if (relkind !== 'v') continue
+    if (disagreed.has(index)) continue
     const sources = plan.columns[index]
     if (sources && sources.length > 0) {
       if (plan.nullIntroduced[index] !== false) continue
@@ -483,7 +545,10 @@ export function deriveViewConstraints(
       if (sources.every((origin) => neverNullOrigin(origin))) notNullColumns.push(viewColumn)
       continue
     }
-    if (plan.groupingSets) continue
+    // A computed column is read by the same rule a base one is: an outer join nulling
+    // the side the value comes from puts a NULL in every padded row, whatever the
+    // expression promises about the rows it computed over.
+    if (plan.entryNullExtended[index] !== false) continue
     if (plan.expressionNotNull[index] === true) notNullColumns.push(viewColumn)
   }
 
@@ -614,6 +679,42 @@ export function deriveViewConstraints(
     }
   }
 
+  // Where the plan could not read a column at all, the view's own stored tree still
+  // traces it to the base column it was written as — through subqueries, joins and
+  // `WITH` queries alike — and a bare reference to a base column carries its foreign
+  // keys. Only the columns the plan left without a source are read this way, and only
+  // for a relation: the tree says nothing of non-nullness, and a column whose value the
+  // plan did read is judged by the plan. A column the plan and the tree disagreed on is
+  // left out: it was refused whole above, and the tree is the side that may be wrong.
+  for (let index = 0; index < columns.length; index++) {
+    const viewColumn = columns[index]
+    if (viewColumn === undefined || origins[index] !== null) continue
+    if (disagreed.has(index)) continue
+    const tree = treeColumns.get(index)
+    if (!tree) continue
+    const origin: ColumnOrigin = {
+      schema: tree.schema,
+      relation: tree.relation,
+      alias: `tree:${tree.schema}.${tree.relation}`,
+      column: tree.column,
+      coerced: false,
+      via: [],
+      nullExtended: false,
+      qualifiedNonNull: false
+    }
+    for (const target of singleColumnTargets(origin, catalog)) {
+      emit(
+        [viewColumn],
+        {
+          foreignSchema: target.foreignSchema,
+          foreignRelation: target.foreignRelation,
+          foreignColumns: target.foreignColumns
+        },
+        [target.via]
+      )
+    }
+  }
+
   foreignKeys.sort((left, right) => left.tag.localeCompare(right.tag))
 
   // A row identity is a set of columns the plan proves unique whose every column is
@@ -628,7 +729,15 @@ export function deriveViewConstraints(
       plan.nullIntroduced[index] === false &&
       sources.every((origin) => neverNullOrigin(origin))
   )
-  const candidates = plan.rowIdentities.filter((key) =>
+  // A key column the plan can null from an outer join is no row identity, its
+  // discriminator no discriminator: a NULL cannot tell a row it pads. That guard holds
+  // for a `@unique` as much as for a `@primaryKey` — a sequence of NULLs is as
+  // indistinguishable as a sequence of values — so both tags are taken from the same
+  // keys, and the never-NULL question is the only one that separates them.
+  const rowIdentities = plan.rowIdentities.filter((key) =>
+    key.columns.every((index) => plan.entryNullExtended[index] !== true)
+  )
+  const candidates = rowIdentities.filter((key) =>
     key.columns.every((index) => key.discriminators.includes(index) || neverNull[index])
   )
   // A key that is one base relation's own comes first — it is the one a relation to a
@@ -646,6 +755,7 @@ export function deriveViewConstraints(
     return a < b ? -1 : a > b ? 1 : 0
   })
   let primaryKey: DerivedPrimaryKey | null = null
+  let unique: DerivedUniqueKey | null = null
   if (chosen) {
     primaryKey = {
       kind: 'primaryKey',
@@ -660,18 +770,50 @@ export function deriveViewConstraints(
       tag: tagOf(chosen)
     }
   } else if (plan.rowIdentities.length > 0) {
-    const nullable = [
-      ...new Set(
-        plan.rowIdentities.flatMap((key) =>
-          key.columns.filter((index) => !key.discriminators.includes(index) && !neverNull[index])
+    // A set the plan proves unique whose every column is never NULL is the
+    // `@primaryKey` chosen above. What is left is a key a NULL can sit in beside
+    // another — a unique index over a nullable column, a group key or a
+    // de-duplication over one. PostgreSQL's uniqueness admits that: no two rows share
+    // the tuple, and a NULL is distinct from every other value, so the key is sound
+    // and `PgFakeConstraintsPlugin` declares it without making its columns non-null.
+    // It is taken from `rowIdentities` and not from every key the plan proves: a key
+    // an outer join nulls is no row identity for a `@unique` either.
+    if (deriveUnique) {
+      const [best] = [...rowIdentities].sort((left, right) => {
+        const [a, b] = [rank(left), rank(right)]
+        return a < b ? -1 : a > b ? 1 : 0
+      })
+      if (best) {
+        unique = {
+          kind: 'unique',
+          viewColumns: best.columns.map((index) => columns[index] ?? ''),
+          via: best.carried
+            ? {
+                schema: best.carried.schema,
+                relation: best.carried.relation,
+                constraintName: best.carried.name
+              }
+            : null,
+          tag: tagOf(best)
+        }
+      }
+    }
+    // Nothing stood: either `@unique` is turned off or every key the plan proves is
+    // one an outer join can null, and the columns it may null are named here.
+    if (!unique) {
+      const nullable = [
+        ...new Set(
+          plan.rowIdentities.flatMap((key) =>
+            key.columns.filter((index) => !key.discriminators.includes(index) && !neverNull[index])
+          )
         )
+      ]
+        .sort((left, right) => left - right)
+        .map((index) => columns[index] ?? '')
+      notes.push(
+        `no key: every set of columns the plan proves unique has one not known never to be NULL (${nullable.join(', ')})`
       )
-    ]
-      .sort((left, right) => left - right)
-      .map((index) => columns[index] ?? '')
-    notes.push(
-      `no key: every set of columns the plan proves unique has one not known never to be NULL (${nullable.join(', ')})`
-    )
+    }
   } else {
     notes.push('no key: the plan proves no set of the view’s columns unique')
   }
@@ -693,6 +835,7 @@ export function deriveViewConstraints(
     notNullColumns,
     foreignKeys,
     primaryKey,
+    unique,
     declinedViewTargets: [],
     notes
   }

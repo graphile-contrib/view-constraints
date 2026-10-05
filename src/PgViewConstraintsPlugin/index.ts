@@ -20,10 +20,11 @@
 // constraint the rest of PostGraphile understands — does the rest.
 //
 // `@notNull` on a column is the same derivation over one column instead of a key: the
-// base column is NOT NULL in `pg_attribute` and no shape of the plan — an outer join,
-// a `UNION` branch of NULLs, a `GROUPING SETS` superaggregate row — puts a NULL over
-// it. That is the whole rule; no expression is read, so everything a parser would
-// recover stays nullable. That is why this
+// base column is NOT NULL in `pg_attribute` and no shape of the plan — an outer join, a
+// `UNION` branch of NULLs, a `GROUPING SETS` superaggregate row — puts a NULL over it;
+// or the column is a computed one, no base column to ask, and the select-list expression
+// itself proves the value never NULL (`plan-expressions.ts`), by shapes whose SQL
+// definition is the claim and not by any function's name or strictness. That is why this
 // plugin runs `after: ['smart-tags']` and `before: ['PgFakeConstraintsPlugin']`, on the
 // same `pgIntrospection_introspection` hook: the tag has to exist by the time fake
 // constraints are built, and the view's own tags have to be readable to compare with.
@@ -53,6 +54,8 @@ export interface ViewConstraintsComparison {
   declaredForeignKeys: string[]
   /** The `@primaryKey` tag already on the view, if any. */
   declaredPrimaryKey: string | null
+  /** `@unique` tags already on the view, from smart tags or SQL comments. */
+  declaredUnique: string[]
   /** View columns already carrying `@notNull` by hand, in attribute order. */
   declaredNotNullColumns: string[]
 }
@@ -94,6 +97,12 @@ export interface ViewConstraintsReport {
   failures: { schema: string; view: string; relkind: 'v' | 'm'; error: string }[]
   /** Views this plugin did not ask the database to plan, with the reason it did not. */
   skipped: { schema: string; view: string; relkind: 'v' | 'm'; reason: string }[]
+  /**
+   * The built-in spellings a user object has taken over in the database. The rules those
+   * spellings carry stand down for every view, so this list separates "derived nothing
+   * because another object bears the name" from "had nothing to derive".
+   */
+  shadowedNames: string[]
 }
 
 export interface ViewConstraintsOptions {
@@ -102,6 +111,13 @@ export interface ViewConstraintsOptions {
    * a reporting run must leave the schema exactly as it found it.
    */
   declare?: boolean
+  /**
+   * Derive a `@unique` tag where the plan proves a key whose columns may be NULL.
+   * On unless turned off: a proven key is a fact of the plan, not a guess, and the
+   * tag is what publishes the row-lookup the key authorises. Turn it off to keep the
+   * derived surface to `@primaryKey`/`@notNull`/`@foreignKey` alone.
+   */
+  deriveUnique?: boolean
   /** Receives the derivation and the view's own declarations, once per service. */
   report?: (report: ViewConstraintsReport) => void | Promise<void>
 }
@@ -184,12 +200,13 @@ export function PgViewConstraintsPlugin(
   options: ViewConstraintsOptions = {}
 ): GraphileConfig.Plugin {
   const declare = options.declare ?? true
+  const deriveUnique = options.deriveUnique ?? true
   return {
     name: 'PgViewConstraintsPlugin',
     version: '0.1.0',
     description:
-      "Derives a view's foreign keys, primary key and non-null columns from the " +
-      "planner's account of where its columns come from, confirmed against " +
+      "Derives a view's foreign keys, primary key, unique keys and non-null columns " +
+      "from the planner's account of where its columns come from, confirmed against " +
       'pg_constraint, pg_index and pg_attribute, and states them as the smart tags ' +
       "PgFakeConstraintsPlugin already understands; and leads a view's or a " +
       "table's foreign key to the projection of the surface keyed by the key it references.",
@@ -249,7 +266,8 @@ export function PgViewConstraintsPlugin(
                   [...schemas],
                   null,
                   publishedAsEnumeration,
-                  declaredRowIdentity
+                  declaredRowIdentity,
+                  deriveUnique
                 )
               }
               return withSuperuserPgClientFromPgService(pgService, pgSettings, (privilegedClient) =>
@@ -258,7 +276,8 @@ export function PgViewConstraintsPlugin(
                   [...schemas],
                   runQueryOn(privilegedClient),
                   publishedAsEnumeration,
-                  declaredRowIdentity
+                  declaredRowIdentity,
+                  deriveUnique
                 )
               )
             }
@@ -278,6 +297,7 @@ export function PgViewConstraintsPlugin(
               declaredForeignKeys: asStringArray(tags['foreignKey']),
               declaredPrimaryKey:
                 typeof tags['primaryKey'] === 'string' ? tags['primaryKey'] : null,
+              declaredUnique: asStringArray(tags['unique']),
               declaredNotNullColumns: declaredNotNullColumnsOf(pgClass)
             })
             if (!declare) continue
@@ -296,6 +316,9 @@ export function PgViewConstraintsPlugin(
             }
             if (derived.primaryKey && tags['primaryKey'] === undefined) {
               tags['primaryKey'] = derived.primaryKey.tag
+            }
+            if (derived.unique && tags['unique'] === undefined) {
+              tags['unique'] = derived.unique.tag
             }
           }
 
@@ -379,7 +402,8 @@ export function PgViewConstraintsPlugin(
             tables,
             unexamined,
             failures: collected.failures,
-            skipped: collected.skipped
+            skipped: collected.skipped,
+            shadowedNames: collected.shadowedNames
           })
         }
       }

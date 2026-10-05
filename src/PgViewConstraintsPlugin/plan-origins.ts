@@ -41,7 +41,7 @@
 // other; what the plan's qualifiers reject — `IS NOT NULL`, a strict equality — is
 // read by `plan-qualifiers.ts` and recorded on the origin.
 
-import { readPlanKeys } from './plan-keys.ts'
+import { readPlanKeys, unwrap } from './plan-keys.ts'
 import type { PlanKey, UniqueKeysOf } from './plan-keys.ts'
 import { qualifiedReference, readQualifiedNonNull } from './plan-qualifiers.ts'
 import type { QualifierCatalog } from './plan-qualifiers.ts'
@@ -59,6 +59,29 @@ export interface PlanCatalog extends QualifierCatalog {
    * non-nullness rule that spelling carries does not hold in this database.
    */
   shadowedNames: ReadonlySet<string>
+  /**
+   * Each `WITH` query of this view's defining query, by name, and its column names in
+   * select-list order — the map a `CTE Scan` reads a column by. Read from the view's
+   * stored rewrite tree (`view-tree.ts`); empty where it could not be read, which
+   * leaves a `CTE Scan` refused as before.
+   */
+  cteColumns: ReadonlyMap<string, string[]>
+  /**
+   * Each `WITH` query's own columns' origins, in order: the base column each column is
+   * a reference to, or `null` where it is an expression. A plan subplan named after a
+   * `WITH` query is read only where it is proved to be that query's materialization by
+   * matching these, position for position.
+   */
+  cteOrigins: ReadonlyMap<string, ({ schema: string; relation: string; column: string } | null)[]>
+  /**
+   * Whether each of this view's own `WITH` queries is materialized by PostgreSQL (see
+   * `view-tree.ts`): a plan carries a `CTE <name>` subplan and a `CTE Scan` only for a
+   * materialized query, so a name this view inlines has no scan of its own and any scan
+   * of that name is another query's.
+   */
+  cteMaterialized: ReadonlyMap<string, boolean>
+  /** How many times each `WITH` query is referenced in this view's own query. */
+  cteRefCount: ReadonlyMap<string, number>
 }
 
 /** One plan node of `EXPLAIN (FORMAT JSON)`, as much of it as this reader uses. */
@@ -79,6 +102,10 @@ export interface ExplainPlanNode {
   'Group Key'?: string[]
   /** `Simple`, or `Partial` / `Finalize` for an aggregate split across workers. */
   'Partial Mode'?: string
+  /** On a `CTE Scan`: the `WITH` query it reads. */
+  'CTE Name'?: string
+  /** On the subplan computing a `WITH` query: `CTE <name>`. */
+  'Subplan Name'?: string
   /** The index an index scan reads, whose predicate may stand in for a qualifier. */
   'Index Name'?: string
   // The conditions a node applies, where `plan-keys.ts` and `plan-qualifiers.ts` read
@@ -112,12 +139,12 @@ export interface ViewShape {
  */
 export const PLAN_REFUSALS = {
   'unreadable-set-operation':
-    'a `Recursive Union`, `SetOp` or `HashSetOp`: its input is one tagged stream and ' +
-    'there is no branch to read a column off',
+    'a `Recursive Union`: its input is one tagged stream that references its own ' +
+    'output, and there is no branch to read a column off',
   'set-operation-not-a-select-list':
-    'a set operation stands somewhere the reader does not read its branches — under a ' +
-    'node that computes, or beside a second set operation — and whatever projects over ' +
-    'it is spelled with the Vars of one branch out of several',
+    'a set operation’s branches cannot be told apart — a column of a branch is ' +
+    'spelled the same as a column of another, as when a set operation stands over ' +
+    'another, or a branch has no select list to read position by position',
   'output-not-positional':
     'the node carrying the select list prints no `Output`, or one that does not line ' +
     'up one-to-one with the view’s columns'
@@ -141,20 +168,24 @@ export const COLUMN_REFUSALS = {
     'value to it',
   'through-a-materialized-with':
     'the entry is spelled with a materialized `WITH` query’s own column name, and the ' +
-    'map from those names to the positions of its select list is not in the plan',
+    'map from those names to the positions of its select list — read from the view’s ' +
+    'stored rewrite tree — is not at hand',
   'through-an-unpinned-subquery':
     'the entry is spelled with the alias of a `Subquery Scan` the catalog does not pin ' +
     'to one view this relation is built on — a set operation’s own branch ' +
-    '(`*SELECT* 3`), an inline `FROM (SELECT …) x`, or a view the query gave an alias ' +
-    'of its own — or one whose child does not print that view’s select list entry for ' +
-    'entry',
+    '(`*SELECT* 3`), an inline `FROM (SELECT …) x`, or a source view whose alias the ' +
+    'stored tree does not resolve — or one whose child does not print that view’s ' +
+    'select list entry for entry',
   'through-a-row-source-the-catalog-does-not-name':
     'the entry is spelled with an alias that is not a relation scan — a function ' +
     'scan, a `VALUES` list, or a scan the plan does not carry at all because a ' +
     'constant-false qualifier removed it',
   'cast-not-value-preserving':
     'the value passed through a cast that builds a new datum or narrows it, so it is ' +
-    'no longer the base column’s value'
+    'no longer the base column’s value',
+  'plan-and-tree-disagree':
+    'the plan and the view’s stored rewrite tree name different base columns for the ' +
+    'column, and neither is trusted over the other'
 } as const
 
 export type ColumnRefusal = keyof typeof COLUMN_REFUSALS
@@ -204,13 +235,18 @@ export interface ColumnOrigin {
 export type ColumnSources = ColumnOrigin[] | null
 
 // A node that unions tuple streams. The rows above it come from several branches
-// while the `Output` above it is spelled with the Vars of one branch only, so a
-// node that projects over an `Append` reads exactly like one over a single scan. The
-// shape where every branch can be read is the `Append` itself: it prints no `Output`
-// of its own, and each child prints the branch's own select list, in the set
-// operation's column order. Anywhere a node that projects stands over it — and for
-// any second such node — the spelling above it cannot be trusted and the plan is
-// refused.
+// while the `Output` above it is spelled with the Vars of one branch only, so a node
+// that projects over a union reads exactly like one over a single scan — which is why
+// the branches are read position by position: `Append`/`Merge Append` for a
+// `UNION ALL` (and an inheritance scan), `SetOp`/`HashSetOp` for `UNION`,
+// `INTERSECT` and `EXCEPT`. Each branch prints the set operation's columns in its own
+// order, and the column at a position of the union is the column at that position of
+// whichever branch a row came from.
+const SET_OPERATION_NODE_TYPES = new Set(['Append', 'Merge Append', 'SetOp', 'HashSetOp'])
+
+// The set-operation nodes whose branches the key reader walks positionally to build
+// a key of the union: a `UNION ALL` and an inheritance scan. A `SetOp`/`HashSetOp`
+// de-duplicates or filters and names no key by position, so its keys are not read.
 const TUPLE_UNIONING_NODE_TYPES = new Set(['Append', 'Merge Append'])
 
 // Nodes that hand their child's select list on and say nothing of their own.
@@ -283,9 +319,10 @@ function selectListNodeOf(root: ExplainPlanNode): ExplainPlanNode {
   return node
 }
 
-// Set operations other than a plain union read their input as one tagged stream and
-// are refused wherever they appear: there is no branch to read a column off.
-const UNREADABLE_SET_NODE_TYPES = new Set(['Recursive Union', 'SetOp', 'HashSetOp'])
+// A recursive `WITH` reads one tagged stream that references its own output, so a
+// column cannot be traced to a branch. No other set operation is refused here: the
+// branches of an `Append`, a `SetOp` and their kin are read position by position.
+const UNREADABLE_SET_NODE_TYPES = new Set(['Recursive Union'])
 
 // Which input of a join the join itself can null. `Left` keeps every row of its outer
 // input and writes NULLs into the inner one where nothing matched; `Right` is the
@@ -463,6 +500,57 @@ function aliasNodeTypes(root: ExplainPlanNode): Map<string, string> {
   return kinds
 }
 
+// The name a `CTE Scan` prints for the query it reads: `Subplan Name` is `CTE <name>`
+// on the subplan that computes the query, and `CTE Name` is where a scan says which
+// query it reads.
+const CTE_SUBPLAN_PREFIX = 'CTE '
+
+/**
+ * Every subplan computing a `WITH` query of this name. A name can be shared by several —
+ * the same name at two query levels, or a `WITH` query of a view or a function the
+ * analysed view goes through — so all are kept and one is proved to be the analysed
+ * view's own query before it is read (`provedSubplan`).
+ */
+function cteSubplansIn(root: ExplainPlanNode): Map<string, ExplainPlanNode[]> {
+  const subplans = new Map<string, ExplainPlanNode[]>()
+  walk(root, (node) => {
+    const name = node['Subplan Name']
+    if (typeof name === 'string' && name.startsWith(CTE_SUBPLAN_PREFIX)) {
+      const cte = name.slice(CTE_SUBPLAN_PREFIX.length)
+      const found = subplans.get(cte)
+      if (found) found.push(node)
+      else subplans.set(cte, [node])
+    }
+  })
+  return subplans
+}
+
+/** How many `CTE Scan`s the plan carries for each `WITH` query name. */
+function cteScanCountsIn(root: ExplainPlanNode): Map<string, number> {
+  const counts = new Map<string, number>()
+  walk(root, (node) => {
+    if (node['Node Type'] !== CTE_SCAN) return
+    const name = node['CTE Name']
+    if (typeof name === 'string') counts.set(name, (counts.get(name) ?? 0) + 1)
+  })
+  return counts
+}
+
+/** The `WITH` query each `CTE Scan` alias reads, by alias. */
+function cteAliasesIn(root: ExplainPlanNode): Map<string, string> {
+  const aliases = new Map<string, string>()
+  walk(root, (node) => {
+    if (
+      node['Node Type'] === CTE_SCAN &&
+      node.Alias !== undefined &&
+      node['CTE Name'] !== undefined
+    ) {
+      aliases.set(node.Alias, node['CTE Name'])
+    }
+  })
+  return aliases
+}
+
 /**
  * A `Subquery Scan` this reader may descend through, and the node under it that
  * carries the crossed view's select list.
@@ -485,6 +573,89 @@ interface CrossableSubquery {
   selectList: ExplainPlanNode
   /** When that node is a union, its branches; each prints the whole select list. */
   branches: ExplainPlanNode[] | null
+}
+
+/** One branch of a set operation: the node printing its select list, and the entries. */
+interface UnionBranch {
+  node: ExplainPlanNode
+  output: string[]
+}
+
+/** One column of a set operation, and the branches whose value it is. */
+interface UnionColumn {
+  branches: UnionBranch[]
+  /** The position of the column in every branch's select list. */
+  position: number
+}
+
+/**
+ * Every column of every set operation whose branches can be told apart, by the
+ * `Output` entry an enclosing node spells it with.
+ *
+ * A node above a set operation prints the Vars of one branch, so a column of the union
+ * appears there as that branch's own expression; the position of that expression in
+ * the branch's select list is the union's column. The branches are told apart by their
+ * scan aliases, which name one range-table entry each; where the same spelling would
+ * name a column of two different set operations — a set operation over another — there
+ * is no one branch to read the column off, and the plan is refused rather than guessed
+ * between them. A set operation inside a view this reader crosses is read by the cross
+ * itself and left out here.
+ */
+function unionColumnsOf(
+  root: ExplainPlanNode,
+  crossable: ReadonlyMap<string, CrossableSubquery>
+): { columns: Map<string, UnionColumn>; aliases: Set<string>; ambiguous: boolean } {
+  const columns = new Map<string, UnionColumn>()
+  const aliases = new Set<string>()
+  let ambiguous = false
+
+  const branchesOf = (node: ExplainPlanNode): UnionBranch[] | null => {
+    const branches = inputChildren(node).map((child) => {
+      const list = selectListNodeOf(child)
+      return { node: list, output: list.Output ?? [] }
+    })
+    if (branches.length < 2) return null
+    const width = branches[0]?.output.length ?? 0
+    if (width === 0) return null
+    // A branch that prints a shorter list than the first is not the set operation's
+    // columns in the same order, and nothing may be read off it positionally.
+    if (branches.some((branch) => branch.output.length !== width)) return null
+    return branches
+  }
+
+  const visit = (node: ExplainPlanNode, insideCrossing: boolean): void => {
+    if (!insideCrossing && SET_OPERATION_NODE_TYPES.has(node['Node Type'])) {
+      const branches = branchesOf(node)
+      if (branches === null) {
+        ambiguous = true
+      } else {
+        for (const branch of branches) {
+          for (const entry of branch.output) {
+            const reference = parseReference(entry)
+            if (reference?.alias != null) aliases.add(reference.alias)
+          }
+        }
+        const width = branches[0]?.output.length ?? 0
+        for (let position = 0; position < width; position++) {
+          const column: UnionColumn = { branches, position }
+          for (const branch of branches) {
+            const entry = branch.output[position] ?? ''
+            const seen = columns.get(entry)
+            if (seen !== undefined && seen !== column) {
+              ambiguous = true
+              continue
+            }
+            columns.set(entry, column)
+          }
+        }
+      }
+    }
+    const crossed =
+      node['Node Type'] === SUBQUERY_SCAN && node.Alias !== undefined && crossable.has(node.Alias)
+    for (const child of node.Plans ?? []) visit(child, insideCrossing || crossed)
+  }
+  visit(root, false)
+  return { columns, aliases, ambiguous }
 }
 
 /**
@@ -518,7 +689,7 @@ function crossableSubqueries(
     const only = children.length === 1 ? children[0] : undefined
     if (!only) continue
     const selectList = selectListNodeOf(only)
-    if (TUPLE_UNIONING_NODE_TYPES.has(selectList['Node Type'])) {
+    if (SET_OPERATION_NODE_TYPES.has(selectList['Node Type'])) {
       const branches = inputChildren(selectList)
       if (branches.length === 0) continue
       if (!branches.every((branch) => branch.Output?.length === view.columns.length)) continue
@@ -543,6 +714,13 @@ interface Reading {
   /** The plan writes a NULL of its own into this column. */
   nullValue: boolean
   reason: ColumnRefusal | null
+  /**
+   * The expression rules' answer for a column a set operation assembled, where that is
+   * more than the origins say: a branch spelling a literal has no base column yet its
+   * value is never NULL, and the union's column is never NULL where every branch's is.
+   * Absent for a column read off one scan, whose nullability the origins already give.
+   */
+  nullability?: ExpressionNullability
 }
 
 function unknown(reason: ColumnRefusal): Reading {
@@ -602,26 +780,24 @@ function mergeReadings(readings: Reading[]): Reading {
 }
 
 /**
- * Why a materialized `WITH` query is a wall rather than a boundary to cross, where a
- * view is a boundary.
+ * The two boundaries the reader crosses, and where each one's map lives.
  *
  * A `WITH` query referenced once is inlined and leaves no boundary at all; referenced
  * twice it is materialized, and then the reader above it says `live_routes.currency_id`
- * — the name of the `WITH` query's own column, not of any relation. Crossing that
- * needs the map from the `WITH` query's column names to the positions of its select
- * list, and nothing holds that map: the `CTE <name>` subplan node prints the select
- * list in order but never its names; a `CTE Scan` prints names but in the order its
- * own parent asked for, and which columns it prints at all is decided by what the
- * nodes above it happen to need — `live.id, live.cur_code, live.amount` under one
- * join method and `live.id, live.cur_code` under another, for the same view on the
- * same schema. Recovering the map from a scan that happens to print the whole list is
- * an answer that exists on the days the planner is generous, and a reader whose
- * answer depends on that is the reader this plugin exists to replace.
+ * — the name of the `WITH` query's own column, not of any relation. Crossing that needs
+ * the map from the `WITH` query's column names to the positions of its select list, and
+ * the plan does not hold it: the `CTE <name>` subplan node prints the select list in
+ * order but never its names, and a `CTE Scan` prints names in the order its own parent
+ * asked for. Recovering the map from a scan that happens to print the whole list is an
+ * answer that exists on the days the planner is generous; the map the view's stored
+ * rewrite tree holds (`cteColumns`, read by `view-tree.ts`) is a fact about the schema
+ * and is what this reader uses.
  *
- * A view is the case where that map does exist and is not in the plan at all: the
- * catalog holds it, in `attnum` order, and it is a fact about the schema rather than
- * about the day's plan. So a `Subquery Scan` the catalog pins to one view this
- * relation is built on is descended through, and a `CTE Scan` is not.
+ * A view is the other boundary, and there the map — a view's columns in `attnum` order
+ * are the positions of its select list — is in the catalog rather than the plan. So a
+ * `Subquery Scan` the catalog pins to one view this relation is built on is descended
+ * through, and a `CTE Scan` whose tree names the query's columns is descended into its
+ * subplan.
  */
 class OriginReader {
   private readonly relations: Map<string, { schema: string; relation: string }>
@@ -638,7 +814,22 @@ class OriginReader {
   private readonly nulledNodes: ReadonlySet<ExplainPlanNode>
   private readonly crossable: ReadonlyMap<string, CrossableSubquery>
   private readonly aliasKinds: ReadonlyMap<string, string>
+  /** The `WITH` query each `CTE Scan` alias reads, and every subplan named for a query. */
+  private readonly cteOfAlias: ReadonlyMap<string, string>
+  private readonly cteSubplans: ReadonlyMap<string, ExplainPlanNode[]>
+  /** How many `CTE Scan`s the plan carries for each `WITH` query name. */
+  private readonly cteScanCounts: ReadonlyMap<string, number>
+  private readonly cteStack = new Set<string>()
+  /** A `WITH` query name's proved subplan, or `null` where none was proved. */
+  private readonly cteProven = new Map<string, ExplainPlanNode | null>()
   private readonly catalog: PlanCatalog
+  /** Every column of a set operation whose branches can be told apart, by entry text. */
+  private readonly unionColumns: ReadonlyMap<string, UnionColumn>
+  /** Branch scan aliases of those set operations, by alias. */
+  private readonly unionAliases: ReadonlySet<string>
+  private readonly unionsAmbiguous: boolean
+  private readonly unionMemo = new Map<UnionColumn, Reading>()
+  private readonly unionPending = new Set<UnionColumn>()
 
   constructor(
     root: ExplainPlanNode,
@@ -651,6 +842,13 @@ class OriginReader {
     this.nulledNodes = nullExtended.nodes
     this.crossable = crossableSubqueries(root, candidates)
     this.aliasKinds = aliasNodeTypes(root)
+    this.cteOfAlias = cteAliasesIn(root)
+    this.cteSubplans = cteSubplansIn(root)
+    this.cteScanCounts = cteScanCountsIn(root)
+    const unions = unionColumnsOf(root, this.crossable)
+    this.unionColumns = unions.columns
+    this.unionAliases = unions.aliases
+    this.unionsAmbiguous = unions.ambiguous
     const [sole] = [...this.relations]
     const aliasNodes = countNodes(root, (node) => node.Alias !== undefined)
     this.soleRelation =
@@ -661,6 +859,11 @@ class OriginReader {
   /** `Subquery Scan` nodes this reader descends through, by alias. */
   get crossed(): ReadonlyMap<string, CrossableSubquery> {
     return this.crossable
+  }
+
+  /** Whether a set operation's branches could not be told apart anywhere in the plan. */
+  get ambiguousUnions(): boolean {
+    return this.unionsAmbiguous
   }
 
   /** The alias an unqualified column name belongs to, where there is one. */
@@ -675,7 +878,54 @@ class OriginReader {
    * cycle, which PostgreSQL does not allow between views and this reader does not
    * follow.
    */
-  read(entry: string, crossing: ReadonlySet<string> = new Set()): Reading {
+  read(entry: string, crossing: ReadonlySet<string> = new Set(), branchLocal = false): Reading {
+    if (!branchLocal) {
+      const column = this.unionColumns.get(entry)
+      if (column) return this.readUnionColumn(column, crossing)
+      const reference = parseReference(entry)
+      if (reference?.alias != null && this.unionAliases.has(reference.alias)) {
+        // A column of a set operation's branch reached somewhere its position in the
+        // branch is not the entry itself — inside a larger expression. The same spelling
+        // may stand for another branch's column of a different type, so which value it
+        // is is not said here, and the column stays unknown rather than read off one
+        // branch.
+        return unknown('not-a-column-reference')
+      }
+    }
+    return this.readEntry(entry, crossing)
+  }
+
+  /**
+   * The one value every branch of a set operation answers at this column: one base
+   * column per branch, and a NULL in any branch makes the column nullable there. A key
+   * of the union under a column a branch reads is not carried: the union's own columns
+   * are the union's answer, read by `plan-keys.ts`.
+   */
+  private readUnionColumn(column: UnionColumn, crossing: ReadonlySet<string>): Reading {
+    const memo = this.unionMemo.get(column)
+    if (memo) return memo
+    if (this.unionPending.has(column)) return unknown('not-a-column-reference')
+    this.unionPending.add(column)
+    const merged = mergeReadings(
+      column.branches.map((branch) =>
+        this.readEntry(branch.output[column.position] ?? '', crossing)
+      )
+    )
+    // The origins name the base columns a branch proxies and say nothing where a branch
+    // spells a literal; the nullability is the union's own answer — never NULL only
+    // where every branch's entry is — and is kept beside them.
+    merged.nullability = mergeNullabilities(
+      column.branches.map((branch) =>
+        this.evaluateEntry(branch.output[column.position] ?? '', branch.node, crossing, true)
+      )
+    )
+    this.unionPending.delete(column)
+    this.unionMemo.set(column, merged)
+    return merged
+  }
+
+  /** The reading of one entry that is not itself a set operation's column. */
+  readEntry(entry: string, crossing: ReadonlySet<string> = new Set()): Reading {
     if (NULL_LITERAL.test(entry)) return { origins: [], nullValue: true, reason: null }
     const reference = parseReference(entry)
     if (!reference) return unknown('not-a-column-reference')
@@ -694,9 +944,123 @@ class OriginReader {
       return this.cross(crossable, reference, new Set([...crossing, reference.alias]))
     }
     const kind = this.aliasKinds.get(reference.alias)
-    if (kind === CTE_SCAN) return unknown('through-a-materialized-with')
+    if (kind === CTE_SCAN) {
+      return this.crossCte(reference.alias, reference.column, crossing)
+    }
     if (kind === SUBQUERY_SCAN) return unknown('through-an-unpinned-subquery')
     return unknown('through-a-row-source-the-catalog-does-not-name')
+  }
+
+  /**
+   * The subplan a `CTE Scan` of this view's `WITH` query `name` may be read by, or `null`.
+   *
+   * A `WITH` name is not unique to the view: the same name can stand in a view or a
+   * function the analysed view goes through, where the plan carries a `CTE <name>`
+   * subplan nothing says the owner of. Two facts place the view's own. A plan carries a
+   * subplan and a `CTE Scan` only for a query PostgreSQL **materializes**, and the tree
+   * says whether this view's own query of that name is one of those (`view-tree.ts`):
+   * where it is inlined — `NOT MATERIALIZED`, or the default referenced once — the view
+   * contributes no subplan at all, so any scan of that name is another query's and is
+   * refused. Where it materializes, the view contributes exactly one subplan, so the plan
+   * must carry exactly one: a second is another query's query of the same name, and
+   * nothing says which a scan reads. The plan must then name no more scans of the name
+   * than the view's own query references it, and the one subplan must match the query's
+   * columns' origins, position for position. Any of these unproved refuses every column
+   * read through the scan.
+   */
+  private usableSubplan(name: string): ExplainPlanNode | null {
+    if (this.catalog.cteMaterialized.get(name) !== true) return null
+    if ((this.cteSubplans.get(name) ?? []).length !== 1) return null
+    if ((this.cteScanCounts.get(name) ?? 0) > (this.catalog.cteRefCount.get(name) ?? 0)) return null
+    return this.provedSubplan(name)
+  }
+
+  /**
+   * The one subplan that matches this view's `WITH` query `name` by its columns' origins,
+   * position for position: the base column a column is a `Var` of, or an expression.
+   * `null` where none matches.
+   */
+  private provedSubplan(name: string): ExplainPlanNode | null {
+    if (this.cteProven.has(name)) return this.cteProven.get(name) ?? null
+    const own = this.catalog.cteOrigins.get(name)
+    const columns = this.catalog.cteColumns.get(name)
+    let proved: ExplainPlanNode | null = null
+    let count = 0
+    if (own && columns && own.length === columns.length) {
+      for (const candidate of this.cteSubplans.get(name) ?? []) {
+        const output = candidate.Output ?? []
+        if (output.length !== own.length) continue
+        const matches = own.every((origin, position) => {
+          const seen = this.subplanOrigin(output[position] ?? '')
+          if (origin === null) return seen === 'expression'
+          return (
+            seen !== 'expression' &&
+            seen !== 'unknown' &&
+            seen.schema === origin.schema &&
+            seen.relation === origin.relation &&
+            seen.column === origin.column
+          )
+        })
+        if (!matches) continue
+        count += 1
+        proved = candidate
+      }
+    }
+    const found = count === 1 ? proved : null
+    this.cteProven.set(name, found)
+    return found
+  }
+
+  /**
+   * What the plan names at one `Output` entry of a subplan: the base column a bare
+   * reference is to, `'expression'` where the entry is anything else (a call, a cast, a
+   * constant), or `'unknown'` where a reference names no relation this reader can place —
+   * which proves nothing and never matches.
+   */
+  private subplanOrigin(
+    entry: string
+  ): { schema: string; relation: string; column: string } | 'expression' | 'unknown' {
+    const reference = parseReference(entry)
+    if (!reference || reference.coerced) return 'expression'
+    const alias = reference.alias ?? this.soleRelation?.alias ?? null
+    if (alias === null) return 'unknown'
+    const relation = this.relations.get(alias)
+    if (!relation) return 'unknown'
+    return { schema: relation.schema, relation: relation.relation, column: reference.column }
+  }
+
+  /**
+   * Reads one column of a `WITH` query through the subplan proved to be its own: the
+   * stored tree says which position of the query's select list the column stands at, and
+   * that subplan prints the select list. The value is the entry's value unchanged — a
+   * `WITH` query's column is its select list entry's type — so there is no waypoint to
+   * judge. A `WITH` query whose map is not in hand, or whose subplan is not proved,
+   * stays refused.
+   */
+  private crossCte(alias: string, column: string, crossing: ReadonlySet<string>): Reading {
+    const cte = this.cteOfAlias.get(alias)
+    if (cte === undefined) return unknown('through-a-materialized-with')
+    const columns = this.catalog.cteColumns.get(cte)
+    const subplan = this.usableSubplan(cte)
+    if (!columns || !subplan || this.cteStack.has(cte)) {
+      return unknown('through-a-materialized-with')
+    }
+    const position = columns.indexOf(column)
+    if (position < 0) return unknown('through-a-materialized-with')
+    this.cteStack.add(cte)
+    const inner = this.read(subplan.Output?.[position] ?? '', crossing)
+    this.cteStack.delete(cte)
+    // An outer join nulls the `CTE Scan` instance, not the subplan that computes the
+    // query — the subplan is an `InitPlan` beside the join and is never padded — so the
+    // scan's own null-extension is what the value carries.
+    if (this.nulled.has(alias)) {
+      return {
+        origins: inner.origins?.map((origin) => ({ ...origin, nullExtended: true })) ?? null,
+        nullValue: true,
+        reason: inner.reason
+      }
+    }
+    return inner
   }
 
   private origin(
@@ -773,7 +1137,8 @@ class OriginReader {
   evaluateEntry(
     entry: string,
     node: ExplainPlanNode,
-    crossing: ReadonlySet<string> = new Set()
+    crossing: ReadonlySet<string> = new Set(),
+    branchLocal = false
   ): ExpressionNullability {
     if (this.nulledNodes.has(node)) return 'nullable'
     // A join that nulls one of its inputs can print the very aggregate the nulled
@@ -794,9 +1159,25 @@ class OriginReader {
       return 'unknown'
     }
     if (NULL_LITERAL.test(entry)) return 'nullable'
+    // A `GROUP BY ROLLUP` and its kin emit a superaggregate row in which every
+    // grouping column is NULL and which stands for no base row. Any bare column the
+    // select list names is one of those grouping columns — a column outside every
+    // grouping set is not valid SQL here — so where the node computes `GROUPING
+    // SETS`, a column reference is nullable whatever the plan around it says. What
+    // survives is what is non-null independently of any such column: a literal, a
+    // `count`, a `COALESCE` with a non-null arm. `min`/`max`/`sum`/`avg` do not: the
+    // grand-total row over an empty input is the aggregate over no rows, and that
+    // answers NULL. So `hasGroupKey` is false here and the references a shape is
+    // built of answer nullable; the shapes whose SQL definition is the claim answer
+    // for themselves.
+    const groupingSets = node['Grouping Sets'] !== undefined
     const reference = parseReference(entry)
     if (reference) {
+      if (groupingSets) return 'nullable'
       if (reference.alias !== null) {
+        if (this.aliasKinds.get(reference.alias) === CTE_SCAN) {
+          return this.evaluateCte(reference.alias, reference.column, crossing)
+        }
         const crossable = this.crossable.get(reference.alias)
         if (crossable) {
           // The expression rules reach across a boundary the origin reader
@@ -807,42 +1188,75 @@ class OriginReader {
           return this.evaluateCrossed(
             crossable,
             reference.column,
-            new Set([...crossing, reference.alias])
+            new Set([...crossing, reference.alias]),
+            branchLocal
           )
         }
       }
-      return this.readingNullability(this.read(entry, crossing))
+      return this.readingNullability(this.read(entry, crossing, branchLocal))
     }
     return evaluateExpression(parseExpression(entry), {
-      column: (referenceText) => this.readingNullability(this.read(referenceText, crossing)),
+      column: (referenceText) =>
+        groupingSets
+          ? 'nullable'
+          : this.readingNullability(this.read(referenceText, crossing, branchLocal)),
       hasGroupKey: groupsItsInput(node),
       shadowed: (name) => this.catalog.shadowedNames.has(name)
     })
   }
 
+  /**
+   * The nullability of one column of a `WITH` query, evaluated at the entry of the
+   * subplan that computes it — where the node that grouped the query, and the plan's
+   * own outer joins around it, are the node's own.
+   */
+  private evaluateCte(
+    alias: string,
+    column: string,
+    crossing: ReadonlySet<string>
+  ): ExpressionNullability {
+    const cte = this.cteOfAlias.get(alias)
+    if (cte === undefined) return 'unknown'
+    const columns = this.catalog.cteColumns.get(cte)
+    const subplan = this.usableSubplan(cte)
+    if (!columns || !subplan || this.cteStack.has(cte)) return 'unknown'
+    const position = columns.indexOf(column)
+    if (position < 0) return 'unknown'
+    // An outer join nulls the `CTE Scan` instance even though the subplan beside the
+    // join is never padded, so the scan's own null-extension answers here.
+    if (this.nulled.has(alias)) return 'nullable'
+    this.cteStack.add(cte)
+    const state = this.evaluateEntry(subplan.Output?.[position] ?? '', subplan, crossing)
+    this.cteStack.delete(cte)
+    return state
+  }
+
   private evaluateCrossed(
     crossable: CrossableSubquery,
     column: string,
-    crossing: ReadonlySet<string>
+    crossing: ReadonlySet<string>,
+    branchLocal = false
   ): ExpressionNullability {
     const position = crossable.view.columns.indexOf(column)
     if (position < 0) return 'unknown'
     if (crossable.branches) {
       return mergeNullabilities(
         crossable.branches.map((branch) =>
-          this.evaluateEntry(branch.Output?.[position] ?? '', branch, crossing)
+          this.evaluateEntry(branch.Output?.[position] ?? '', branch, crossing, branchLocal)
         )
       )
     }
     return this.evaluateEntry(
       crossable.selectList.Output?.[position] ?? '',
       crossable.selectList,
-      crossing
+      crossing,
+      branchLocal
     )
   }
 
   /** The reading of a bare reference, turned into the expression rules' answers. */
   private readingNullability(reading: Reading): ExpressionNullability {
+    if (reading.nullability !== undefined) return reading.nullability
     if (reading.origins === null) return 'unknown'
     if (reading.origins.length === 0) return 'nullable'
     if (reading.nullValue) return 'nullable'
@@ -857,6 +1271,54 @@ class OriginReader {
       if (!notNull) return 'nullable'
     }
     return unknown ? 'unknown' : 'never-null'
+  }
+
+  /**
+   * Whether the value one `Output` entry spells can be NULL because an outer join
+   * between `node` and where the value is read nulls the side it comes from.
+   *
+   * A column reference carries this on its origin (`nullExtended`), but a computed
+   * value — a literal, a `CAST`, a `CASE`, a `COALESCE`, a `count` — is printed by the
+   * join itself, whose `Output` is its inputs' concatenated, and the node is not under
+   * the nulled side. The entry is followed down the plan: at a join that nulls an input,
+   * an entry printing from a nulled input's output is nulled there; an entry from a
+   * preserved input is chased into that input, and an entry from no input was computed
+   * at the join, above the nulling, and is not nulled by it. Where the same entry prints
+   * from both a nulled and a preserved input the answer is the nulled one — the reader
+   * does not guess which side a value came from.
+   */
+  entryNullExtended(entry: string, node: ExplainPlanNode): boolean {
+    if (this.nulledNodes.has(node)) return true
+    const joinType = node['Join Type']
+    const nulled =
+      joinType === undefined ? null : (JOIN_TYPE_NULLED_SIDES.get(joinType) ?? BOTH_JOIN_SIDES)
+    const target = unwrap(entry)
+    let nulledHere = false
+    for (const child of inputChildren(node)) {
+      if (!this.emits(target, child)) continue
+      const relationship = child['Parent Relationship'] ?? 'Outer'
+      if (nulled !== null && nulled.has(relationship)) {
+        nulledHere = true
+        continue
+      }
+      if (this.entryNullExtended(entry, child)) return true
+    }
+    return nulledHere
+  }
+
+  /**
+   * Whether `node` or anything under it prints `target` in its select list. A node that
+   * projects prints the entry; a tuple-unioning node (`Append`, `Merge Append`) prints
+   * none of its own and hands its branches', so its branches are asked. The comparison
+   * is on the expression with its outer parentheses stripped, which `EXPLAIN` adds where
+   * it resolves an expression through a node (`('x'::text)` at a join over the
+   * `'x'::text` the scan under it prints).
+   */
+  private emits(target: string, node: ExplainPlanNode): boolean {
+    const output = node.Output ?? []
+    if (output.some((entry) => unwrap(entry) === target)) return true
+    if (output.length > 0) return false
+    return inputChildren(node).some((child) => this.emits(target, child))
   }
 }
 
@@ -925,6 +1387,13 @@ export interface PlanOrigins {
    * NULL where the expression does not, which `groupingSets` below says apart.
    */
   expressionNotNull: boolean[]
+  /**
+   * One entry per requested column: the value the select list spells — a base column or a
+   * computed one — can be NULL because an outer join nulls the side it comes from. A
+   * computed value is read by the same rule as a base one here, so a literal, a `CASE`,
+   * a `COALESCE` or a `count` from a nulled side is `true` just as a base column is.
+   */
+  entryNullExtended: boolean[]
   /** The plan computes `GROUPING SETS` / `ROLLUP` / `CUBE`, whose superaggregate row is all-NULL grouping columns. */
   groupingSets: boolean
   /**
@@ -963,24 +1432,18 @@ export function readPlanOrigins(
   const reader = new OriginReader(root, candidates, catalog)
   const selectListNode = selectListNodeOf(root)
 
-  // A union is readable only where this reader reads its branches one by one: at the
-  // select list of the plan, or at the select list of a view it descends into. A
-  // union anywhere else has a node that projects over it, and that node's `Output` is
-  // spelled with the Vars of one branch out of several — which reads exactly like a
-  // projection over a single scan. A second union is refused for the same reason.
-  const unions = collectNodes(root, (node) => TUPLE_UNIONING_NODE_TYPES.has(node['Node Type']))
-  const readableUnions = new Set<ExplainPlanNode>(
-    [...reader.crossed.values()]
-      .filter((crossable) => crossable.branches !== null)
-      .map((crossable) => crossable.selectList)
-  )
-  if (TUPLE_UNIONING_NODE_TYPES.has(selectListNode['Node Type'])) readableUnions.add(selectListNode)
-  if (unions.some((union) => !readableUnions.has(union))) return 'set-operation-not-a-select-list'
+  // A set operation's branches are read position by position, wherever the operation
+  // stands: at the select list of the plan, under a node that computes over it, or at
+  // the select list of a view the reader descends into. Where the branches cannot be
+  // told apart — a set operation over another, a branch with no select list — the
+  // plan is refused rather than one branch's spelling trusted for the union's.
+  if (reader.ambiguousUnions) return 'set-operation-not-a-select-list'
 
   const readings: Reading[] = []
   const nullabilities: ExpressionNullability[] = []
-  if (TUPLE_UNIONING_NODE_TYPES.has(selectListNode['Node Type'])) {
-    const branches = inputChildren(selectListNode)
+  const nullExtended: boolean[] = []
+  if (SET_OPERATION_NODE_TYPES.has(selectListNode['Node Type'])) {
+    const branches = inputChildren(selectListNode).map((child) => selectListNodeOf(child))
     if (branches.length === 0) return 'output-not-positional'
     // Each branch prints its own select list, in the set operation's column order. A
     // shorter or longer one is not that list, and nothing may be read off it
@@ -990,12 +1453,17 @@ export function readPlanOrigins(
     }
     for (let index = 0; index < requestedColumnCount; index++) {
       readings.push(
-        mergeReadings(branches.map((branch) => reader.read(branch.Output?.[index] ?? '')))
+        mergeReadings(branches.map((branch) => reader.readEntry(branch.Output?.[index] ?? '')))
       )
       nullabilities.push(
         mergeNullabilities(
-          branches.map((branch) => reader.evaluateEntry(branch.Output?.[index] ?? '', branch))
+          branches.map((branch) =>
+            reader.evaluateEntry(branch.Output?.[index] ?? '', branch, new Set(), true)
+          )
         )
+      )
+      nullExtended.push(
+        branches.some((branch) => reader.entryNullExtended(branch.Output?.[index] ?? '', branch))
       )
     }
   } else {
@@ -1004,6 +1472,7 @@ export function readPlanOrigins(
     for (const entry of output) {
       readings.push(reader.read(entry))
       nullabilities.push(reader.evaluateEntry(entry, selectListNode))
+      nullExtended.push(reader.entryNullExtended(entry, selectListNode))
     }
   }
 
@@ -1048,6 +1517,7 @@ export function readPlanOrigins(
         reading.origins.some((origin) => origin.nullExtended)
     ),
     expressionNotNull: nullabilities.map((state) => state === 'never-null'),
+    entryNullExtended: nullExtended,
     groupingSets,
     rowIdentities: readPlanKeys(root, selectListNode, context)
   }

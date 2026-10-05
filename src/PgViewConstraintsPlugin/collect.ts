@@ -18,6 +18,8 @@ import type {
 import { readPlanOrigins } from './plan-origins.ts'
 import type { ExplainPlanNode, ViewShape } from './plan-origins.ts'
 import type { PlanCatalog } from './plan-origins.ts'
+import { readViewTree } from './view-tree.ts'
+import type { TreeOrigin } from './view-tree.ts'
 
 /** The one thing this module needs of a connection: run SQL, get rows. */
 export type RunQuery = <Row>(text: string, values?: unknown[]) => Promise<readonly Row[]>
@@ -211,14 +213,9 @@ const STRICT_EQUALITY_QUERY = `
 // The built-in spellings the non-nullness rules of `plan-expressions.ts` lean on —
 // `count`, `min`, `max`, `sum`, `avg` as functions, `+ - * / % || = <> < <= > >=` as
 // operators, and `smallint`/`integer`/`bigint`/`numeric`/`text`/`character` as the
-// type families a cast is read by — taken over by a user-defined object. The plan
-// prints a name, not an oid, so a user function called `count`, or a user type
-// called `integer` printed where the built-in's name would be, is printed exactly
-// like the built-in, and the rule it does not obey has to stand down for the whole
-// database. Keywords (`COALESCE`, `CASE`, `AND`, …) cannot be shadowed: the grammar
-// reserves them. Everything PostgreSQL itself defines sits below the first normal
-// object id.
-const SHADOWED_NAMES = [
+// type families a cast is read by. Keywords (`COALESCE`, `CASE`, `AND`, …) cannot be
+// shadowed: the grammar reserves them.
+const RULE_SPELLINGS = [
   'count',
   'min',
   'max',
@@ -244,12 +241,39 @@ const SHADOWED_NAMES = [
   'character',
   'character varying'
 ]
+
+// The user-defined (non-built-in) functions, operators and types the database holds
+// under a spelling the rules lean on, read from the whole catalog. A built-in object
+// is pinned — it sits below the first normal object id — so every row here is an
+// object a user created: one that can take a built-in's spelling and be printed by it
+// in a plan. A plan prints a name, not an oid, so a user `count`, or a user type
+// spelled `integer`, printed where the built-in's name would be looks exactly like the
+// built-in, and the rule it does not obey has to stand down. The stand-down is taken
+// over the whole database and not over one view's dependencies: a user object a view
+// reaches only through an inlined function's body leaves no dependency edge on the
+// view, so a per-view set would miss it and trust the built-in's name for someone
+// else's object.
 const SHADOWED_NAMES_QUERY = `
   SELECT proname AS name FROM pg_proc WHERE oid >= 16384 AND proname = ANY ($1)
   UNION
   SELECT oprname FROM pg_operator WHERE oid >= 16384 AND oprname = ANY ($1)
   UNION
   SELECT typname FROM pg_type WHERE oid >= 16384 AND typname = ANY ($1)`
+
+// The stored analysed body of each view (`pg_node_tree`), read for the facts the plan
+// cannot state: the column names of every `WITH` query, and the base relation and
+// column each of the view's own columns came from. Read field by field
+// (`view-tree.ts`), not parsed as SQL; a view whose tree cannot be read leaves the
+// plan's own refusals in place.
+const VIEW_ACTION_QUERY = `
+  SELECT namespace.nspname    AS schema,
+         class.relname        AS view,
+         rule.ev_action::text AS action
+  FROM pg_rewrite rule
+           JOIN pg_class class ON class.oid = rule.ev_class
+           JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
+  WHERE class.relkind IN ('v', 'm')
+    AND namespace.nspname = ANY ($1)`
 
 // Column types, for the one question the plan cannot answer: whether a cast over a
 // column reference leaves the value alone.
@@ -405,9 +429,9 @@ export async function readStrictEquality(query: RunQuery): Promise<boolean> {
   return row?.strict === true
 }
 
-/** The built-in spellings a user-defined function or operator has taken over. */
+/** The rule spellings a user object has taken over somewhere in the database. */
 export async function readShadowedNames(query: RunQuery): Promise<Set<string>> {
-  const rows = await query<{ name: string }>(SHADOWED_NAMES_QUERY, [SHADOWED_NAMES])
+  const rows = await query<{ name: string }>(SHADOWED_NAMES_QUERY, [RULE_SPELLINGS])
   return new Set(rows.map((row) => row.name))
 }
 
@@ -415,7 +439,11 @@ export async function readShadowedNames(query: RunQuery): Promise<Set<string>> {
 export function planCatalogFrom(
   catalog: ReadonlyMap<string, CatalogRelation>,
   strictEquality: boolean,
-  shadowedNames: ReadonlySet<string> = new Set()
+  shadowedNames: ReadonlySet<string> = new Set(),
+  cteColumns: ReadonlyMap<string, string[]> = new Map(),
+  cteOrigins: ReadonlyMap<string, (CteColumnOrigin | null)[]> = new Map(),
+  cteMaterialized: ReadonlyMap<string, boolean> = new Map(),
+  cteRefCount: ReadonlyMap<string, number> = new Map()
 ): PlanCatalog {
   return {
     uniqueKeysOf: (schema, relation) => catalog.get(`${schema}.${relation}`)?.uniqueKeys ?? [],
@@ -426,8 +454,40 @@ export function planCatalogFrom(
     strictEquality,
     columnNotNull: (schema, relation, column) =>
       catalog.get(`${schema}.${relation}`)?.columns.get(column)?.notNull,
-    shadowedNames
+    shadowedNames,
+    cteColumns,
+    cteOrigins,
+    cteMaterialized,
+    cteRefCount
   }
+}
+
+/** One base column a view's own `WITH` query column is a reference to; `null` for an expression. */
+export interface CteColumnOrigin {
+  schema: string
+  relation: string
+  column: string
+}
+
+/** Resolves a view's `WITH` query origins to the base columns they name, by query. */
+export function resolveCteOrigins(
+  index: RelationOidIndex,
+  origins: ReadonlyMap<string, (TreeOrigin | null)[]>
+): Map<string, (CteColumnOrigin | null)[]> {
+  const resolved = new Map<string, (CteColumnOrigin | null)[]>()
+  for (const [name, columns] of origins) {
+    resolved.set(
+      name,
+      columns.map((origin) => {
+        if (origin === null) return null
+        const relation = index.get(origin.tableId)
+        const column = relation?.columns.get(origin.attnum)
+        if (!relation || column === undefined) return null
+        return { schema: relation.schema, relation: relation.relation, column }
+      })
+    )
+  }
+  return resolved
 }
 
 /** One view of the database, with its select-list order and the views it is built on. */
@@ -441,6 +501,174 @@ export interface ViewSourceRow {
 
 export async function readViewSources(query: RunQuery): Promise<readonly ViewSourceRow[]> {
   return query<ViewSourceRow>(VIEW_SOURCE_QUERY)
+}
+
+/** What a view's stored rewrite tree says: its CTE columns and its columns' origins. */
+export interface ViewTreeFacts {
+  /** Whether the tree parsed; `false` means none of the rest is trusted. */
+  ok: boolean
+  cteColumns: Map<string, string[]>
+  /** CTE name → the origin of each of its columns (a `Var`'s base column, or `null`). */
+  cteOrigins: Map<string, (TreeOrigin | null)[]>
+  /** CTE names the tree defines at more than one query level. */
+  cteAmbiguous: Set<string>
+  treeOrigins: Map<number, TreeOrigin>
+  /** The relation each range-table alias of the view names, by alias. */
+  relationAliases: Map<string, number>
+  /** Whether each `WITH` query of the view is materialized (see `view-tree.ts`). */
+  cteMaterialized: Map<string, boolean>
+  /** How many times each `WITH` query is referenced in the view's own query. */
+  cteRefCount: Map<string, number>
+}
+
+/** One base column a view column's stored tree traced it to. */
+export interface TreeColumn {
+  schema: string
+  relation: string
+  column: string
+  /** `pg_class.relkind` of the relation — a base table or a view the tree stops at. */
+  relkind: string
+}
+
+// The oid, schema, relation and column names of every relation, so a stored tree's
+// `resorigtbl`/`resorigcol` (an oid and an attribute number) resolves to the base
+// column it names.
+const RELATION_OIDS_QUERY = `
+  SELECT class.oid              AS oid,
+         namespace.nspname      AS schema,
+         class.relname          AS relation,
+         class.relkind::text    AS relkind,
+         attribute.attnum       AS attnum,
+         attribute.attname::text AS column_name
+  FROM pg_class class
+           JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
+           JOIN pg_attribute attribute ON attribute.attrelid = class.oid
+  WHERE attribute.attnum > 0
+    AND NOT attribute.attisdropped
+    AND class.relkind IN ('r', 'p', 'v', 'm', 'f')
+    AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')`
+
+/** An index of every relation by oid, so a stored tree's origin resolves by name. */
+export type RelationOidIndex = ReadonlyMap<
+  number,
+  { schema: string; relation: string; relkind: string; columns: ReadonlyMap<number, string> }
+>
+
+export async function readRelationOids(query: RunQuery): Promise<RelationOidIndex> {
+  const rows = await query<{
+    oid: number
+    schema: string
+    relation: string
+    relkind: string
+    attnum: number
+    column_name: string
+  }>(RELATION_OIDS_QUERY)
+  const index = new Map<
+    number,
+    { schema: string; relation: string; relkind: string; columns: Map<number, string> }
+  >()
+  for (const row of rows) {
+    let entry = index.get(row.oid)
+    if (!entry) {
+      entry = {
+        schema: row.schema,
+        relation: row.relation,
+        relkind: row.relkind,
+        columns: new Map()
+      }
+      index.set(row.oid, entry)
+    }
+    entry.columns.set(row.attnum, row.column_name)
+  }
+  return index
+}
+
+/** Resolves each of a view's tree origins to the base column it names, by position. */
+export function resolveTreeColumns(
+  index: RelationOidIndex,
+  origins: ReadonlyMap<number, TreeOrigin>
+): Map<number, TreeColumn> {
+  const resolved = new Map<number, TreeColumn>()
+  for (const [position, origin] of origins) {
+    const relation = index.get(origin.tableId)
+    const column = relation?.columns.get(origin.attnum)
+    if (relation && column !== undefined) {
+      resolved.set(position, {
+        schema: relation.schema,
+        relation: relation.relation,
+        column,
+        relkind: relation.relkind
+      })
+    }
+  }
+  return resolved
+}
+
+// The `pg_node_tree` a view's rewrite rule stores is PostgreSQL-internal and its
+// format carries no cross-version promise. The lab reads it against every major this
+// reader has been checked on, and a major outside that set is left unread — the plan's
+// own refusals stand where the tree's facts would have — because a format nobody has
+// read against is a guess, and a guess here is a wrong tag rather than a missed one.
+const SUPPORTED_TREE_MAJORS = [15, 16, 17, 18]
+/** The same range, said in prose: one place, so a message cannot name a major that moved. */
+const TREE_MAJOR_RANGE = `${SUPPORTED_TREE_MAJORS[0]}–${SUPPORTED_TREE_MAJORS.at(-1)}`
+const SERVER_VERSION_QUERY = `SELECT current_setting('server_version_num')::int AS version`
+
+/** What reading the views' stored trees gave: the facts, and whether they were read. */
+export interface ViewTreeRead {
+  /** Whether this server's major is one the stored format is read against. */
+  supported: boolean
+  trees: Map<string, ViewTreeFacts>
+}
+
+/** Each view's CTE column map and column origins, by `schema.view`. */
+export async function readViewTrees(query: RunQuery, schemas: string[]): Promise<ViewTreeRead> {
+  const [version] = await query<{ version: number }>(SERVER_VERSION_QUERY)
+  const major = Math.floor((version?.version ?? 0) / 10000)
+  if (!SUPPORTED_TREE_MAJORS.includes(major)) return { supported: false, trees: new Map() }
+  const rows = await query<{ schema: string; view: string; action: string | null }>(
+    VIEW_ACTION_QUERY,
+    [schemas]
+  )
+  const trees = new Map<string, ViewTreeFacts>()
+  for (const row of rows) {
+    if (row.action === null) continue
+    const tree = readViewTree(row.action)
+    trees.set(`${row.schema}.${row.view}`, {
+      ok: tree.ok,
+      cteColumns: tree.cteColumns,
+      cteOrigins: tree.cteOrigins,
+      cteAmbiguous: tree.cteAmbiguous,
+      treeOrigins: tree.treeOrigins,
+      relationAliases: tree.relationAliases,
+      cteMaterialized: tree.cteMaterialized,
+      cteRefCount: tree.cteRefCount
+    })
+  }
+  return { supported: true, trees }
+}
+
+/**
+ * The views a `Subquery Scan` may be pinned to, by the name it carries: the source
+ * views of this relation by their own names, and — for a source the defining query
+ * referred to by an explicit alias (`FROM deposit.v bank_range`) — by that alias, read
+ * from the relation each range-table alias names. The plan spells such a node with the
+ * range-table entry's name, which is the alias, and the alias is no view's name.
+ */
+export function subqueryCandidatesFor(
+  views: readonly ViewSourceRow[],
+  facts: ViewTreeFacts | undefined,
+  oids: RelationOidIndex,
+  schema: string,
+  name: string
+): Map<string, ViewShape> {
+  const candidates = subqueryViewCandidates(views, schema, name)
+  for (const [alias, relid] of facts?.relationAliases ?? []) {
+    const relation = oids.get(relid)
+    const shape = relation === undefined ? undefined : candidates.get(relation.relation)
+    if (shape) candidates.set(alias, shape)
+  }
+  return candidates
 }
 
 /**
@@ -540,6 +768,19 @@ export const NO_PRIVILEGED_CONNECTION_REASON =
   'materialized view: its defining query is planned, and this service configures ' +
   'no privileged connection to plan it with (pgService superuserConnectionString)'
 
+/**
+ * Why the views' stored rewrite trees were left unread: the `pg_node_tree` format is
+ * PostgreSQL-internal, and a major the reader has not been checked against is not read
+ * at all. Said out loud because the tree is what a `WITH` query's columns and a column's
+ * stored origin come from, and "no `WITH` query was crossed" must be distinguishable
+ * from "there was no `WITH` query".
+ */
+export const TREE_FORMAT_UNCHECKED_REASON =
+  'stored rewrite tree (pg_rewrite.ev_action) not read: this PostgreSQL major is ' +
+  `outside the range the reader is checked against (${TREE_MAJOR_RANGE}), so its stored ` +
+  'format is not read, and no `WITH` query of this view is crossed and no column origin ' +
+  'is taken from it'
+
 export interface CollectResult {
   derivations: ViewDerivation[]
   /** Every table of the schemas this role may read, with what its foreign keys led to. */
@@ -548,6 +789,13 @@ export interface CollectResult {
   failures: { schema: string; view: string; relkind: 'v' | 'm'; error: string }[]
   /** Views this reader deliberately did not plan, with the reason it did not. */
   skipped: { schema: string; view: string; relkind: 'v' | 'm'; reason: string }[]
+  /**
+   * The built-in spellings a user object has taken over somewhere in the database. The
+   * rules those spellings carry stand down for every view, so a surface that derives
+   * less than expected can be read against this list rather than mistaken for a surface
+   * that had nothing to derive.
+   */
+  shadowedNames: string[]
 }
 
 /**
@@ -562,16 +810,16 @@ export async function collectViewConstraints(
   schemas: string[],
   privilegedQuery: RunQuery | null,
   publishedAsEnumeration?: PublishedAsEnumeration,
-  declaredRowIdentity?: DeclaredRowIdentity
+  declaredRowIdentity?: DeclaredRowIdentity,
+  deriveUnique = true
 ): Promise<CollectResult> {
   const catalog = await readCatalogRelations(query)
-  const planCatalog = planCatalogFrom(
-    catalog,
-    await readStrictEquality(query),
-    await readShadowedNames(query)
-  )
+  const strictEquality = await readStrictEquality(query)
   const coercions = await readTypeCoercions(query)
   const viewSources = await readViewSources(query)
+  const shadowedNames = await readShadowedNames(query)
+  const { supported: treeSupported, trees: viewTrees } = await readViewTrees(query, schemas)
+  const relationOids = await readRelationOids(query)
   const views = await readViews(query, schemas)
   const derivations: ViewDerivation[] = []
   const failures: CollectResult['failures'] = []
@@ -610,22 +858,44 @@ export async function collectViewConstraints(
       })
       continue
     }
-    derivations.push(
-      deriveViewConstraints(
-        view.schema,
-        view.view,
-        view.relkind,
-        columns,
-        readPlanOrigins(
-          plan,
-          columns.length,
-          subqueryViewCandidates(viewSources, view.schema, view.view),
-          planCatalog
-        ),
-        catalog,
-        coercions
-      )
+    const facts = viewTrees.get(`${view.schema}.${view.view}`)
+    const derivation = deriveViewConstraints(
+      view.schema,
+      view.view,
+      view.relkind,
+      columns,
+      readPlanOrigins(
+        plan,
+        columns.length,
+        subqueryCandidatesFor(viewSources, facts, relationOids, view.schema, view.view),
+        planCatalogFrom(
+          catalog,
+          strictEquality,
+          shadowedNames,
+          facts?.cteColumns ?? new Map(),
+          resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map()),
+          facts?.cteMaterialized ?? new Map(),
+          facts?.cteRefCount ?? new Map()
+        )
+      ),
+      catalog,
+      coercions,
+      deriveUnique,
+      resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map())
     )
+    // A tree the walk could not place is said out loud: its CTE map is empty, so a
+    // `WITH` query reads as refused, and the reason the map is empty is named here
+    // rather than left to look like a query that has no `WITH` at all.
+    if (!treeSupported) {
+      derivation.notes.push(TREE_FORMAT_UNCHECKED_REASON)
+    } else if (facts && !facts.ok) {
+      derivation.notes.push(
+        'stored rewrite tree (pg_rewrite.ev_action) not read: its format was not ' +
+          'recognised, so no `WITH` query of this view is crossed and no column origin ' +
+          'is taken from it'
+      )
+    }
+    derivations.push(derivation)
   }
   const tables: TableDerivation[] = (await readTables(query, schemas)).map((table) => ({
     schema: table.schema,
@@ -644,5 +914,5 @@ export async function collectViewConstraints(
     declaredRowIdentity,
     tables
   )
-  return { derivations, tables, failures, skipped }
+  return { derivations, tables, failures, skipped, shadowedNames: [...shadowedNames].sort() }
 }

@@ -58,6 +58,14 @@ function renderService(
 ): NotNullTally {
   const tally: NotNullTally = { confirmed: 0, derivedOnly: 0, handOnly: [] }
   line(`\n════ ${title} (schemas: ${report.schemas.length})`)
+  // The rules a user object has taken a spelling from stand down for every view, so a
+  // surface that derives less than expected is read against this line rather than taken
+  // for a surface with nothing to derive.
+  line(
+    report.shadowedNames.length === 0
+      ? '  ~~ built-in spellings a user object has taken over: none'
+      : `  ~~ built-in spellings a user object has taken over: ${report.shadowedNames.join(', ')} — the rules they carry stand down for every view`
+  )
   for (const failure of report.failures) {
     line(
       `  !! ${failure.schema}.${failure.view} (relkind ${failure.relkind}): EXPLAIN refused: ${failure.error}`
@@ -81,6 +89,8 @@ function renderService(
       declaredKeys.size > 0 ||
       derived.primaryKey !== null ||
       view.declaredPrimaryKey !== null ||
+      derived.unique !== null ||
+      view.declaredUnique.length > 0 ||
       derivedNotNull.size > 0 ||
       declaredNotNull.size > 0 ||
       derived.origins === null
@@ -114,6 +124,21 @@ function renderService(
     }
     if (view.declaredPrimaryKey && view.declaredPrimaryKey !== derivedPk?.tag) {
       line(`     pk HAND-ONLY   ${view.declaredPrimaryKey}`)
+    }
+    // A `@unique` is the key a `@primaryKey` could not be: proven unique, but with a
+    // column that may be NULL. It is compared to what the view declares by hand the
+    // way a foreign key is — the reference, not the `|@fieldName` tail.
+    const derivedUnique = derived.unique
+    if (derivedUnique) {
+      line(
+        `     unique DERIVED-ONLY ${derivedUnique.tag}   [${derivedUnique.via ? `via ${derivedUnique.via.schema}.${derivedUnique.via.relation} ${derivedUnique.via.constraintName}` : 'made by the plan'}]`
+      )
+    }
+    for (const tag of view.declaredUnique) {
+      if (derivedUnique && foreignKeyReference(tag) === foreignKeyReference(derivedUnique.tag)) {
+        continue
+      }
+      line(`     unique HAND-ONLY   ${tag}`)
     }
     // The three ways a column's non-nullness can stand. The third is the one to read:
     // either the derivation is too weak to see what the author saw, or the hand tag
@@ -195,6 +220,7 @@ function renderService(
     const got =
       `${derived.foreignKeys.length} fk` +
       `${derived.primaryKey ? ', pk' : ''}` +
+      `${derived.unique ? ', unique' : ''}` +
       `, ${derived.notNullColumns.length} nn`
     const read = derived.origins?.filter((sources) => sources !== null).length ?? 0
     line(

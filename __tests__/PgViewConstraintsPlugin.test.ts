@@ -39,7 +39,10 @@ import type {
 import {
   collectViewConstraints,
   NO_PRIVILEGED_CONNECTION_REASON,
+  readShadowedNames,
+  readViewTrees,
   subqueryViewCandidates,
+  TREE_FORMAT_UNCHECKED_REASON,
   planCatalogFrom
 } from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { ViewSourceRow } from '../src/PgViewConstraintsPlugin/collect.ts'
@@ -51,6 +54,7 @@ import {
   readPlanOrigins
 } from '../src/PgViewConstraintsPlugin/plan-origins.ts'
 import { conditionEqualities } from '../src/PgViewConstraintsPlugin/plan-keys.ts'
+import { readViewTree } from '../src/PgViewConstraintsPlugin/view-tree.ts'
 import {
   evaluateExpression,
   parseExpression
@@ -70,7 +74,7 @@ interface Fixture {
   coercions: { binary: string[]; domainBase: Record<string, number> }
   /** Every `=` operator of the lab database is strict. */
   strictEquality: boolean
-  /** Built-in spellings a user-defined function or operator of the lab took over. */
+  /** The rule spellings a user object has taken over somewhere in the lab database. */
   shadowedNames: string[]
   /** Every lab table, each a referencing half of a relation to a projection. */
   tables: { schema: string; table: string }[]
@@ -83,6 +87,25 @@ interface Fixture {
     /** The planner regime the plan was taken under; see build-fixture.ts. */
     regime: string
     columns: ViewColumn[]
+    /** Whether the view's stored rewrite tree parsed. */
+    treeOk: boolean
+    /** The view's `WITH` query column map, from its stored rewrite tree. */
+    cteColumns: Record<string, string[]>
+    /** Each `WITH` query column's base column, by query and position, or `null`. */
+    cteOrigins: Record<string, ({ schema: string; relation: string; column: string } | null)[]>
+    /** `WITH` names the tree defines at more than one query level. */
+    cteAmbiguous: string[]
+    /** Whether each `WITH` query of the view is materialized by PostgreSQL. */
+    cteMaterialized: Record<string, boolean>
+    /** How many times each `WITH` query is referenced in the view's own query. */
+    cteRefCount: Record<string, number>
+    /** Each view column's traced base column, by position, from the stored tree. */
+    treeColumns: Record<
+      string,
+      { schema: string; relation: string; column: string; relkind: string }
+    >
+    /** Each range-table alias of the view, resolved to the relation it names. */
+    viewAliases: Record<string, string>
     plan: ExplainPlanNode
   }[]
 }
@@ -98,11 +121,11 @@ const catalog = new Map<string, CatalogRelation>(
   ])
 )
 
-const planCatalog = planCatalogFrom(
-  catalog,
-  fixture.strictEquality,
-  new Set(fixture.shadowedNames ?? [])
-)
+// The rule spellings a user object has taken over across the lab database: the same
+// set for every view, since a plan prints a name and not the object it stands for.
+const shadowedNames = new Set(fixture.shadowedNames ?? [])
+
+const planCatalog = planCatalogFrom(catalog, fixture.strictEquality, shadowedNames)
 
 const coercions: TypeCoercions = {
   binary: new Set(fixture.coercions.binary),
@@ -130,12 +153,14 @@ const REGIMES = [...new Set(fixture.views.map((view) => view.regime))]
 /** What one lab view's derivation reduces to, in the shape the cases are written in. */
 function derive(
   name: string,
-  regime: string = DEFAULT_REGIME
+  regime: string = DEFAULT_REGIME,
+  shadowed: ReadonlySet<string> = shadowedNames
 ): {
   origins: string[] | null
   notNull: string[]
   foreignKeys: string[]
   primaryKey: string | null
+  unique: string | null
   planRefusal: PlanRefusal | null
   refusals: (ColumnRefusal | null)[]
   notes: string[]
@@ -144,6 +169,19 @@ function derive(
     (candidate) => candidate.view === name && candidate.regime === regime
   )
   assert.ok(view, `no fixture for lab.${name} under ${regime}`)
+  const cteColumns = new Map(Object.entries(view.cteColumns ?? {}))
+  const cteOrigins = new Map(Object.entries(view.cteOrigins ?? {}))
+  const cteMaterialized = new Map(Object.entries(view.cteMaterialized ?? {}))
+  const cteRefCount = new Map(Object.entries(view.cteRefCount ?? {}))
+  const treeColumns = new Map(
+    Object.entries(view.treeColumns ?? {}).map(([position, column]) => [Number(position), column])
+  )
+  // A source view the defining query gave an explicit alias is crossable by that alias.
+  const candidates = subqueryViewCandidates(fixture.viewSources, view.schema, view.view)
+  for (const [alias, relation] of Object.entries(view.viewAliases ?? {})) {
+    const shape = candidates.get(relation)
+    if (shape) candidates.set(alias, shape)
+  }
   const derivation = deriveViewConstraints(
     view.schema,
     view.view,
@@ -152,11 +190,21 @@ function derive(
     readPlanOrigins(
       view.plan,
       view.columns.length,
-      subqueryViewCandidates(fixture.viewSources, view.schema, view.view),
-      planCatalog
+      candidates,
+      planCatalogFrom(
+        catalog,
+        fixture.strictEquality,
+        shadowed,
+        cteColumns,
+        cteOrigins,
+        cteMaterialized,
+        cteRefCount
+      )
     ),
     catalog,
-    coercions
+    coercions,
+    true,
+    treeColumns
   )
   return {
     origins:
@@ -168,6 +216,7 @@ function derive(
     notNull: derivation.notNullColumns,
     foreignKeys: derivation.foreignKeys.map((foreignKey) => foreignKey.tag),
     primaryKey: derivation.primaryKey?.tag ?? null,
+    unique: derivation.unique?.tag ?? null,
     planRefusal: derivation.planRefusal,
     refusals: derivation.columnRefusals,
     notes: derivation.notes
@@ -183,6 +232,19 @@ interface Case {
   notNull: string[]
   foreignKeys: string[]
   primaryKey: string | null
+  /**
+   * The `@unique` tag derived for the view, where the plan proves a key whose columns
+   * may be NULL. Left out on the cases that prove none, which is asserted to be none.
+   */
+  unique?: string
+  /**
+   * A whole-plan refusal a reader on another PostgreSQL major gives this view instead of
+   * the expectations above, which is accepted. A plan shape that moved between majors
+   * (a set operation the older one wraps in a subquery) makes the column unread either
+   * way; both answers are the conservative one, and the lab is read on every supported
+   * major in CI.
+   */
+  alsoPlanRefusal?: PlanRefusal
 }
 
 const CASES: Case[] = [
@@ -212,6 +274,19 @@ const CASES: Case[] = [
     // `bank` is joined by its own key, so no row of `tx` meets two of it, and `tx`'s
     // key is the view's.
     primaryKey: 'id'
+  },
+  {
+    view: 'v_left_group_nulled',
+    about:
+      'a group key taken from the nulled side of an outer join is no row identity for a ' +
+      '`@unique` either: the guard a `@primaryKey` is taken under holds for both, so no ' +
+      'key is derived and the plan’s own set is named in the notes',
+    origins: ['bank_id=bank.id', 'n=—'],
+    // The group key is NULL in every padded row — that is why it is no identity — while
+    // `count` answers 0 over the rows it counted.
+    notNull: ['n'],
+    foreignKeys: ['(bank_id) references lab.bank (id)'],
+    primaryKey: null
   },
   {
     view: 'v_group',
@@ -267,11 +342,22 @@ const CASES: Case[] = [
   {
     view: 'v_cte',
     about:
-      'a WITH query referenced twice is materialized, and the wall it puts up is not ' +
-      'crossed: the plan holds no map from its column names to its select list',
-    origins: ['id=—', 'cur_code=—', 'top_amount=—'],
-    notNull: [],
-    foreignKeys: [],
+      'a WITH query referenced twice is materialized, and its column names come from ' +
+      'the view’s stored tree: each `live.col` is read at that column’s position in ' +
+      'the subplan the WITH query computes',
+    origins: ['id=tx.id', 'cur_code=tx.cur_code', 'top_amount=—'],
+    notNull: ['id', 'cur_code', 'top_amount'],
+    foreignKeys: ['(cur_code) references lab.currency (code)', '(id) references lab.tx (id)'],
+    primaryKey: 'id,cur_code'
+  },
+  {
+    view: 'v_cte_aggregate',
+    about:
+      'a computed column of a materialized WITH query is read at the entry its ' +
+      'subplan prints — here a count, never NULL',
+    origins: ['cur_code=tx.cur_code', 'n=—'],
+    notNull: ['cur_code', 'n'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
     primaryKey: null
   },
   {
@@ -286,9 +372,13 @@ const CASES: Case[] = [
     view: 'm_tx',
     about:
       'a materialized view is read through its defining query, whose single range ' +
-      'table entry EXPLAIN prints unqualified',
+      'table entry EXPLAIN prints unqualified, and by the same non-nullness rule a ' +
+      'plain view is: its stored copy of a never-`NULL` column holds no NULL either',
     origins: ['id=tx.id', 'cur_code=tx.cur_code', 'amount=tx.amount'],
-    notNull: [],
+    // The same columns `v_bare` derives non-null over the same base table: a
+    // materialized view carries no exception, and its key's columns are read as
+    // never `NULL` here as they are there.
+    notNull: ['id', 'cur_code', 'amount'],
     foreignKeys: ['(cur_code) references lab.currency (code)', '(id) references lab.tx (id)'],
     primaryKey: 'id'
   },
@@ -371,12 +461,13 @@ const CASES: Case[] = [
   {
     view: 'v_distinct_over_union',
     about:
-      'the trap: DISTINCT over a UNION prints a Unique whose Output names one branch ' +
-      'of two, so the plan is refused whole rather than read as a single scan',
-    origins: null,
-    notNull: [],
-    foreignKeys: [],
-    primaryKey: null
+      'DISTINCT over a UNION prints a `Unique` or a de-duplicating `Aggregate` whose ' +
+      'Output names one branch of two; the branches are read position by position and ' +
+      'the group key over the union’s columns is the row identity',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'id,cur_code'
   },
   {
     view: 'v_self_join',
@@ -390,11 +481,14 @@ const CASES: Case[] = [
   },
   {
     view: 'v_nullable_unique',
-    about: 'a unique index over a nullable column identifies no row and is no key',
+    about:
+      'a unique index over a nullable column identifies no row of the table, so it is ' +
+      'no @primaryKey — but no two rows share the value, which is a proven @unique',
     origins: ['tag=slot.tag'],
     notNull: [],
     foreignKeys: [],
-    primaryKey: null
+    primaryKey: null,
+    unique: 'tag'
   },
 
   // ── Non-nullness: what the shape of the plan gives, and what it takes away ─────
@@ -449,9 +543,38 @@ const CASES: Case[] = [
     view: 'v_grouping_sets',
     about:
       'GROUP BY ROLLUP adds a superaggregate row that answers to no base row: the ' +
-      'grouping column is NULL in it, and it is not a row of the table either',
+      'grouping column is NULL in it, and it is not a row of the table either — but ' +
+      'count is 0 over the rows it counted, grand-total row included',
     origins: ['id=tx.id', 'n=—'],
-    notNull: [],
+    notNull: ['n'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_group_by_empty_count',
+    about:
+      'GROUP BY () reaches the plan as GROUPING SETS too: min over the one possibly ' +
+      'empty group answers NULL, count does not',
+    origins: ['lo=—', 'n=—'],
+    notNull: ['n'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_group_count_rollup',
+    about:
+      'count survives the superaggregate rows of ROLLUP, counting every row the group ' +
+      'holds and answering 0 for none — while the grouping column does not',
+    origins: ['id=tx.id', 'n=—', 'some_n=—'],
+    notNull: ['n', 'some_n'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_group_count_cube',
+    about: 'and the same under CUBE, whose every subtotal group count counts over',
+    origins: ['id=tx.id', 'n=—'],
+    notNull: ['n'],
     foreignKeys: ['(id) references lab.tx (id)'],
     primaryKey: null
   },
@@ -468,10 +591,10 @@ const CASES: Case[] = [
   {
     view: 'v_cte_nulled_scan',
     about:
-      'a column read through a materialized WITH query is unknown however plainly ' +
-      'the query reads it; the columns beside it are read as usual',
-    origins: ['id=refund.id', 'a_code=—', 'b_code=—'],
-    notNull: ['id'],
+      'a column read through a materialized WITH query is read like any other; the ' +
+      'outer join nulls the `CTE Scan` instance, so the column it pads stays nullable',
+    origins: ['id=refund.id', 'a_code=tx.cur_code', 'b_code=tx.cur_code'],
+    notNull: ['id', 'b_code'],
     foreignKeys: ['(id) references lab.refund (id)'],
     primaryKey: null
   },
@@ -496,21 +619,19 @@ const CASES: Case[] = [
   {
     view: 'v_union_distinct',
     about:
-      'de-duplication over a union is refused both ways the planner implements it: ' +
-      'a hashed `Aggregate` computes, and a `Unique` is what the same query becomes ' +
-      'when hashing is off, so accepting one would answer by cost',
-    origins: null,
-    notNull: [],
-    foreignKeys: [],
-    primaryKey: null
+      'a de-duplicating `UNION` is a grouping by every column over the union: read the ' +
+      'same whether the planner hashes it or sorts it, and its key is the whole tuple',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'id,cur_code'
   },
   {
     view: 'v_cte_reordered_scans',
     about:
-      'two scans of one WITH query print its columns in two different orders, and ' +
-      'which of the two orders is the query’s own is the very thing the plan does ' +
-      'not say — so neither is read',
-    origins: ['id=refund.id', 'cur_code=—', 'b_cur_code=—'],
+      'two scans of one WITH query print its columns in two different orders; the ' +
+      'stored tree says which order is the query’s own, so each is read off its position',
+    origins: ['id=refund.id', 'cur_code=tx.cur_code', 'b_cur_code=tx.cur_code'],
     notNull: ['id'],
     foreignKeys: ['(id) references lab.refund (id)'],
     primaryKey: null
@@ -678,12 +799,12 @@ const CASES: Case[] = [
   {
     view: 'v_aliased_barrier',
     about:
-      'the plan gives a Subquery Scan an alias and nothing else, so an aliased barrier ' +
-      'view is a boundary with no name to pin it to a view by, and is not crossed',
-    origins: ['id=—', 'cur_code=—'],
-    notNull: [],
-    foreignKeys: [],
-    primaryKey: null
+      'the plan gives a Subquery Scan an alias and nothing else; the stored tree says ' +
+      'which view that alias stands for, so `t` is crossed to the barrier view it names',
+    origins: ['id=tx.id', 'cur_code=tx.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)', '(id) references lab.tx (id)'],
+    primaryKey: 'id'
   },
 
   // ── The rest of the closed list of refusals ────────────────────────────────────
@@ -697,7 +818,51 @@ const CASES: Case[] = [
   },
   {
     view: 'v_except',
-    about: 'EXCEPT reads its inputs as one tagged stream: there is no branch to read',
+    about:
+      'EXCEPT prints its two branches directly and a column of the result is one ' +
+      'branch’s value, never NULL only where both branches’ entries are not',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: null,
+    // PostgreSQL 17 and earlier wrap the `SetOp` in a `Subquery Scan`, so the columns
+    // are not read and the view is refused whole; both answers hold back rather than
+    // claim.
+    alsoPlanRefusal: 'set-operation-not-a-select-list'
+  },
+  {
+    view: 'v_intersect',
+    about: 'and INTERSECT the same, a row of the result answering to both branches',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: null,
+    alsoPlanRefusal: 'set-operation-not-a-select-list'
+  },
+  {
+    view: 'v_union_grouped',
+    about:
+      'a grouping over a `UNION ALL`: the group key proxies both branches and is the ' +
+      'row identity, and sum/count read the union’s columns — a literal branch answers ' +
+      'never NULL, so the aggregate is never NULL too',
+    origins: ['sid=refund.id|tx.id', 'cur_code=refund.cur_code|tx.cur_code', 'total=—', 'n=—'],
+    notNull: ['sid', 'cur_code', 'total', 'n'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'sid,cur_code'
+  },
+  {
+    view: 'v_union_nested',
+    about:
+      'a set operation over another cannot tell its branches apart: the same spelling ' +
+      'names a column of both, so no column is read',
+    origins: null,
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_recursive',
+    about: 'a recursive WITH reads its own output as one tagged stream: no branch',
     origins: null,
     notNull: [],
     foreignKeys: [],
@@ -723,10 +888,11 @@ const CASES: Case[] = [
     view: 'v_where_false',
     about:
       'a constant-false qualifier leaves a plan with no scan in it, while the select ' +
-      'list still spells the relation that is not read',
+      'list still spells the relation that is not read — the stored tree still traces ' +
+      'the columns to the base table, so their relations are led',
     origins: ['id=—', 'cur_code=—'],
     notNull: [],
-    foreignKeys: [],
+    foreignKeys: ['(cur_code) references lab.currency (code)', '(id) references lab.tx (id)'],
     primaryKey: null
   },
 
@@ -1086,10 +1252,11 @@ const CASES: Case[] = [
   {
     view: 'v_sale_first_store',
     about:
-      'but under a join a view that ends in a LIMIT is the top of a subquery, whose ' +
-      'boundary the planner keeps or removes by join method',
-    origins: ['id=sale.id', 'code=—'],
-    notNull: ['id'],
+      'a view that ends in a LIMIT is the top of a subquery under a join; the alias ' +
+      'the plan gives it is resolved to the view, so its columns are read — the LIMIT ' +
+      'alone makes no row identity, so the view still has no key',
+    origins: ['id=sale.id', 'code=store.code'],
+    notNull: ['id', 'code'],
     foreignKeys: ['(id) references lab.sale (id)'],
     primaryKey: null
   },
@@ -1155,22 +1322,26 @@ const CASES: Case[] = [
   },
   {
     view: 'v_group_nullable',
-    about: 'a group key over a column that can be NULL is no row identity',
+    about:
+      'a group key over a column that can be NULL is no row identity — but every row ' +
+      'stands for a distinct combination, so the key is a proven @unique',
     origins: ['cur_code=tx.cur_code', 'bank_id=tx.bank_id', 'n=—'],
     notNull: ['cur_code', 'n'],
     foreignKeys: [
       '(bank_id) references lab.bank (id)',
       '(cur_code) references lab.currency (code)'
     ],
-    primaryKey: null
+    primaryKey: null,
+    unique: 'cur_code,bank_id'
   },
   {
     view: 'v_distinct_nullable',
-    about: 'nor is a de-duplication over one',
+    about: 'nor is a de-duplication over one — and it is a @unique all the same',
     origins: ['bank_id=tx.bank_id'],
     notNull: [],
     foreignKeys: ['(bank_id) references lab.bank (id)'],
-    primaryKey: null
+    primaryKey: null,
+    unique: 'bank_id'
   },
   {
     view: 'v_group_expression',
@@ -1563,16 +1734,372 @@ const CASES: Case[] = [
     notNull: [],
     foreignKeys: [],
     primaryKey: null
+  },
+  {
+    view: 'v_cte_name_shadowed',
+    about:
+      'a WITH name two query levels share cannot be told apart in the plan, so neither ' +
+      '`live` is read: a reader that took the first subplan would call `inner_x.y` — ' +
+      'really `need.nul` — never NULL',
+    origins: ['x=—', 'y=—'],
+    notNull: [],
+    foreignKeys: ['(x) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_name_shadowed_fk',
+    about:
+      'and a reader that took the first subplan would lead `inner_x.inner_v` — really ' +
+      '`need.nn`, no key — to `need` over `need_ref.need_id`’s foreign key',
+    origins: ['v=—', 'inner_v=—'],
+    notNull: [],
+    foreignKeys: ['(v) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_where_false',
+    about:
+      'a constant array in the stored tree (what `WHERE false` writes) does not break ' +
+      'the walk: the WITH query is read into the map and the columns’ origins resolve, ' +
+      'while the plan carries no scan a constant-false qualifier removed',
+    origins: ['id=—', 'cur_code=—'],
+    notNull: [],
+    foreignKeys: ['(cur_code) references lab.currency (code)', '(id) references lab.tx (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_src',
+    about: 'the source view of the cross-view clash: its own `live` reads as usual',
+    origins: ['k=need.id', 'x=need.nul'],
+    notNull: ['k'],
+    foreignKeys: ['(k) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_src_fk',
+    about: 'and the source of the key variant: `x` is `child.plain`, no key',
+    origins: ['k=child.id', 'x=child.plain'],
+    notNull: ['k', 'x'],
+    foreignKeys: ['(k) references lab.child (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_view',
+    about:
+      'the analysed view and its source both define `live`; the plan spells the ' +
+      'source’s `CTE Scan` `live` and never says which view’s query it is, so `sx` is ' +
+      'refused rather than read off the source’s subplan — really `need.nul`, the wrong ' +
+      '`live` would call it never NULL',
+    origins: ['oy=need.id', 'sx=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_view_fk',
+    about:
+      'the same with a key in play: the wrong `live` would lead `sx` — really ' +
+      '`child.plain` — to `parent` over `child.ref`’s foreign key',
+    origins: ['oy=child.id', 'sx=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.child (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_mid',
+    about: 'a source reached through two views, so the clash is not direct to the asked one',
+    origins: ['k=need.id', 'x=need.nul'],
+    notNull: ['k'],
+    foreignKeys: ['(k) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_src2',
+    about:
+      'a view over a materialized `WITH` query it does not define reads no column off ' +
+      'it: its own tree names no such query, and the source’s is not its to read',
+    origins: ['k=—', 'x=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_view_two',
+    about:
+      'the clash reached through two views: the name is dropped from the closure, so the ' +
+      'column is refused all the same',
+    origins: ['oy=need.id', 'sx=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_cross_src_once',
+    about: 'a source whose `live` is inlined reads its base column directly',
+    origins: ['k=need.id', 'x=need.nul'],
+    notNull: ['k'],
+    foreignKeys: ['(k) references lab.need (id)'],
+    primaryKey: 'k'
+  },
+  {
+    view: 'v_cte_cross_view_inlined',
+    about:
+      'both `live` queries inlined: the plan carries no subplan of that name, so `sx` is ' +
+      'the base `need.nul` read directly and stays nullable',
+    origins: ['oy=need.id', 'sx=need.nul'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.need (id)'],
+    primaryKey: 'oy'
+  },
+  {
+    view: 'v_cte_foreign_view',
+    about:
+      'the source `live` stands in a view outside the surface, whose tree is never read: ' +
+      'the one `CTE live` subplan prints three columns where the analysed view’s has two, ' +
+      'so it is not proved to be its own and `sx` — really the foreign `need.nul` — is refused',
+    origins: ['oy=need.id', 'sx=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_foreign_view_fk',
+    about:
+      'and with a key: the unproved subplan would lead `sx` — really `child.plain` — to ' +
+      '`parent` over the foreign `child.ref`',
+    origins: ['oy=child.id', 'sx=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.child (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_coinciding',
+    about:
+      'a foreign subplan whose every column’s origin lines up is still another query’s: ' +
+      'its scan carries that query’s range-table alias, not this view’s, so `sx` is refused',
+    origins: ['oy=need.id', 'sx=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_swap_src',
+    about: 'the source of the swap: its own `live` reads as usual',
+    origins: ['q=need.nul', 'p=need.nn'],
+    notNull: ['p'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_swap',
+    about:
+      'the foreign `live` matches the view’s own by origin — `[nul, nn]` both ways — but ' +
+      'carries its columns as `q, p` where the view’s are `p, q`: the foreign scan is not ' +
+      'this view’s range-table entry, so `sq` and `sp` are refused, not read off the wrong ' +
+      'positions',
+    origins: ['op=need.nul', 'sq=—', 'sp=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_swap_src_fk',
+    about: 'the swap’s key variant source: its own `live` reads as usual',
+    origins: ['q=child.plain', 'p=child.ref'],
+    notNull: ['q', 'p'],
+    foreignKeys: ['(p) references lab.parent (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_swap_fk',
+    about:
+      'and with a key: the swapped foreign scan would read `ref` where the view means ' +
+      '`plain`, leading a foreign key the rows do not carry — refused',
+    origins: ['op=child.plain', 'sq=—', 'sp=—'],
+    notNull: ['op'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_function_lateral',
+    about:
+      'an inlined SQL function with its own `live` reached through `LATERAL`: nothing is ' +
+      'read off the unproved subplan, and the function’s scan is not crossed either',
+    origins: ['oy=need.id', 'sy=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_function',
+    about: 'and the same function in the FROM list rather than after `LATERAL`',
+    origins: ['oy=need.id', 'sy=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_function_fk',
+    about: 'the function variant with a key in play',
+    origins: ['oy=child.id', 'sx=—'],
+    notNull: ['oy'],
+    foreignKeys: ['(oy) references lab.child (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_alias_src',
+    about: 'the same-alias source: its own `live` is referenced twice and reads as usual',
+    origins: ['q=need.nul', 'p=need.nn'],
+    notNull: ['p'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_alias',
+    about:
+      'the view’s own `live` is referenced once, so the default inlines it and it has no ' +
+      'scan; the only `CTE live` is the source’s, whose columns are `q, p` where the ' +
+      'view’s are `p, q` — the alias matches but proves nothing, so `sq` and `sp` are refused',
+    origins: ['op=need.nul', 'sq=—', 'sp=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_ab_src',
+    about: 'the twice-referenced source `live` is materialized and reads as usual',
+    origins: ['q=need.nul', 'p=need.nn'],
+    notNull: ['p'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_ab',
+    about:
+      'both `live` queries are referenced twice, so both materialize: the plan carries ' +
+      'two `CTE live` subplans, nothing says which a scan reads, and the columns are refused',
+    origins: ['op=—', 'oq=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_ref_once',
+    about:
+      'a `WITH` query referenced once is inlined, so its columns come off the base ' +
+      'relation directly and read as usual',
+    origins: ['p=need.id', 'q=need.nn'],
+    notNull: ['p', 'q'],
+    foreignKeys: ['(p) references lab.need (id)'],
+    primaryKey: 'p'
+  },
+  {
+    view: 'v_cte_not_materialized',
+    about: 'and `NOT MATERIALIZED` inlines even a repeated `WITH` query',
+    origins: ['p=need.id', 'q=need.nn'],
+    notNull: ['p', 'q'],
+    foreignKeys: ['(p) references lab.need (id)'],
+    primaryKey: 'p'
+  },
+  {
+    view: 'v_cte_volatile',
+    about:
+      'a `WITH` query the tree reads as inlined, but a volatile body materializes: the ' +
+      'reader refuses rather than trust the prediction',
+    origins: ['p=—', 'q=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_recursive',
+    about: 'a recursive `WITH` reads its own output as one tagged stream',
+    origins: null,
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_oj_expr_src',
+    about:
+      'the source of the outer-join cases: a literal, a cast, an `IS` test, a `CASE` and a ' +
+      '`COALESCE` over a NOT NULL column are all never NULL where they are computed',
+    origins: ['id=need.id', 'c=—', 'n=—', 'f=—', 'g=—', 'cs=—', 'co=—', 'gr=—'],
+    notNull: ['id', 'c', 'n', 'f', 'g', 'cs', 'co', 'gr'],
+    foreignKeys: ['(id) references lab.need (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_oj_expr',
+    about:
+      'a LEFT join nulls its inner side in every padded row, so each computed column of ' +
+      'that side — literal, cast, `IS NULL`, `IS DISTINCT FROM`, `CASE`, `COALESCE`, ' +
+      '`GREATEST` — is refused, not claimed never NULL',
+    origins: ['aid=need.id', 'c=—', 'n=—', 'f=—', 'g=—', 'cs=—', 'co=—', 'gr=—'],
+    notNull: ['aid'],
+    foreignKeys: ['(aid) references lab.need (id)'],
+    primaryKey: 'aid'
+  },
+  {
+    view: 'v_oj_full',
+    about: 'and a FULL join leaves either side nullable the same way',
+    origins: ['aid=need.id', 'c=—', 'n=—'],
+    notNull: [],
+    foreignKeys: ['(aid) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_oj_above',
+    about: 'a literal computed at the join, above the nulling of its inputs, is not nulled by it',
+    origins: ['aid=need.id', 'lit=—'],
+    notNull: ['aid', 'lit'],
+    foreignKeys: ['(aid) references lab.need (id)'],
+    primaryKey: 'aid'
+  },
+  {
+    view: 'v_oj_preserved',
+    about: 'so is an expression over a column of the preserved side',
+    origins: ['aid=need.id', 'preserved=—'],
+    notNull: ['aid', 'preserved'],
+    foreignKeys: ['(aid) references lab.need (id)'],
+    primaryKey: 'aid'
+  },
+  {
+    view: 'v_oj_union_src',
+    about: 'the discrimination source: its `UNION ALL` discriminator is a key of its rows',
+    origins: ['src=—', 'id=need.id', 'nn=need.nn'],
+    notNull: ['src', 'id', 'nn'],
+    foreignKeys: ['(id) references lab.need (id)'],
+    primaryKey: 'src,id'
+  },
+  {
+    view: 'v_oj_union',
+    about:
+      'a `UNION ALL` discriminator read from the nulled side is no discriminator and its ' +
+      'column is refused',
+    origins: ['aid=need.id', 'src=—'],
+    notNull: ['aid'],
+    foreignKeys: ['(aid) references lab.need (id)'],
+    primaryKey: null
   }
 ]
 
 for (const testCase of CASES) {
   test(`${testCase.view}: ${testCase.about}`, () => {
     const derived = derive(testCase.view)
+    // A plan shape the running major builds differently may refuse the view whole; the
+    // expectations are for the major the fixture here was built on.
+    if (
+      testCase.alsoPlanRefusal !== undefined &&
+      derived.planRefusal === testCase.alsoPlanRefusal
+    ) {
+      return
+    }
     assert.deepEqual(derived.origins, testCase.origins)
     assert.deepEqual(derived.notNull, testCase.notNull)
     assert.deepEqual(derived.foreignKeys, testCase.foreignKeys)
     assert.equal(derived.primaryKey, testCase.primaryKey)
+    assert.equal(derived.unique, testCase.unique ?? null)
   })
 }
 
@@ -1595,17 +2122,285 @@ test('every view in the fixture is a case, and every case is in the fixture', ()
 // `Unique` over a `Sort`. None of it may change the answer — including the cases
 // where the answer is "nothing", which have to be nothing every time rather than
 // nothing on the days the plan is shaped wrong.
+// The contract is what reaches the published schema — the origins a column has, the
+// relations and keys derived, and whether the plan was read at all — and it is what
+// `invariance.ts` holds across regimes. The per-column refusal *text* and the notes are
+// diagnostics, and the same shape of plan may name a different reason for the same
+// outcome (a column with no source either way); they are left out of the comparison.
+const contractOf = (derived: ReturnType<typeof derive>): unknown => ({
+  origins: derived.origins,
+  notNull: derived.notNull,
+  foreignKeys: derived.foreignKeys,
+  primaryKey: derived.primaryKey,
+  unique: derived.unique,
+  planRefusal: derived.planRefusal
+})
 for (const regime of REGIMES.filter((name) => name !== DEFAULT_REGIME)) {
   test(`the derivation of every lab view is the same under ${regime}`, () => {
     for (const testCase of CASES) {
       assert.deepEqual(
-        derive(testCase.view, regime),
-        derive(testCase.view),
+        contractOf(derive(testCase.view, regime)),
+        contractOf(derive(testCase.view)),
         `${testCase.view} derives differently under ${regime}`
       )
     }
   })
 }
+
+test('a key whose columns are never NULL is a @primaryKey and never also a @unique', () => {
+  // The two are one reading of the plan at different strengths: where a never-null
+  // key exists it is the `@primaryKey`, and `PgFakeConstraintsPlugin` already makes
+  // that key's rows unique, so a second `@unique` over the same columns would publish
+  // a second constraint saying nothing new.
+  assert.equal(derive('v_bare').primaryKey, 'id')
+  assert.equal(derive('v_bare').unique, null)
+})
+
+test('uniqueness derivation can be turned off, and the refusal of a key is named again', () => {
+  const view = fixture.views.find(
+    (candidate) => candidate.view === 'v_nullable_unique' && candidate.regime === DEFAULT_REGIME
+  )
+  assert.ok(view)
+  const deriveWith = (deriveUnique: boolean) =>
+    deriveViewConstraints(
+      view.schema,
+      view.view,
+      view.relkind,
+      view.columns,
+      readPlanOrigins(
+        view.plan,
+        view.columns.length,
+        subqueryViewCandidates(fixture.viewSources, view.schema, view.view),
+        planCatalog
+      ),
+      catalog,
+      coercions,
+      deriveUnique
+    )
+  assert.equal(deriveWith(true).unique?.tag, 'tag')
+  const off = deriveWith(false)
+  assert.equal(off.unique, null)
+  assert.ok(
+    off.notes.some((note) => note.startsWith('no key:')),
+    'with uniqueness off the key is named as a refusal again'
+  )
+})
+
+test('where the plan and the stored tree name different base columns, the column is refused', () => {
+  const view = fixture.views.find(
+    (candidate) => candidate.view === 'v_bare' && candidate.regime === DEFAULT_REGIME
+  )
+  assert.ok(view)
+  const plan = readPlanOrigins(view.plan, view.columns.length, new Map(), planCatalog)
+  const derived = deriveViewConstraints(
+    view.schema,
+    view.view,
+    view.relkind,
+    view.columns,
+    plan,
+    catalog,
+    coercions,
+    true,
+    // The tree traces column 0 to a different base table than the plan did.
+    new Map([[0, { schema: 'lab', relation: 'currency', column: 'code', relkind: 'r' }]])
+  )
+  assert.equal(derived.columns[0], 'id')
+  assert.equal(derived.origins?.[0], null)
+  assert.equal(derived.columnRefusals[0], 'plan-and-tree-disagree')
+  // The column is refused whole: the tree side, which named `currency.code` for it, is
+  // not read for a foreign key either, and the column is not non-null.
+  assert.deepEqual(
+    derived.foreignKeys.map((foreignKey) => foreignKey.tag),
+    ['(cur_code) references lab.currency (code)']
+  )
+  assert.deepEqual(derived.notNullColumns, ['cur_code'])
+  // A column with no tree entry is left exactly as the plan read it.
+  assert.ok(derived.origins?.[1])
+})
+
+test('a user object anywhere in the database stands its rule spelling down for every view', () => {
+  // A plan prints a name, not the object the name stands for, so a user `count` is
+  // printed exactly like the built-in. The stand-down is taken over the whole database
+  // rather than over one view's dependencies: a user object a view reaches only through
+  // an inlined function's body leaves no dependency edge on the view, and a per-view set
+  // would miss it and trust the built-in's rule for someone else's object. So every
+  // view loses the rule the moment any user object takes the spelling.
+  assert.ok(derive('v_expr_group_count').notNull.includes('n'))
+  const shadowed = new Set(['count'])
+  assert.equal(derive('v_expr_group_count', DEFAULT_REGIME, shadowed).notNull.includes('n'), false)
+  // `count(bank_id)` and `count(distinct bank_id)` read the same spelling and stand down
+  // with it; nothing else in the view moves.
+  assert.deepEqual(derive('v_expr_group_count', DEFAULT_REGIME, shadowed).notNull, ['cur_code'])
+  // The lab itself holds no object under a spelling the rules lean on, so every view
+  // above keeps its rules in force.
+  assert.deepEqual([...shadowedNames], [])
+})
+
+test('a bare built-in spelling reached through an inlined function’s body is refused, not trusted', () => {
+  // The form a per-view set falls for: a view calls a user function that PostgreSQL
+  // inlines, whose body calls a user object under a built-in spelling. The plan for the
+  // view prints that name bare, and the view's own dependencies name only the function,
+  // so a per-view set is empty where the plan really prints a user object. The global
+  // stand-down closes it: the same spelling stands down for every view, table and schema,
+  // so no view is left trusting the built-in for the user's object.
+  // A qualified call names the object itself and keeps the rule: `pg_catalog.count` is
+  // the built-in wherever it is printed, whatever spelling a user object took.
+  const asker = (shadowed: (name: string) => boolean) => ({
+    column: () => 'never-null' as const,
+    hasGroupKey: false,
+    shadowed
+  })
+  assert.equal(
+    evaluateExpression(
+      parseExpression('count((x)::integer)'),
+      asker((name) => name === 'count')
+    ),
+    'unknown'
+  )
+  assert.equal(
+    evaluateExpression(
+      parseExpression('pg_catalog.count((x)::integer)'),
+      asker((name) => name === 'count')
+    ),
+    'never-null'
+  )
+})
+
+test('the shadow set is read once over the whole catalog, not per view', async () => {
+  // The set is one answer for the database, so it is asked once from the functions,
+  // operators and types themselves and never from a view's dependencies (`pg_rewrite`).
+  const issued: string[] = []
+  const query: RunQuery = async <Row>(text: string) => {
+    issued.push(text)
+    return [{ name: 'count' }, { name: 'integer' }] as Row[]
+  }
+  const names = await readShadowedNames(query)
+  assert.deepEqual([...names].sort(), ['count', 'integer'])
+  assert.equal(issued.length, 1)
+  assert.match(issued[0] ?? '', /pg_proc/)
+  assert.match(issued[0] ?? '', /pg_operator/)
+  assert.match(issued[0] ?? '', /pg_type/)
+  assert.doesNotMatch(issued[0] ?? '', /pg_rewrite/)
+})
+
+test('a view’s stored tree is read by field name, and a format it does not know yields nothing', () => {
+  // `view-tree.ts` walks `pg_node_tree`, not SQL. This hand-written tree holds the
+  // fields it reads; the lab fixture is the real guard, a case per version, since a
+  // major-version change to the format would leave the CTE lab views unread.
+  const action =
+    '({QUERY :targetList ({TARGETENTRY :expr <> :resno 1 :resname id :resorigtbl 99 :resorigcol 3}' +
+    ' {TARGETENTRY :expr <> :resno 2 :resname nm :resorigtbl 0 :resorigcol 0})' +
+    ' :cteList ({COMMONTABLEEXPR :ctename live :ctecolnames ("a" "b")})})'
+  const tree = readViewTree(action)
+  assert.equal(tree.ok, true)
+  assert.deepEqual(Object.fromEntries(tree.cteColumns), { live: ['a', 'b'] })
+  assert.deepEqual([...tree.treeOrigins.entries()], [[0, { tableId: 99, attnum: 3 }]])
+  // A range-table alias resolves to the relation it stands for, wherever in the tree
+  // the entry stands; an entry that is not a relation names none.
+  assert.deepEqual(
+    Object.fromEntries(
+      readViewTree(
+        '({QUERY :cteList <> :targetList <> :rtable' +
+          ' ({RANGETBLENTRY :alias {ALIAS :aliasname bank_range :colnames <>}' +
+          ' :rtekind 0 :relid 42} {RANGETBLENTRY :alias {ALIAS :aliasname s :colnames <>}' +
+          ' :rtekind 1 :relid 0})})'
+      ).relationAliases
+    ),
+    { bank_range: 42 }
+  )
+  // An identifier with a space is one escaped token, not two.
+  assert.deepEqual(
+    Object.fromEntries(
+      readViewTree(
+        '({QUERY :targetList <> :cteList ({COMMONTABLEEXPR :ctename *S*\\ 1 :ctecolnames ("x")})})'
+      ).cteColumns
+    ),
+    { '*S* 1': ['x'] }
+  )
+  // A `WITH` name at two query levels is ambiguous: the plan spells both by it and
+  // cannot say which a `CTE Scan` reads, so neither is taken.
+  const shadowed = readViewTree(
+    '({QUERY :targetList <> :cteList ({COMMONTABLEEXPR :ctename live :ctecolnames ("a")})' +
+      ' :rtable ({RANGETBLENTRY :rtekind 1 :alias <> :subquery {QUERY :cteList' +
+      ' ({COMMONTABLEEXPR :ctename live :ctecolnames ("b")}) :targetList <>}})})'
+  )
+  assert.deepEqual(Object.fromEntries(shadowed.cteColumns), {})
+  assert.deepEqual([...shadowed.cteAmbiguous], ['live'])
+  // A constant array (`:constvalue […]`) is read, not treated as a format break.
+  assert.equal(
+    readViewTree(
+      '({QUERY :cteList <> :targetList <> :jointree {FROMEXPR :quals {CONST :constvalue 1 [ 0 0 ]}}})'
+    ).ok,
+    true
+  )
+  // A field the reader needs on a node it reads, missing, is a format change: the whole
+  // tree fails rather than hand back a partial answer.
+  assert.equal(readViewTree('({QUERY :cteList <> :targetList <>})').ok, true)
+  assert.equal(readViewTree('({QUERY :nonesuch 1})').ok, false)
+  assert.equal(
+    readViewTree('({QUERY :cteList ({COMMONTABLEEXPR :ctename live}) :targetList <>})').ok,
+    false
+  )
+  for (const garbage of ['', 'not a tree', '({QUERY])', '({QUERY :x (unclosed}']) {
+    const broken = readViewTree(garbage)
+    assert.equal(broken.ok, false, JSON.stringify(garbage))
+    assert.deepEqual(Object.fromEntries(broken.cteColumns), {})
+    assert.deepEqual([...broken.treeOrigins], [])
+  }
+})
+
+test('the lab holds the stored-tree shapes the reader must survive', () => {
+  const facts = (view: string) =>
+    fixture.views.find(
+      (candidate) => candidate.view === view && candidate.regime === DEFAULT_REGIME
+    )
+  assert.equal(facts('v_cte_where_false')?.treeOk, true)
+  assert.deepEqual(facts('v_cte_where_false')?.cteColumns, { live: ['id', 'cur_code'] })
+  assert.deepEqual(facts('v_cte_name_shadowed')?.cteAmbiguous, ['live'])
+  assert.deepEqual(facts('v_cte_name_shadowed')?.cteColumns, {})
+})
+
+test('a built-in the deparser qualified pg_catalog is the built-in; another schema is a user function', () => {
+  // Where a same-named function shadows the built-in in the search path, the deparser
+  // prints the built-in qualified — `pg_catalog.count(...)` — precisely because the bare
+  // spelling no longer resolves to it. That qualified call is the built-in, so its rule
+  // holds; a call under another schema is that schema's own function and holds nothing.
+  const asker = (shadowed: (name: string) => boolean) => ({
+    column: () => 'never-null' as const,
+    hasGroupKey: false,
+    shadowed
+  })
+  assert.equal(
+    evaluateExpression(
+      parseExpression('pg_catalog.count((x)::integer)'),
+      asker(() => false)
+    ),
+    'never-null'
+  )
+  // The rule holds even where the view took a user `count` elsewhere: the qualified
+  // spelling is the built-in regardless.
+  assert.equal(
+    evaluateExpression(
+      parseExpression('pg_catalog.count((x)::integer)'),
+      asker((name) => name === 'count')
+    ),
+    'never-null'
+  )
+  assert.equal(
+    evaluateExpression(
+      parseExpression('adv.count((x)::integer)'),
+      asker(() => false)
+    ),
+    'unknown'
+  )
+  assert.equal(
+    evaluateExpression(
+      parseExpression('count((x)::integer)'),
+      asker((name) => name === 'count')
+    ),
+    'unknown'
+  )
+})
 
 test('a reference parses; anything with structure does not', () => {
   assert.deepEqual(parseReference('b1.cur_id'), {
@@ -1997,6 +2792,48 @@ test('with no privileged connection the materialized view is named, not passed o
   ])
 })
 
+test('the report names the built-in spellings a user object has taken over', async () => {
+  // The rules a shadowed spelling carries stand down for every view, so the set is
+  // carried on the result: a surface that derives less than expected is read against it
+  // rather than taken for one with nothing to derive.
+  const issued: string[] = []
+  const surface = runnerRecording(issued, 'surface', {
+    'FROM pg_class class': TWO_VIEWS,
+    EXPLAIN: ONE_COLUMN_PLAN,
+    'FROM pg_proc': [{ name: 'count' }, { name: 'integer' }]
+  })
+  const collected = await collectViewConstraints(surface, ['lab'], null)
+  assert.deepEqual(collected.shadowedNames, ['count', 'integer'])
+  // The fake connection answers no version, so the stored tree is left unread and the
+  // view says so rather than looking like one with no `WITH` query at all.
+  assert.deepEqual(
+    collected.derivations[0]?.notes.filter((note) => note.includes('stored rewrite tree')),
+    [TREE_FORMAT_UNCHECKED_REASON]
+  )
+})
+
+test('the stored rewrite tree is read only on a major the format is checked against', async () => {
+  const asked = (version: number) => {
+    const issued: string[] = []
+    const query: RunQuery = async <Row>(text: string) => {
+      issued.push(text)
+      if (text.includes('server_version_num')) return [{ version }] as Row[]
+      return [{ schema: 'lab', view: 'v', action: '({QUERY :targetList <> :cteList <>})' }] as Row[]
+    }
+    return { issued, read: readViewTrees(query, ['lab']) }
+  }
+  const checked = asked(180000)
+  assert.equal((await checked.read).supported, true)
+  assert.ok(checked.issued.some((text) => text.includes('ev_action')))
+  // A major outside the range is not read at all: the stored action is never queried,
+  // so the plan's own refusals stand where the tree's facts would have and the format is
+  // a missed derivation rather than a guessed one.
+  const unchecked = asked(190000)
+  assert.equal((await unchecked.read).supported, false)
+  assert.deepEqual((await unchecked.read).trees.size, 0)
+  assert.ok(!unchecked.issued.some((text) => text.includes('ev_action')))
+})
+
 // ── The refusals are a closed list, and every one of them has a case ─────────────
 //
 // A view that derives nothing has to say which refusal it is, or "nothing derived"
@@ -2010,16 +2847,17 @@ test('with no privileged connection the materialized view is named, not passed o
 // that had no answer for those would have to invent one, and their cases are plans
 // built by hand here — the same way the join type this reader does not know is held.
 const REFUSAL_CASES: Record<PlanRefusal | ColumnRefusal, string> = {
-  'unreadable-set-operation': 'v_except',
-  'set-operation-not-a-select-list': 'v_union_distinct',
+  'unreadable-set-operation': 'v_recursive',
+  'set-operation-not-a-select-list': 'v_union_nested',
   'output-not-positional': 'a plan built by hand, below',
   'not-a-column-reference': 'v_coalesce',
   'unqualified-name-without-a-sole-relation': 'a plan built by hand, above',
   'no-value-from-any-branch': 'v_null_column',
-  'through-a-materialized-with': 'v_cte',
-  'through-an-unpinned-subquery': 'v_aliased_barrier',
+  'through-a-materialized-with': 'a plan built by hand, below',
+  'through-an-unpinned-subquery': 'v_sale_store_totals',
   'through-a-row-source-the-catalog-does-not-name': 'v_function_scan',
-  'cast-not-value-preserving': 'v_over_barrier_narrowing'
+  'cast-not-value-preserving': 'v_over_barrier_narrowing',
+  'plan-and-tree-disagree': 'a plan and a tree built by hand, below'
 }
 
 test('the closed list of refusals is exactly the list with cases', () => {
@@ -2114,6 +2952,99 @@ test('a Subquery Scan is crossed only where the catalog pins it to one view', ()
     'through-an-unpinned-subquery',
     'through-an-unpinned-subquery'
   ])
+})
+
+test('a CTE Scan is read only where the stored tree names the query’s columns and its subplan is proved', () => {
+  // The plan prints `live.<col>` and the subplan prints the query's select list in
+  // order, but the map from the names to the positions is not in the plan — it comes
+  // from the view's stored rewrite tree. Without it the scan is refused, as before, and
+  // so is a subplan whose columns' origins do not line up with the query's own.
+  const cte: ExplainPlanNode = {
+    'Node Type': 'Seq Scan',
+    'Subplan Name': 'CTE live',
+    Alias: 't',
+    Schema: 'lab',
+    'Relation Name': 'tx',
+    Output: ['t.id', 't.cur_code']
+  }
+  const scan: ExplainPlanNode = {
+    'Node Type': 'CTE Scan',
+    'CTE Name': 'live',
+    Alias: 'live',
+    Output: ['live.cur_code']
+  }
+  const plan: ExplainPlanNode = {
+    'Node Type': 'Result',
+    Output: ['live.cur_code'],
+    Plans: [scan, cte]
+  }
+  const without = readPlanOrigins(plan, 1, new Map(), planCatalog)
+  assert.ok(typeof without !== 'string')
+  assert.deepEqual(without.refusals, ['through-a-materialized-with'])
+  // The query's own columns are `lab.tx.id` and `lab.tx.cur_code`, it is materialized so
+  // its own scan is expected, and the one subplan prints those origins position for
+  // position: it is proved and read.
+  const withMap = planCatalogFrom(
+    catalog,
+    fixture.strictEquality,
+    new Set(),
+    new Map([['live', ['id', 'cur_code']]]),
+    new Map([
+      [
+        'live',
+        [
+          { schema: 'lab', relation: 'tx', column: 'id' },
+          { schema: 'lab', relation: 'tx', column: 'cur_code' }
+        ]
+      ]
+    ]),
+    new Map([['live', true]]),
+    new Map([['live', 1]])
+  )
+  const origins = readPlanOrigins(plan, 1, new Map(), withMap)
+  assert.ok(typeof origins !== 'string')
+  assert.deepEqual(
+    origins.columns.map(
+      (sources) => sources?.map((origin) => `${origin.relation}.${origin.column}`).join('|') ?? '—'
+    ),
+    ['tx.cur_code']
+  )
+  // A subplan whose columns' origins are not the query's own is not proved: refused.
+  const mismatched = planCatalogFrom(
+    catalog,
+    fixture.strictEquality,
+    new Set(),
+    new Map([['live', ['id', 'cur_code']]]),
+    // The query's second column is an expression where the subplan names a base column.
+    new Map([['live', [{ schema: 'lab', relation: 'tx', column: 'id' }, null]]]),
+    new Map([['live', true]]),
+    new Map([['live', 1]])
+  )
+  const refused = readPlanOrigins(plan, 1, new Map(), mismatched)
+  assert.ok(typeof refused !== 'string')
+  assert.deepEqual(refused.refusals, ['through-a-materialized-with'])
+  // And a `WITH` query this view inlines has no scan of its own, so a `CTE Scan` of the
+  // name is another query's and is refused even where the map and the origins both fit.
+  const inlined = planCatalogFrom(
+    catalog,
+    fixture.strictEquality,
+    new Set(),
+    new Map([['live', ['id', 'cur_code']]]),
+    new Map([
+      [
+        'live',
+        [
+          { schema: 'lab', relation: 'tx', column: 'id' },
+          { schema: 'lab', relation: 'tx', column: 'cur_code' }
+        ]
+      ]
+    ]),
+    new Map([['live', false]]),
+    new Map([['live', 1]])
+  )
+  const inlinedRefused = readPlanOrigins(plan, 1, new Map(), inlined)
+  assert.ok(typeof inlinedRefused !== 'string')
+  assert.deepEqual(inlinedRefused.refusals, ['through-a-materialized-with'])
 })
 
 // ── A relation led to a projection ──────────────────────────────────────────────

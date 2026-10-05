@@ -22,12 +22,16 @@ import pg from 'pg'
 import {
   explainStatement,
   readCatalogRelations,
+  readRelationOids,
   readShadowedNames,
   readStrictEquality,
   readTables,
   readTypeCoercions,
+  readViewTrees,
   readViews,
-  readViewSources
+  readViewSources,
+  resolveCteOrigins,
+  resolveTreeColumns
 } from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { RunQuery } from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { ExplainPlanNode } from '../src/PgViewConstraintsPlugin/plan-origins.ts'
@@ -79,6 +83,8 @@ const PLAN_FIELDS = [
   'Index Name',
   'Group Key',
   'Partial Mode',
+  'CTE Name',
+  'Subplan Name',
   'Hash Cond',
   'Merge Cond',
   'Join Filter',
@@ -129,7 +135,22 @@ await lab.query(readFileSync(LAB_SQL, 'utf8'))
 const catalog = await readCatalogRelations(runQueryOn(lab))
 const coercions = await readTypeCoercions(runQueryOn(lab))
 const strictEquality = await readStrictEquality(runQueryOn(lab))
-const shadowedNames = await readShadowedNames(runQueryOn(lab))
+// The rule spellings a user object has taken over in the lab: the names whose rule
+// stands down database-wide.
+const shadowedNames = [...(await readShadowedNames(runQueryOn(lab)))].sort()
+// Each view's stored rewrite tree: its CTE columns and the base column each of its own
+// columns came from. Read only on a major the format is checked against — the fixture
+// is the lab for those majors, and one built without its trees would carry empty CTE
+// maps that look like a database with no `WITH` query at all.
+const treeRead = await readViewTrees(runQueryOn(lab), ['lab'])
+if (!treeRead.supported) {
+  throw new Error(
+    'the lab fixture is built on a PostgreSQL major outside the range the stored ' +
+      'rewrite tree is read against (15–18); build it on one of those'
+  )
+}
+const viewTrees = treeRead.trees
+const relationOids = await readRelationOids(runQueryOn(lab))
 const views = await readViews(runQueryOn(lab), ['lab'])
 // The tables of the lab, each a referencing half of a relation to a projection.
 const tables = await readTables(runQueryOn(lab), ['lab'])
@@ -152,12 +173,33 @@ for (const regime of REGIMES) {
     )
     const plan = rows.rows[0]?.['QUERY PLAN']?.[0]?.Plan
     if (!plan) throw new Error(`${view.view}: EXPLAIN returned no plan`)
+    const facts = viewTrees.get(`lab.${view.view}`)
+    // Each range-table alias the view's stored tree names, resolved to the relation it
+    // stands for, so a `Subquery Scan` spelled with an explicit alias is crossable.
+    const viewAliases = Object.fromEntries(
+      [...(facts?.relationAliases ?? [])].flatMap(([alias, relid]) => {
+        const relation = relationOids.get(relid)
+        return relation ? [[alias, relation.relation]] : []
+      })
+    )
     planned.push({
       schema: view.schema,
       view: view.view,
       relkind: view.relkind,
       regime: regime.name,
       columns,
+      treeOk: facts?.ok ?? false,
+      cteColumns: Object.fromEntries(facts?.cteColumns ?? new Map()),
+      cteOrigins: Object.fromEntries(
+        resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map())
+      ),
+      cteAmbiguous: [...(facts?.cteAmbiguous ?? [])].sort(),
+      cteMaterialized: Object.fromEntries(facts?.cteMaterialized ?? new Map()),
+      cteRefCount: Object.fromEntries(facts?.cteRefCount ?? new Map()),
+      treeColumns: Object.fromEntries(
+        resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map())
+      ),
+      viewAliases,
       plan: prune(plan)
     })
   }
@@ -211,7 +253,7 @@ writeFileSync(
         )
       },
       strictEquality,
-      shadowedNames: [...shadowedNames].sort(),
+      shadowedNames,
       tables,
       viewSources,
       views: planned

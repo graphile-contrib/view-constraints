@@ -42,6 +42,13 @@ create unique index slot_tag_key on slot (tag);
 create view v_bare as select id, cur_code from tx;
 create view v_left_join as
   select t.id, b.id as bank_id, t.cur_code from tx t left join bank b on b.id = t.bank_id;
+-- NEGATIVE: a group key taken from the nulled side of an outer join is no row identity
+-- for a `@unique` either, under the same guard a `@primaryKey` is taken under. Every
+-- padded row carries the same NULL there, so the key cannot tell those rows apart.
+create view v_left_group_nulled as
+  select b.id as bank_id, count(*) as n
+  from tx t left join bank b on b.id = t.bank_id
+  group by b.id;
 create view v_group as select cur_code, count(*) as n from tx group by cur_code;
 create view v_window as
   select id, cur_code, row_number() over (partition by cur_code order by id) as rn from tx;
@@ -62,6 +69,11 @@ create view v_cte as
   select live.id, live.cur_code, max(paired.amount) as top_amount
   from live join live paired on paired.cur_code = live.cur_code
   group by live.id, live.cur_code;
+-- POSITIVE: a computed column of a materialized WITH query is read at the entry the
+-- subplan prints — here a `count` inside the query, never NULL.
+create view v_cte_aggregate as
+  with totals as materialized (select cur_code, count(*) as n from tx group by cur_code)
+  select cur_code, n from totals;
 create view v_unique_key as select code from asset;
 create materialized view m_tx as select id, cur_code, amount from tx;
 
@@ -191,10 +203,44 @@ create view v_aliased_barrier as select t.id, t.cur_code from v_barrier t;
 -- NEGATIVE: a column that is a NULL literal all the way up contributes no value.
 create view v_null_column as select id, NULL::text as cur_code from tx;
 
--- NEGATIVE: a set operation that is not a union reads its input as one tagged
--- stream, and there is no branch to read a column off.
+-- POSITIVE: a set operation's branches are read one by one wherever it stands. An
+-- `EXCEPT`/`INTERSECT` prints its branches directly; a `UNION` under a grouping prints
+-- the union's columns inside the aggregate, and a column of the result is the value at
+-- that position of whichever branch a row came from.
 create view v_except as
   select id, cur_code from tx except select id, cur_code from wallet;
+create view v_intersect as
+  select id, cur_code from tx intersect select id, cur_code from wallet;
+
+-- POSITIVE: a grouping over a `UNION ALL` — the shape the ledger totals are built
+-- from. The group key proxies both branches, and the aggregates read the union's
+-- columns.
+create view v_union_grouped as
+  select sid, cur_code, sum(amount) as total, count(*) as n
+  from (
+    select t.id as sid, t.cur_code, t.amount from tx t
+    union all
+    select r.id, r.cur_code, 0::numeric from refund r
+  ) u
+  group by sid, cur_code;
+
+-- NEGATIVE: a set operation over another cannot tell its branches apart — the same
+-- spelling names a column of both — so no column of it is read.
+create view v_union_nested as
+  select id, cur_code from tx
+  union all
+  select id, cur_code
+  from (select id, cur_code from tx union select id, cur_code from wallet) w;
+
+-- NEGATIVE: a recursive WITH reads its own output as one tagged stream, so a column
+-- has no branch to be read off.
+create view v_recursive as
+  with recursive walk as (
+    select t.id, t.bank_id from tx t where t.bank_id is null
+    union all
+    select t.id, t.bank_id from tx t join walk w on w.id = t.bank_id
+  )
+  select id, bank_id from walk;
 
 -- NEGATIVE: a row source the catalog has nothing to say about. A function scan
 -- carries an alias like any other scan and names no relation.
@@ -666,3 +712,287 @@ create view v_expr_is_tests as
 -- so an aggregate over it answers NULL when the input is empty.
 create view v_expr_group_by_empty as
   select min(amount) as lo, avg(amount) as mean from tx group by ();
+
+-- POSITIVE: `count` is 0 over no rows, so it is never NULL in the grand-total and
+-- subtotal rows of `GROUP BY ()`, `ROLLUP`, `CUBE` and `GROUPING SETS` alike — the
+-- one aggregate SQL defines over the rows themselves rather than over their values.
+-- `ROLLUP`/`CUBE`/`()` all reach the plan as a node computing `GROUPING SETS`, the
+-- same node an explicit `GROUPING SETS` builds; PostgreSQL does not pull a view using
+-- the explicit spelling up into the query above it, so the case is written with the
+-- spellings that do flatten.
+create view v_group_by_empty_count as
+  select min(amount) as lo, count(*) as n from tx group by ();
+create view v_group_count_rollup as
+  select id, count(*) as n, count(bank_id) as some_n from tx group by rollup (id);
+create view v_group_count_cube as select id, count(*) as n from tx group by cube (id);
+
+-- ── A `WITH` name at two query levels ───────────────────────────────────────────
+--
+-- The plan spells a `CTE Scan` with the `WITH` query's own name and never says which
+-- level it reads, so a name two `WITH` queries share is ambiguous: the reader takes
+-- neither rather than read one level's column off another level's subplan. The tables
+-- carry rows so that a case which crossed the wrong level would emit a tag the rows
+-- contradict.
+
+create table need (id int primary key, nn int not null, nul int);
+insert into need values (1, 10, null), (2, 20, 5);
+create table need_ref (id int primary key, need_id int not null references need(id), note text);
+insert into need_ref values (1, 1, 'a'), (2, 2, 'b');
+
+-- NEGATIVE: the outer `live` and the lateral `live` share a name. The true `inner_x.y`
+-- is `need.nul` (nullable), but the top `live`'s subplan computes `need.nn`; a reader
+-- that picked the first subplan would call it never NULL.
+create view v_cte_name_shadowed as
+  with live as materialized (select id as x, nn as y from need)
+  select outer_live.x, inner_x.y
+  from live outer_live
+  join lateral (
+    with live as materialized (select n.nul as y, n.id as x from need n)
+    select il.x, il.y from live il
+  ) inner_x on inner_x.x = outer_live.x;
+
+-- NEGATIVE: the same shape with a relation in play. The true `inner_x.inner_v` is
+-- `need.nn` (no foreign key); the top `live`'s subplan computes `need_ref.need_id`
+-- (which references `need`), so a reader that picked the first subplan would lead a
+-- foreign key the rows do not carry.
+create view v_cte_name_shadowed_fk as
+  with live as materialized (select need_ref.need_id as v from need_ref)
+  select outer_live.v, inner_x.inner_v
+  from live outer_live
+  join lateral (
+    with live as materialized (select n.nn as v from need n)
+    select il.v as inner_v from live il
+  ) inner_x on inner_x.inner_v = outer_live.v;
+
+-- POSITIVE: a constant array in the stored tree (`:constvalue … [ … ]`, what a
+-- `WHERE false` writes) does not break the walk, so the `WITH` query still reads.
+create view v_cte_where_false as
+  with live as materialized (select id, cur_code from tx)
+  select live.id, live.cur_code from live where false;
+
+-- ── A `WITH` name shared across the views a query goes through ──────────────────
+--
+-- The plan spells a `CTE Scan` with the `WITH` query's own name and never says which
+-- view's query it is. A name the analysed view and one of its source views both define
+-- — the source's materialized, so it leaves a `CTE live` subplan, the analysed view's
+-- inlined, so its own tree shows no clash — cannot be pinned to either, and reading it
+-- off the analysed view's map puts the source's columns behind the wrong names. The
+-- data is here so a case that crossed the wrong query would emit a tag the rows
+-- contradict.
+
+create table parent (id int primary key);
+create table child (id int primary key, ref int not null references parent(id), plain int not null);
+insert into parent values (1);
+insert into child values (1, 1, 5);
+
+-- NEGATIVE: `v_cte_cross_view.sx` is `v_cte_cross_src.x`, a nullable `need.nul`, but the
+-- source's own `live` computes `need.nn` at the position `x` stands at in the analysed
+-- view's `live`.
+create view v_cte_cross_src as
+  with live as materialized (select id as k, nn as y, nul as x from need)
+  select a.k, a.x from live a join live b using (k);
+create view v_cte_cross_view as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.x as sx from live o join v_cte_cross_src s on s.k = o.y;
+
+-- NEGATIVE: the same with a key in play. `sx` is `child.plain`, no key, but the source's
+-- `live` computes `child.ref` at that position, which references `parent`.
+create view v_cte_cross_src_fk as
+  with live as materialized (select id as k, ref as y, plain as x from child)
+  select a.k, a.x from live a join live b using (k);
+create view v_cte_cross_view_fk as
+  with live as (select id as y, ref as x from child)
+  select o.y as oy, s.x as sx from live o join v_cte_cross_src_fk s on s.k = o.y;
+
+-- NEGATIVE: a source reached through two views, so the clash is not direct.
+create view v_cte_cross_mid as
+  with live as materialized (select id as k, nn as y, nul as x from need)
+  select a.k, a.x from live a join live b using (k);
+create view v_cte_cross_src2 as select k, x from v_cte_cross_mid;
+create view v_cte_cross_view_two as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.x as sx from live o join v_cte_cross_src2 s on s.k = o.y;
+
+-- NEGATIVE: both `live` queries inlined, so the plan carries no subplan of that name and
+-- the source's `live` leaves no trace; the clash is still refused rather than read.
+create view v_cte_cross_src_once as
+  with live as (select id as k, nul as x from need)
+  select k, x from live;
+create view v_cte_cross_view_inlined as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.x as sx from live o join v_cte_cross_src_once s on s.k = o.y;
+
+-- ── A `WITH` name reached through a source the surface does not read ─────────────
+--
+-- A `WITH` name can stand in a view outside the surface, or in a SQL function the view
+-- inlines, where neither its tree nor its sources are read. Nothing then names the owner
+-- of the `CTE <name>` subplan the plan carries, so the subplan is read only where it is
+-- proved to be the analysed view's own query by its columns' origins, position for
+-- position (`provedSubplan`). The data is here so a wrong reading would emit a tag the
+-- rows contradict.
+
+create schema lab_other;
+set search_path = lab_other;
+-- A source view outside the surface (its tree is never read for the surface's views).
+create view src_os as
+  with live as materialized (select id as k, nn as y, nul as x from lab.need)
+  select a.k, a.x from live a join live b using (k);
+-- The same shape as the analysed view's own `live`: the origins line up, so the subplan
+-- is read correctly even though it is another query's.
+create view src_coinciding as
+  with live as materialized (select id as y, nn as x from lab.need)
+  select a.y, a.x from live a join live b using (y);
+-- The key variant's source.
+create view src_os_fk as
+  with live as materialized (select id as k, ref as y, plain as x from lab.child)
+  select a.k, a.x from live a join live b using (k);
+set search_path = lab;
+
+-- NEGATIVE: `sx` is `lab_other.src_os.x`, a nullable `need.nul`; the source's own `live`
+-- prints three columns where the analysed view's has two, so no subplan is proved.
+create view v_cte_foreign_view as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.x as sx from live o join lab_other.src_os s on s.k = o.y;
+-- NEGATIVE: and with a key: `sx` is `child.plain`, no key, where the foreign `live`'s
+-- matching position computes `child.ref`.
+create view v_cte_foreign_view_fk as
+  with live as (select id as y, ref as x from child)
+  select o.y as oy, s.x as sx from live o join lab_other.src_os_fk s on s.k = o.y;
+-- POSITIVE: the foreign subplan's origins line up position for position, so it is read
+-- and the column is the real `need.nn` — not NULL.
+create view v_cte_coinciding as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.x as sx from live o join lab_other.src_coinciding s on s.y = o.y;
+
+-- NEGATIVE: an inlined `STABLE` SQL function with its own `live`, its columns out of
+-- step with the analysed view's.
+create function f_live() returns table (x int, y int) language sql stable as $$
+  with live as materialized (select nn as x, nul as y from need) select x, y from live $$;
+create view v_cte_function_lateral as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.y as sy from live o cross join lateral f_live() s;
+create view v_cte_function as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.y as sy from live o, f_live() s;
+-- NEGATIVE: the same with a key in play.
+create function f_live_fk() returns table (x int, y int) language sql stable as $$
+  with live as materialized (select ref as x, plain as y from child) select x, y from live $$;
+create view v_cte_function_fk as
+  with live as (select id as y, ref as x from child)
+  select o.y as oy, s.x as sx from live o cross join lateral f_live_fk() s;
+
+-- ── A foreign `WITH` whose columns are swapped ──────────────────────────────────
+--
+-- A subplan can match the analysed view's own `WITH` query by every column's origin and
+-- still be another query's, whose columns carry other names in another order. The
+-- column's position is looked up by name in the analysed view's own map, so the scan is
+-- read only where it is this view's own range-table entry reading its `WITH` query
+-- (`cteRefAliases`, from the tree's `RTE_CTE`). Here the origins line up as `[nul, nn]`
+-- both ways, but the source's names are `[q, p]` where the view's are `[p, q]`.
+
+create view v_cte_swap_src as
+  with live as materialized (select nul as q, nn as p from need)
+  select a.q, a.p from live a join live b on a.q is not distinct from b.q;
+create view v_cte_swap as
+  with live as (select nul as p, nn as q from need)
+  select o.p as op, s.q as sq, s.p as sp
+  from live o join v_cte_swap_src s on s.p = o.q;
+
+-- NEGATIVE: the same with a key. The source's `live` computes `[plain, ref]`; the view's
+-- own `live` computes `[plain, ref]` too, so the origins line up, but the foreign names
+-- are `[q, p]` where the view's are `[p, q]` and `sq` — really `plain` — must not be led
+-- to `parent` over a `ref` read from the wrong position.
+create view v_cte_swap_src_fk as
+  with live as materialized (select plain as q, ref as p from child)
+  select a.q, a.p from live a join live b on a.q is not distinct from b.q;
+create view v_cte_swap_fk as
+  with live as (select plain as p, ref as q from child)
+  select o.p as op, s.q as sq, s.p as sp
+  from live o join v_cte_swap_src_fk s on s.p = o.q;
+
+-- ── A `WITH` name shared with a query whose alias matches ───────────────────────
+--
+-- The alias a `CTE Scan` carries is only a name, and a source and the view can both
+-- write the same one: `live l` in both. What places the scan is that a plan carries a
+-- `CTE Scan` only for a `WITH` query PostgreSQL materializes, and the view's own
+-- `WITH` query of that name (its `:ctematerialized`, `:cterefcount`, `:cterecursive`)
+-- says whether it is one of those.
+
+-- NEGATIVE: the view's own `live` is referenced once, so the default inlines it and it
+-- has no scan; the source's `live` (referenced twice, materialized) is the only one, and
+-- its columns are `q, p` where the view's are `p, q`.
+create view v_cte_alias_src as
+  with live as materialized (select nul as q, nn as p from need)
+  select l.q, l.p from live l join live l2 on l.q is not distinct from l2.q;
+create view v_cte_alias as
+  with live as (select nul as p, nn as q from need)
+  select l.p as op, s.q as sq, s.p as sp
+  from live l join v_cte_alias_src s on s.p = l.q;
+
+-- NEGATIVE: both `live` queries are referenced twice, so both materialize and the plan
+-- carries two `CTE live` subplans; nothing says which a scan reads.
+create view v_cte_ab_src as
+  with live as materialized (select nul as q, nn as p from need)
+  select l.q, l.p from live l join live l2 on l.q is not distinct from l2.q;
+create view v_cte_ab as
+  with live as (select nul as p, nn as q from need)
+  select a.p as op, b.q as oq
+  from live a join live b on a.p = b.p
+  join v_cte_ab_src s on s.p = a.q;
+
+-- POSITIVE: a `WITH` query referenced once is inlined, so its columns come straight off
+-- the base relation and know nothing of a `CTE Scan`.
+create view v_cte_ref_once as
+  with live as (select id as p, nn as q from need)
+  select p, q from live;
+-- POSITIVE: `NOT MATERIALIZED` inlines even a repeated `WITH` query.
+create view v_cte_not_materialized as
+  with live as not materialized (select id as p, nn as q from need)
+  select a.p, a.q from live a join live b on a.p = b.p;
+-- NEGATIVE: a `WITH` query the tree reads as inlined, but a volatile body materializes:
+-- the plan carries a scan of it, and the reader refuses rather than trust the guess.
+create view v_cte_volatile as
+  with live as (select nul as p, nn as q, random() as r from need)
+  select p, q from live;
+-- NEGATIVE: a recursive `WITH` reads its own output as one tagged stream.
+create view v_cte_recursive as
+  with recursive walk as (
+    select id, nul from need where id = 1
+    union all
+    select n.id, n.nul from need n join walk w on w.id = n.id
+  )
+  select id, nul from walk;
+
+-- ── A computed value from the nulled side of an outer join ──────────────────────
+--
+-- A relation with no base column — a literal, a `CAST`, a `CASE`, a `COALESCE`, an
+-- `IS` test — is printed by the join that nulls its input, and the join nulls it in
+-- every padded row. The expression rules must not claim it never NULL there, and a
+-- `UNION ALL` discriminator read from a nulled side is no discriminator.
+
+create view v_oj_expr_src as
+  select id, 'x'::text as c, '5'::int as n, (id is null) as f, (id is distinct from 0) as g,
+         case when id > 0 then 'y' else 'z' end as cs, coalesce(id, 7) as co, greatest(id, 1) as gr
+  from need;
+-- NEGATIVE: every computed column of the nulled side is NULL wherever the join pads.
+create view v_oj_expr as
+  select a.id as aid, s.c, s.n, s.f, s.g, s.cs, s.co, s.gr
+  from need a left join v_oj_expr_src s on s.id = a.id;
+-- NEGATIVE: a FULL join leaves both sides nullable.
+create view v_oj_full as
+  select a.id as aid, s.c, s.n from need a full join v_oj_expr_src s on s.id = a.id;
+-- POSITIVE: a literal computed above the join is not nulled by it.
+create view v_oj_above as
+  select a.id as aid, 'z'::text as lit from need a left join v_oj_expr_src s on s.id = a.id;
+-- POSITIVE: an expression over the preserved side is not nulled.
+create view v_oj_preserved as
+  select a.id as aid, coalesce(a.id, 0) as preserved from need a left join v_oj_expr_src s on s.id = a.id;
+
+-- NEGATIVE: a `UNION ALL` discriminator on the nulled side is no discriminator, and its
+-- column is NULL wherever the join pads.
+create view v_oj_union_src as
+  select 'a'::text as src, id, nn from need
+  union all
+  select 'b'::text, id, nn from need;
+create view v_oj_union as
+  select a.id as aid, u.src from need a left join v_oj_union_src u on u.id = a.id;
