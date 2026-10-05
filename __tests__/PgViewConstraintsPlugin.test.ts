@@ -136,6 +136,7 @@ function derive(
   notNull: string[]
   foreignKeys: string[]
   primaryKey: string | null
+  unique: string | null
   planRefusal: PlanRefusal | null
   refusals: (ColumnRefusal | null)[]
   notes: string[]
@@ -168,6 +169,7 @@ function derive(
     notNull: derivation.notNullColumns,
     foreignKeys: derivation.foreignKeys.map((foreignKey) => foreignKey.tag),
     primaryKey: derivation.primaryKey?.tag ?? null,
+    unique: derivation.unique?.tag ?? null,
     planRefusal: derivation.planRefusal,
     refusals: derivation.columnRefusals,
     notes: derivation.notes
@@ -183,6 +185,11 @@ interface Case {
   notNull: string[]
   foreignKeys: string[]
   primaryKey: string | null
+  /**
+   * The `@unique` tag derived for the view, where the plan proves a key whose columns
+   * may be NULL. Left out on the cases that prove none, which is asserted to be none.
+   */
+  unique?: string
 }
 
 const CASES: Case[] = [
@@ -268,11 +275,13 @@ const CASES: Case[] = [
     view: 'v_cte',
     about:
       'a WITH query referenced twice is materialized, and the wall it puts up is not ' +
-      'crossed: the plan holds no map from its column names to its select list',
+      'crossed: the plan holds no map from its column names to its select list — ' +
+      'though the group key is still a proven @unique of the columns it groups by',
     origins: ['id=—', 'cur_code=—', 'top_amount=—'],
     notNull: [],
     foreignKeys: [],
-    primaryKey: null
+    primaryKey: null,
+    unique: 'id,cur_code'
   },
   {
     view: 'v_unique_key',
@@ -390,11 +399,14 @@ const CASES: Case[] = [
   },
   {
     view: 'v_nullable_unique',
-    about: 'a unique index over a nullable column identifies no row and is no key',
+    about:
+      'a unique index over a nullable column identifies no row of the table, so it is ' +
+      'no @primaryKey — but no two rows share the value, which is a proven @unique',
     origins: ['tag=slot.tag'],
     notNull: [],
     foreignKeys: [],
-    primaryKey: null
+    primaryKey: null,
+    unique: 'tag'
   },
 
   // ── Non-nullness: what the shape of the plan gives, and what it takes away ─────
@@ -1184,22 +1196,26 @@ const CASES: Case[] = [
   },
   {
     view: 'v_group_nullable',
-    about: 'a group key over a column that can be NULL is no row identity',
+    about:
+      'a group key over a column that can be NULL is no row identity — but every row ' +
+      'stands for a distinct combination, so the key is a proven @unique',
     origins: ['cur_code=tx.cur_code', 'bank_id=tx.bank_id', 'n=—'],
     notNull: ['cur_code', 'n'],
     foreignKeys: [
       '(bank_id) references lab.bank (id)',
       '(cur_code) references lab.currency (code)'
     ],
-    primaryKey: null
+    primaryKey: null,
+    unique: 'cur_code,bank_id'
   },
   {
     view: 'v_distinct_nullable',
-    about: 'nor is a de-duplication over one',
+    about: 'nor is a de-duplication over one — and it is a @unique all the same',
     origins: ['bank_id=tx.bank_id'],
     notNull: [],
     foreignKeys: ['(bank_id) references lab.bank (id)'],
-    primaryKey: null
+    primaryKey: null,
+    unique: 'bank_id'
   },
   {
     view: 'v_group_expression',
@@ -1602,6 +1618,7 @@ for (const testCase of CASES) {
     assert.deepEqual(derived.notNull, testCase.notNull)
     assert.deepEqual(derived.foreignKeys, testCase.foreignKeys)
     assert.equal(derived.primaryKey, testCase.primaryKey)
+    assert.equal(derived.unique, testCase.unique ?? null)
   })
 }
 
@@ -1635,6 +1652,45 @@ for (const regime of REGIMES.filter((name) => name !== DEFAULT_REGIME)) {
     }
   })
 }
+
+test('a key whose columns are never NULL is a @primaryKey and never also a @unique', () => {
+  // The two are one reading of the plan at different strengths: where a never-null
+  // key exists it is the `@primaryKey`, and `PgFakeConstraintsPlugin` already makes
+  // that key's rows unique, so a second `@unique` over the same columns would publish
+  // a second constraint saying nothing new.
+  assert.equal(derive('v_bare').primaryKey, 'id')
+  assert.equal(derive('v_bare').unique, null)
+})
+
+test('uniqueness derivation can be turned off, and the refusal of a key is named again', () => {
+  const view = fixture.views.find(
+    (candidate) => candidate.view === 'v_nullable_unique' && candidate.regime === DEFAULT_REGIME
+  )
+  assert.ok(view)
+  const deriveWith = (deriveUnique: boolean) =>
+    deriveViewConstraints(
+      view.schema,
+      view.view,
+      view.relkind,
+      view.columns,
+      readPlanOrigins(
+        view.plan,
+        view.columns.length,
+        subqueryViewCandidates(fixture.viewSources, view.schema, view.view),
+        planCatalog
+      ),
+      catalog,
+      coercions,
+      deriveUnique
+    )
+  assert.equal(deriveWith(true).unique?.tag, 'tag')
+  const off = deriveWith(false)
+  assert.equal(off.unique, null)
+  assert.ok(
+    off.notes.some((note) => note.startsWith('no key:')),
+    'with uniqueness off the key is named as a refusal again'
+  )
+})
 
 test('a reference parses; anything with structure does not', () => {
   assert.deepEqual(parseReference('b1.cur_id'), {

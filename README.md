@@ -46,6 +46,22 @@ is only used to show the join does not multiply rows: whether the planner keeps 
 read across a cast. Only a key that is one base relation's own can be the target
 of a relation to a projection.
 
+## Uniqueness
+
+Where the plan proves a set of the view's columns no two rows share but that set is
+not also never-`NULL`, the view carries a `@unique` tag rather than a `@primaryKey`.
+The key is the same reading of the plan — a base relation's unique index or primary
+key carried without a multiplying join, a group key, a `DISTINCT` — and a
+`@unique` is what declares it where a key column may be `NULL`: `PgFakeConstraintsPlugin`
+makes a `@primaryKey` column non-null and leaves a `@unique` column as it is, and
+PostgreSQL's own uniqueness admits a `NULL` beside anything (a `UNIQUE` index admits
+any number of `NULL`s), so declaring a nullable key is sound where declaring it
+non-null would not be. A view gets a `@primaryKey` or a `@unique`, never both: a key
+whose every column is never `NULL` is the `@primaryKey` of "Row identity", and only
+where no such key exists does the `@unique` stand. Pass `deriveUnique: false` to
+`PgViewConstraintsPlugin` to leave `@unique` underived, for instance to keep the
+generated schema's row-lookup fields to the primary keys alone.
+
 ## A relation to a projection
 
 Where a published view is a row of a base relation — its `@primaryKey` is that

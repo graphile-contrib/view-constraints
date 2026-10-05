@@ -53,6 +53,8 @@ export interface ViewConstraintsComparison {
   declaredForeignKeys: string[]
   /** The `@primaryKey` tag already on the view, if any. */
   declaredPrimaryKey: string | null
+  /** `@unique` tags already on the view, from smart tags or SQL comments. */
+  declaredUnique: string[]
   /** View columns already carrying `@notNull` by hand, in attribute order. */
   declaredNotNullColumns: string[]
 }
@@ -102,6 +104,13 @@ export interface ViewConstraintsOptions {
    * a reporting run must leave the schema exactly as it found it.
    */
   declare?: boolean
+  /**
+   * Derive a `@unique` tag where the plan proves a key whose columns may be NULL.
+   * On unless turned off: a proven key is a fact of the plan, not a guess, and the
+   * tag is what publishes the row-lookup the key authorises. Turn it off to keep the
+   * derived surface to `@primaryKey`/`@notNull`/`@foreignKey` alone.
+   */
+  deriveUnique?: boolean
   /** Receives the derivation and the view's own declarations, once per service. */
   report?: (report: ViewConstraintsReport) => void | Promise<void>
 }
@@ -184,12 +193,13 @@ export function PgViewConstraintsPlugin(
   options: ViewConstraintsOptions = {}
 ): GraphileConfig.Plugin {
   const declare = options.declare ?? true
+  const deriveUnique = options.deriveUnique ?? true
   return {
     name: 'PgViewConstraintsPlugin',
     version: '0.1.0',
     description:
-      "Derives a view's foreign keys, primary key and non-null columns from the " +
-      "planner's account of where its columns come from, confirmed against " +
+      "Derives a view's foreign keys, primary key, unique keys and non-null columns " +
+      "from the planner's account of where its columns come from, confirmed against " +
       'pg_constraint, pg_index and pg_attribute, and states them as the smart tags ' +
       "PgFakeConstraintsPlugin already understands; and leads a view's or a " +
       "table's foreign key to the projection of the surface keyed by the key it references.",
@@ -249,7 +259,8 @@ export function PgViewConstraintsPlugin(
                   [...schemas],
                   null,
                   publishedAsEnumeration,
-                  declaredRowIdentity
+                  declaredRowIdentity,
+                  deriveUnique
                 )
               }
               return withSuperuserPgClientFromPgService(pgService, pgSettings, (privilegedClient) =>
@@ -258,7 +269,8 @@ export function PgViewConstraintsPlugin(
                   [...schemas],
                   runQueryOn(privilegedClient),
                   publishedAsEnumeration,
-                  declaredRowIdentity
+                  declaredRowIdentity,
+                  deriveUnique
                 )
               )
             }
@@ -278,6 +290,7 @@ export function PgViewConstraintsPlugin(
               declaredForeignKeys: asStringArray(tags['foreignKey']),
               declaredPrimaryKey:
                 typeof tags['primaryKey'] === 'string' ? tags['primaryKey'] : null,
+              declaredUnique: asStringArray(tags['unique']),
               declaredNotNullColumns: declaredNotNullColumnsOf(pgClass)
             })
             if (!declare) continue
@@ -296,6 +309,9 @@ export function PgViewConstraintsPlugin(
             }
             if (derived.primaryKey && tags['primaryKey'] === undefined) {
               tags['primaryKey'] = derived.primaryKey.tag
+            }
+            if (derived.unique && tags['unique'] === undefined) {
+              tags['unique'] = derived.unique.tag
             }
           }
 

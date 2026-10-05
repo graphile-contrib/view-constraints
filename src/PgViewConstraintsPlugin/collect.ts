@@ -562,7 +562,8 @@ export async function collectViewConstraints(
   schemas: string[],
   privilegedQuery: RunQuery | null,
   publishedAsEnumeration?: PublishedAsEnumeration,
-  declaredRowIdentity?: DeclaredRowIdentity
+  declaredRowIdentity?: DeclaredRowIdentity,
+  deriveUnique = true
 ): Promise<CollectResult> {
   const catalog = await readCatalogRelations(query)
   const planCatalog = planCatalogFrom(
@@ -623,7 +624,8 @@ export async function collectViewConstraints(
           planCatalog
         ),
         catalog,
-        coercions
+        coercions,
+        deriveUnique
       )
     )
   }

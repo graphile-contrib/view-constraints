@@ -121,8 +121,7 @@ export interface DerivedForeignKey {
   tag: string
 }
 
-export interface DerivedPrimaryKey {
-  kind: 'primaryKey'
+export interface DerivedKey {
   viewColumns: string[]
   /**
    * The base relation's unique key this is, where it is one relation's key carried
@@ -131,8 +130,27 @@ export interface DerivedPrimaryKey {
    * one row of any table.
    */
   via: { schema: string; relation: string; constraintName: string } | null
-  /** The `@primaryKey` smart tag this key is equivalent to. */
+  /**
+   * The smart tag this key is equivalent to: `@primaryKey` for the key
+   * `PgFakeConstraintsPlugin` makes every column of non-null, `@unique` for a key
+   * whose columns may be NULL.
+   */
   tag: string
+}
+
+export interface DerivedPrimaryKey extends DerivedKey {
+  kind: 'primaryKey'
+}
+
+/**
+ * A key of the view whose columns are allowed to be NULL. `PgFakeConstraintsPlugin`
+ * does not make a `@unique` column non-null, and PostgreSQL's own uniqueness lets a
+ * NULL sit beside anything — a `UNIQUE` index admits any number of NULLs — so the
+ * plan's proof that no two rows share the tuple is what is declared, and nothing about
+ * the columns' nullness.
+ */
+export interface DerivedUniqueKey extends DerivedKey {
+  kind: 'unique'
 }
 
 export interface ViewDerivation {
@@ -152,6 +170,13 @@ export interface ViewDerivation {
   notNullColumns: string[]
   foreignKeys: DerivedForeignKey[]
   primaryKey: DerivedPrimaryKey | null
+  /**
+   * A proven set of the view's columns no two rows share, where no such set is also
+   * never-NULL — a `@unique` tag rather than a `@primaryKey`. `null` where a
+   * `primaryKey` already carries a key, where no key can be NULL, or where uniqueness
+   * derivation is turned off.
+   */
+  unique: DerivedUniqueKey | null
   /**
    * Relations to a projection of this surface the catalog authorises and this reader
    * declined to lead, with the reason. Filled by `deriveProjectionRelations`.
@@ -375,7 +400,8 @@ export function deriveViewConstraints(
   viewColumns: ViewColumn[],
   plan: PlanOrigins | PlanRefusal,
   catalog: ReadonlyMap<string, CatalogRelation>,
-  coercions: TypeCoercions
+  coercions: TypeCoercions,
+  deriveUnique = true
 ): ViewDerivation {
   const notes: string[] = []
   const columns = viewColumns.map((column) => column.name)
@@ -391,6 +417,7 @@ export function deriveViewConstraints(
       notNullColumns: [],
       foreignKeys: [],
       primaryKey: null,
+      unique: null,
       declinedViewTargets: [],
       notes: [`plan not read — ${plan}: ${PLAN_REFUSALS[plan]}`]
     }
@@ -647,6 +674,7 @@ export function deriveViewConstraints(
     return a < b ? -1 : a > b ? 1 : 0
   })
   let primaryKey: DerivedPrimaryKey | null = null
+  let unique: DerivedUniqueKey | null = null
   if (chosen) {
     primaryKey = {
       kind: 'primaryKey',
@@ -661,18 +689,45 @@ export function deriveViewConstraints(
       tag: tagOf(chosen)
     }
   } else if (plan.rowIdentities.length > 0) {
-    const nullable = [
-      ...new Set(
-        plan.rowIdentities.flatMap((key) =>
-          key.columns.filter((index) => !key.discriminators.includes(index) && !neverNull[index])
+    // A set the plan proves unique whose every column is never NULL is the
+    // `@primaryKey` chosen above. What is left is a key a NULL can sit in beside
+    // another — a unique index over a nullable column, a group key or a
+    // de-duplication over one. PostgreSQL's uniqueness admits that: no two rows share
+    // the tuple, and a NULL is distinct from every other value, so the key is sound
+    // and `PgFakeConstraintsPlugin` declares it without making its columns non-null.
+    if (deriveUnique) {
+      const [best] = [...plan.rowIdentities].sort((left, right) => {
+        const [a, b] = [rank(left), rank(right)]
+        return a < b ? -1 : a > b ? 1 : 0
+      })
+      if (best) {
+        unique = {
+          kind: 'unique',
+          viewColumns: best.columns.map((index) => columns[index] ?? ''),
+          via: best.carried
+            ? {
+                schema: best.carried.schema,
+                relation: best.carried.relation,
+                constraintName: best.carried.name
+              }
+            : null,
+          tag: tagOf(best)
+        }
+      }
+    } else {
+      const nullable = [
+        ...new Set(
+          plan.rowIdentities.flatMap((key) =>
+            key.columns.filter((index) => !key.discriminators.includes(index) && !neverNull[index])
+          )
         )
+      ]
+        .sort((left, right) => left - right)
+        .map((index) => columns[index] ?? '')
+      notes.push(
+        `no key: every set of columns the plan proves unique has one not known never to be NULL (${nullable.join(', ')})`
       )
-    ]
-      .sort((left, right) => left - right)
-      .map((index) => columns[index] ?? '')
-    notes.push(
-      `no key: every set of columns the plan proves unique has one not known never to be NULL (${nullable.join(', ')})`
-    )
+    }
   } else {
     notes.push('no key: the plan proves no set of the view’s columns unique')
   }
@@ -694,6 +749,7 @@ export function deriveViewConstraints(
     notNullColumns,
     foreignKeys,
     primaryKey,
+    unique,
     declinedViewTargets: [],
     notes
   }

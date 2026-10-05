@@ -103,6 +103,7 @@ interface Contract {
   planReadable: boolean
   foreignKeys: string[]
   primaryKey: string | null
+  unique: string | null
   notNull: string[]
 }
 
@@ -147,6 +148,7 @@ async function contractOf(
         planReadable: derived.origins !== null,
         foreignKeys: derived.foreignKeys.map((key) => key.tag).sort(),
         primaryKey: derived.primaryKey?.tag ?? null,
+        unique: derived.unique?.tag ?? null,
         notNull: [...derived.notNullColumns].sort()
       })),
       tables: collected.tables
@@ -173,7 +175,7 @@ function indexed(contracts: TargetContract[]): Map<string, string> {
     for (const view of target.views) {
       lines.set(
         `${target.target} ${view.view}`,
-        `readable=${view.planReadable} fk=[${view.foreignKeys.join('; ')}] pk=${view.primaryKey ?? '-'} nn=[${view.notNull.join(',')}]`
+        `readable=${view.planReadable} fk=[${view.foreignKeys.join('; ')}] pk=${view.primaryKey ?? '-'} unique=${view.unique ?? '-'} nn=[${view.notNull.join(',')}]`
       )
     }
     for (const table of target.tables) {
