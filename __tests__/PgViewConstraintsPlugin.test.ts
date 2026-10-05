@@ -39,6 +39,7 @@ import type {
 import {
   collectViewConstraints,
   NO_PRIVILEGED_CONNECTION_REASON,
+  readShadowedNames,
   subqueryViewCandidates,
   planCatalogFrom
 } from '../src/PgViewConstraintsPlugin/collect.ts'
@@ -2244,6 +2245,23 @@ test('a bare built-in spelling reached through an inlined function’s body is r
     ),
     'never-null'
   )
+})
+
+test('the shadow set is read once over the whole catalog, not per view', async () => {
+  // The set is one answer for the database, so it is asked once from the functions,
+  // operators and types themselves and never from a view's dependencies (`pg_rewrite`).
+  const issued: string[] = []
+  const query: RunQuery = async <Row>(text: string) => {
+    issued.push(text)
+    return [{ name: 'count' }, { name: 'integer' }] as Row[]
+  }
+  const names = await readShadowedNames(query)
+  assert.deepEqual([...names].sort(), ['count', 'integer'])
+  assert.equal(issued.length, 1)
+  assert.match(issued[0] ?? '', /pg_proc/)
+  assert.match(issued[0] ?? '', /pg_operator/)
+  assert.match(issued[0] ?? '', /pg_type/)
+  assert.doesNotMatch(issued[0] ?? '', /pg_rewrite/)
 })
 
 test('a view’s stored tree is read by field name, and a format it does not know yields nothing', () => {
