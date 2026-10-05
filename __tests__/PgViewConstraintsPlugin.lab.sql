@@ -74,6 +74,19 @@ create view v_cte as
 create view v_cte_aggregate as
   with totals as materialized (select cur_code, count(*) as n from tx group by cur_code)
   select cur_code, n from totals;
+-- NEGATIVE: a column read from a `WITH` query this view inlines that is not simple —
+-- it groups, or reads one that does — is refused whole, whatever the plan prints for
+-- it. PostgreSQL pulls such a query up into the query above it only where it chooses to
+-- merge its grouping, and where it does not the columns are printed behind a subquery
+-- of its own, which this reader does not pin. `doubled` reads `scaled`, which reads the
+-- grouped `totals`; `title` is read from a base relation and is derived.
+create view v_inlined_with as
+  with totals as (select bank_id, count(*) as n from tx group by bank_id),
+       scaled as (select bank_id, n * 2 as doubled from totals)
+  select scaled.bank_id, piece.n, scaled.doubled, bank.title
+  from scaled
+       cross join lateral unnest(array[scaled.doubled]) piece(n)
+       join bank on bank.id = scaled.bank_id;
 create view v_unique_key as select code from asset;
 create materialized view m_tx as select id, cur_code, amount from tx;
 

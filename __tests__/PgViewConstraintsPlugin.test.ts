@@ -104,6 +104,8 @@ interface Fixture {
       string,
       { schema: string; relation: string; column: string; relkind: string }
     >
+    /** Columns the view reads from a `WITH` query it inlines, refused whatever the plan. */
+    inlinedWithColumns: number[]
     /** Each range-table alias of the view, resolved to the relation it names. */
     viewAliases: Record<string, string>
     plan: ExplainPlanNode
@@ -204,7 +206,8 @@ function derive(
     catalog,
     coercions,
     true,
-    treeColumns
+    treeColumns,
+    new Set(view.inlinedWithColumns ?? [])
   )
   return {
     origins:
@@ -358,6 +361,20 @@ const CASES: Case[] = [
     origins: ['cur_code=tx.cur_code', 'n=—'],
     notNull: ['cur_code', 'n'],
     foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_inlined_with',
+    about:
+      'a column read from a WITH query this view inlines is refused whatever the plan ' +
+      'prints — PostgreSQL may flatten it into the plan or keep it behind a subquery of ' +
+      'its own, and the two are read differently — while a column read from a base ' +
+      'relation beside it is derived as usual',
+    // The two columns the view reads from `scaled` are refused, and so is the one under
+    // the `unnest` (no row source of its own); `title` stands on `bank` itself.
+    origins: ['bank_id=—', 'n=—', 'doubled=—', 'title=bank.title'],
+    notNull: ['title'],
+    foreignKeys: [],
     primaryKey: null
   },
   {
@@ -2857,7 +2874,8 @@ const REFUSAL_CASES: Record<PlanRefusal | ColumnRefusal, string> = {
   'through-an-unpinned-subquery': 'v_sale_store_totals',
   'through-a-row-source-the-catalog-does-not-name': 'v_function_scan',
   'cast-not-value-preserving': 'v_over_barrier_narrowing',
-  'plan-and-tree-disagree': 'a plan and a tree built by hand, below'
+  'plan-and-tree-disagree': 'a plan and a tree built by hand, below',
+  'through-an-inlined-with': 'v_inlined_with'
 }
 
 test('the closed list of refusals is exactly the list with cases', () => {

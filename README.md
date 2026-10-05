@@ -180,7 +180,14 @@ query's select list in order — with no map between the two in the plan. That m
 where each of the view's own columns was written from, is in the view's stored rewrite
 tree (`pg_rewrite.ev_action`), read field by field and not parsed as SQL: the tree names
 every `WITH` query's columns in order (`:ctename`, `:ctecolnames`), so a `cte.col` is
-read at that column's position in the subplan the plan computes it by. The stored tree
+read at that column's position in the subplan the plan computes it by. Where the view's
+own query reads a column from a `WITH` query it **inlines** that is not simple — one that
+groups, aggregates, de-duplicates, limits or windows, or that reads one of those — the
+column is refused: pulling such a query up into the query above means merging that work
+into it, which PostgreSQL does only where it chooses to, and the plan then prints the
+column flattened (where it resolves to a base column) or behind a subquery of the kept
+query, which this reader does not pin. A simple inlined query — a bare projection — is
+pulled up wherever it stands, and its columns are read as usual. The stored tree
 is read only on a PostgreSQL major whose format this reader has been checked against
 (15 through 18): on any other major it is left unread — the plan's own refusals stand
 where its facts would have, and each view's notes say why — so a format that moved
@@ -251,7 +258,9 @@ The answer must not depend on the plan the planner happened to choose.
 `proveInvariance(targets, ownerConnectionString, open, write)` derives every view
 of every target under each of `PLANNER_REGIMES`, with the statistics as found, after
 `ANALYZE` and with production-scale row counts, and reports each rendering that
-differs. `open` opens a session with your driver.
+differs. `open` opens a session with your driver. The lab's own matrix carries the
+same two axes — its regimes, read again from production-scale row counts — since the
+statistics are the planner's other input and a shape can move with them alone.
 
 This proof is the plugin's own gate on its shape of reading, and a consumer should run
 it in its own CI: the plans it derives from are the ones that consumer's database

@@ -405,7 +405,8 @@ export function deriveViewConstraints(
   treeColumns: ReadonlyMap<
     number,
     { schema: string; relation: string; column: string; relkind: string }
-  > = new Map()
+  > = new Map(),
+  inlinedWithColumns: ReadonlySet<number> = new Set()
 ): ViewDerivation {
   const notes: string[] = []
   const columns = viewColumns.map((column) => column.name)
@@ -482,6 +483,20 @@ export function deriveViewConstraints(
     return sources
   })
 
+  // A column this view reads from a `WITH` query whose columns a plan may spell either
+  // way is refused whole — no non-nullness, no key and no relation — whatever this plan
+  // happens to print for it. A `WITH` query this view inlines that groups, aggregates,
+  // de-duplicates, limits or windows is pulled up into the query above only where the
+  // planner chooses to merge that work, and where it does not the columns are printed
+  // behind a `Subquery Scan` this reader does not pin: the same view of the same query,
+  // read differently by two plans. An answer taken from either alone would move with the
+  // planner's choice, so the column has no answer that holds.
+  for (const index of inlinedWithColumns) {
+    if (index < 0 || index >= columns.length) continue
+    origins[index] = null
+    columnRefusals[index] = 'through-an-inlined-with'
+  }
+
   // The plan and the view's stored rewrite tree each say where a column came from. Where
   // both name a base column and they are not the same, the column is refused rather than
   // either trusted — the tree is read only where the plan named nothing (below), so the
@@ -538,6 +553,7 @@ export function deriveViewConstraints(
     const viewColumn = columns[index]
     if (viewColumn === undefined) continue
     if (disagreed.has(index)) continue
+    if (inlinedWithColumns.has(index)) continue
     const sources = plan.columns[index]
     if (sources && sources.length > 0) {
       if (plan.nullIntroduced[index] !== false) continue
@@ -690,6 +706,7 @@ export function deriveViewConstraints(
     const viewColumn = columns[index]
     if (viewColumn === undefined || origins[index] !== null) continue
     if (disagreed.has(index)) continue
+    if (inlinedWithColumns.has(index)) continue
     const tree = treeColumns.get(index)
     if (!tree) continue
     const origin: ColumnOrigin = {
