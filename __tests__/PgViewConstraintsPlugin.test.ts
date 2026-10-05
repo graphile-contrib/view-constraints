@@ -449,9 +449,38 @@ const CASES: Case[] = [
     view: 'v_grouping_sets',
     about:
       'GROUP BY ROLLUP adds a superaggregate row that answers to no base row: the ' +
-      'grouping column is NULL in it, and it is not a row of the table either',
+      'grouping column is NULL in it, and it is not a row of the table either — but ' +
+      'count is 0 over the rows it counted, grand-total row included',
     origins: ['id=tx.id', 'n=—'],
-    notNull: [],
+    notNull: ['n'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_group_by_empty_count',
+    about:
+      'GROUP BY () reaches the plan as GROUPING SETS too: min over the one possibly ' +
+      'empty group answers NULL, count does not',
+    origins: ['lo=—', 'n=—'],
+    notNull: ['n'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_group_count_rollup',
+    about:
+      'count survives the superaggregate rows of ROLLUP, counting every row the group ' +
+      'holds and answering 0 for none — while the grouping column does not',
+    origins: ['id=tx.id', 'n=—', 'some_n=—'],
+    notNull: ['n', 'some_n'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_group_count_cube',
+    about: 'and the same under CUBE, whose every subtotal group count counts over',
+    origins: ['id=tx.id', 'n=—'],
+    notNull: ['n'],
     foreignKeys: ['(id) references lab.tx (id)'],
     primaryKey: null
   },

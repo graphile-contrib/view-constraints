@@ -462,8 +462,10 @@ export function deriveViewConstraints(
   // no reference at all and the expression it spells proves the value never NULL. A
   // materialized view is left out — its stored row outlives the row it was copied
   // from, and the copy is the only thing this reader ever sees of it. A `GROUPING
-  // SETS` superaggregate row is all-NULL grouping columns, and nothing says this
-  // column is not one of them, so it stands over the expression's own answer too.
+  // SETS` superaggregate row is all-NULL grouping columns; the expression rules
+  // already read every column reference under one as nullable, so a shape they still
+  // answer never-NULL for — a literal, a `count` — holds in every row, superaggregate
+  // rows included, and is kept.
   //
   // The origin path reads the raw sources, not the origins a value-preserving cast
   // leaves: a cast that refuses the proxy (a truncation) is still read for
@@ -483,7 +485,6 @@ export function deriveViewConstraints(
       if (sources.every((origin) => neverNullOrigin(origin))) notNullColumns.push(viewColumn)
       continue
     }
-    if (plan.groupingSets) continue
     if (plan.expressionNotNull[index] === true) notNullColumns.push(viewColumn)
   }
 

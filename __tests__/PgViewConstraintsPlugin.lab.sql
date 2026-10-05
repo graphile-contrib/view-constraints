@@ -666,3 +666,16 @@ create view v_expr_is_tests as
 -- so an aggregate over it answers NULL when the input is empty.
 create view v_expr_group_by_empty as
   select min(amount) as lo, avg(amount) as mean from tx group by ();
+
+-- POSITIVE: `count` is 0 over no rows, so it is never NULL in the grand-total and
+-- subtotal rows of `GROUP BY ()`, `ROLLUP`, `CUBE` and `GROUPING SETS` alike — the
+-- one aggregate SQL defines over the rows themselves rather than over their values.
+-- `ROLLUP`/`CUBE`/`()` all reach the plan as a node computing `GROUPING SETS`, the
+-- same node an explicit `GROUPING SETS` builds; PostgreSQL does not pull a view using
+-- the explicit spelling up into the query above it, so the case is written with the
+-- spellings that do flatten.
+create view v_group_by_empty_count as
+  select min(amount) as lo, count(*) as n from tx group by ();
+create view v_group_count_rollup as
+  select id, count(*) as n, count(bank_id) as some_n from tx group by rollup (id);
+create view v_group_count_cube as select id, count(*) as n from tx group by cube (id);

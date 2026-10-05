@@ -794,8 +794,21 @@ class OriginReader {
       return 'unknown'
     }
     if (NULL_LITERAL.test(entry)) return 'nullable'
+    // A `GROUP BY ROLLUP` and its kin emit a superaggregate row in which every
+    // grouping column is NULL and which stands for no base row. Any bare column the
+    // select list names is one of those grouping columns — a column outside every
+    // grouping set is not valid SQL here — so where the node computes `GROUPING
+    // SETS`, a column reference is nullable whatever the plan around it says. What
+    // survives is what is non-null independently of any such column: a literal, a
+    // `count`, a `COALESCE` with a non-null arm. `min`/`max`/`sum`/`avg` do not: the
+    // grand-total row over an empty input is the aggregate over no rows, and that
+    // answers NULL. So `hasGroupKey` is false here and the references a shape is
+    // built of answer nullable; the shapes whose SQL definition is the claim answer
+    // for themselves.
+    const groupingSets = node['Grouping Sets'] !== undefined
     const reference = parseReference(entry)
     if (reference) {
+      if (groupingSets) return 'nullable'
       if (reference.alias !== null) {
         const crossable = this.crossable.get(reference.alias)
         if (crossable) {
@@ -814,7 +827,8 @@ class OriginReader {
       return this.readingNullability(this.read(entry, crossing))
     }
     return evaluateExpression(parseExpression(entry), {
-      column: (referenceText) => this.readingNullability(this.read(referenceText, crossing)),
+      column: (referenceText) =>
+        groupingSets ? 'nullable' : this.readingNullability(this.read(referenceText, crossing)),
       hasGroupKey: groupsItsInput(node),
       shadowed: (name) => this.catalog.shadowedNames.has(name)
     })
