@@ -380,12 +380,13 @@ const CASES: Case[] = [
   {
     view: 'v_distinct_over_union',
     about:
-      'the trap: DISTINCT over a UNION prints a Unique whose Output names one branch ' +
-      'of two, so the plan is refused whole rather than read as a single scan',
-    origins: null,
-    notNull: [],
-    foreignKeys: [],
-    primaryKey: null
+      'DISTINCT over a UNION prints a `Unique` or a de-duplicating `Aggregate` whose ' +
+      'Output names one branch of two; the branches are read position by position and ' +
+      'the group key over the union’s columns is the row identity',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'id,cur_code'
   },
   {
     view: 'v_self_join',
@@ -537,13 +538,12 @@ const CASES: Case[] = [
   {
     view: 'v_union_distinct',
     about:
-      'de-duplication over a union is refused both ways the planner implements it: ' +
-      'a hashed `Aggregate` computes, and a `Unique` is what the same query becomes ' +
-      'when hashing is off, so accepting one would answer by cost',
-    origins: null,
-    notNull: [],
-    foreignKeys: [],
-    primaryKey: null
+      'a de-duplicating `UNION` is a grouping by every column over the union: read the ' +
+      'same whether the planner hashes it or sorts it, and its key is the whole tuple',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'id,cur_code'
   },
   {
     view: 'v_cte_reordered_scans',
@@ -738,7 +738,46 @@ const CASES: Case[] = [
   },
   {
     view: 'v_except',
-    about: 'EXCEPT reads its inputs as one tagged stream: there is no branch to read',
+    about:
+      'EXCEPT prints its two branches directly and a column of the result is one ' +
+      'branch’s value, never NULL only where both branches’ entries are not',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_intersect',
+    about: 'and INTERSECT the same, a row of the result answering to both branches',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_union_grouped',
+    about:
+      'a grouping over a `UNION ALL`: the group key proxies both branches and is the ' +
+      'row identity, and sum/count read the union’s columns — a literal branch answers ' +
+      'never NULL, so the aggregate is never NULL too',
+    origins: ['sid=refund.id|tx.id', 'cur_code=refund.cur_code|tx.cur_code', 'total=—', 'n=—'],
+    notNull: ['sid', 'cur_code', 'total', 'n'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'sid,cur_code'
+  },
+  {
+    view: 'v_union_nested',
+    about:
+      'a set operation over another cannot tell its branches apart: the same spelling ' +
+      'names a column of both, so no column is read',
+    origins: null,
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_recursive',
+    about: 'a recursive WITH reads its own output as one tagged stream: no branch',
     origins: null,
     notNull: [],
     foreignKeys: [],
@@ -2095,8 +2134,8 @@ test('with no privileged connection the materialized view is named, not passed o
 // that had no answer for those would have to invent one, and their cases are plans
 // built by hand here — the same way the join type this reader does not know is held.
 const REFUSAL_CASES: Record<PlanRefusal | ColumnRefusal, string> = {
-  'unreadable-set-operation': 'v_except',
-  'set-operation-not-a-select-list': 'v_union_distinct',
+  'unreadable-set-operation': 'v_recursive',
+  'set-operation-not-a-select-list': 'v_union_nested',
   'output-not-positional': 'a plan built by hand, below',
   'not-a-column-reference': 'v_coalesce',
   'unqualified-name-without-a-sole-relation': 'a plan built by hand, above',

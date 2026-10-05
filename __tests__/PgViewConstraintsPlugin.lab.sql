@@ -191,10 +191,44 @@ create view v_aliased_barrier as select t.id, t.cur_code from v_barrier t;
 -- NEGATIVE: a column that is a NULL literal all the way up contributes no value.
 create view v_null_column as select id, NULL::text as cur_code from tx;
 
--- NEGATIVE: a set operation that is not a union reads its input as one tagged
--- stream, and there is no branch to read a column off.
+-- POSITIVE: a set operation's branches are read one by one wherever it stands. An
+-- `EXCEPT`/`INTERSECT` prints its branches directly; a `UNION` under a grouping prints
+-- the union's columns inside the aggregate, and a column of the result is the value at
+-- that position of whichever branch a row came from.
 create view v_except as
   select id, cur_code from tx except select id, cur_code from wallet;
+create view v_intersect as
+  select id, cur_code from tx intersect select id, cur_code from wallet;
+
+-- POSITIVE: a grouping over a `UNION ALL` — the shape the ledger totals are built
+-- from. The group key proxies both branches, and the aggregates read the union's
+-- columns.
+create view v_union_grouped as
+  select sid, cur_code, sum(amount) as total, count(*) as n
+  from (
+    select t.id as sid, t.cur_code, t.amount from tx t
+    union all
+    select r.id, r.cur_code, 0::numeric from refund r
+  ) u
+  group by sid, cur_code;
+
+-- NEGATIVE: a set operation over another cannot tell its branches apart — the same
+-- spelling names a column of both — so no column of it is read.
+create view v_union_nested as
+  select id, cur_code from tx
+  union all
+  select id, cur_code
+  from (select id, cur_code from tx union select id, cur_code from wallet) w;
+
+-- NEGATIVE: a recursive WITH reads its own output as one tagged stream, so a column
+-- has no branch to be read off.
+create view v_recursive as
+  with recursive walk as (
+    select t.id, t.bank_id from tx t where t.bank_id is null
+    union all
+    select t.id, t.bank_id from tx t join walk w on w.id = t.bank_id
+  )
+  select id, bank_id from walk;
 
 -- NEGATIVE: a row source the catalog has nothing to say about. A function scan
 -- carries an alias like any other scan and names no relation.

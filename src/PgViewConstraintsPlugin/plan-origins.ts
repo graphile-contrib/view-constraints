@@ -112,12 +112,12 @@ export interface ViewShape {
  */
 export const PLAN_REFUSALS = {
   'unreadable-set-operation':
-    'a `Recursive Union`, `SetOp` or `HashSetOp`: its input is one tagged stream and ' +
-    'there is no branch to read a column off',
+    'a `Recursive Union`: its input is one tagged stream that references its own ' +
+    'output, and there is no branch to read a column off',
   'set-operation-not-a-select-list':
-    'a set operation stands somewhere the reader does not read its branches — under a ' +
-    'node that computes, or beside a second set operation — and whatever projects over ' +
-    'it is spelled with the Vars of one branch out of several',
+    'a set operation’s branches cannot be told apart — a column of a branch is ' +
+    'spelled the same as a column of another, as when a set operation stands over ' +
+    'another, or a branch has no select list to read position by position',
   'output-not-positional':
     'the node carrying the select list prints no `Output`, or one that does not line ' +
     'up one-to-one with the view’s columns'
@@ -204,13 +204,18 @@ export interface ColumnOrigin {
 export type ColumnSources = ColumnOrigin[] | null
 
 // A node that unions tuple streams. The rows above it come from several branches
-// while the `Output` above it is spelled with the Vars of one branch only, so a
-// node that projects over an `Append` reads exactly like one over a single scan. The
-// shape where every branch can be read is the `Append` itself: it prints no `Output`
-// of its own, and each child prints the branch's own select list, in the set
-// operation's column order. Anywhere a node that projects stands over it — and for
-// any second such node — the spelling above it cannot be trusted and the plan is
-// refused.
+// while the `Output` above it is spelled with the Vars of one branch only, so a node
+// that projects over a union reads exactly like one over a single scan — which is why
+// the branches are read position by position: `Append`/`Merge Append` for a
+// `UNION ALL` (and an inheritance scan), `SetOp`/`HashSetOp` for `UNION`,
+// `INTERSECT` and `EXCEPT`. Each branch prints the set operation's columns in its own
+// order, and the column at a position of the union is the column at that position of
+// whichever branch a row came from.
+const SET_OPERATION_NODE_TYPES = new Set(['Append', 'Merge Append', 'SetOp', 'HashSetOp'])
+
+// The set-operation nodes whose branches the key reader walks positionally to build
+// a key of the union: a `UNION ALL` and an inheritance scan. A `SetOp`/`HashSetOp`
+// de-duplicates or filters and names no key by position, so its keys are not read.
 const TUPLE_UNIONING_NODE_TYPES = new Set(['Append', 'Merge Append'])
 
 // Nodes that hand their child's select list on and say nothing of their own.
@@ -283,9 +288,10 @@ function selectListNodeOf(root: ExplainPlanNode): ExplainPlanNode {
   return node
 }
 
-// Set operations other than a plain union read their input as one tagged stream and
-// are refused wherever they appear: there is no branch to read a column off.
-const UNREADABLE_SET_NODE_TYPES = new Set(['Recursive Union', 'SetOp', 'HashSetOp'])
+// A recursive `WITH` reads one tagged stream that references its own output, so a
+// column cannot be traced to a branch. No other set operation is refused here: the
+// branches of an `Append`, a `SetOp` and their kin are read position by position.
+const UNREADABLE_SET_NODE_TYPES = new Set(['Recursive Union'])
 
 // Which input of a join the join itself can null. `Left` keeps every row of its outer
 // input and writes NULLs into the inner one where nothing matched; `Right` is the
@@ -487,6 +493,89 @@ interface CrossableSubquery {
   branches: ExplainPlanNode[] | null
 }
 
+/** One branch of a set operation: the node printing its select list, and the entries. */
+interface UnionBranch {
+  node: ExplainPlanNode
+  output: string[]
+}
+
+/** One column of a set operation, and the branches whose value it is. */
+interface UnionColumn {
+  branches: UnionBranch[]
+  /** The position of the column in every branch's select list. */
+  position: number
+}
+
+/**
+ * Every column of every set operation whose branches can be told apart, by the
+ * `Output` entry an enclosing node spells it with.
+ *
+ * A node above a set operation prints the Vars of one branch, so a column of the union
+ * appears there as that branch's own expression; the position of that expression in
+ * the branch's select list is the union's column. The branches are told apart by their
+ * scan aliases, which name one range-table entry each; where the same spelling would
+ * name a column of two different set operations — a set operation over another — there
+ * is no one branch to read the column off, and the plan is refused rather than guessed
+ * between them. A set operation inside a view this reader crosses is read by the cross
+ * itself and left out here.
+ */
+function unionColumnsOf(
+  root: ExplainPlanNode,
+  crossable: ReadonlyMap<string, CrossableSubquery>
+): { columns: Map<string, UnionColumn>; aliases: Set<string>; ambiguous: boolean } {
+  const columns = new Map<string, UnionColumn>()
+  const aliases = new Set<string>()
+  let ambiguous = false
+
+  const branchesOf = (node: ExplainPlanNode): UnionBranch[] | null => {
+    const branches = inputChildren(node).map((child) => {
+      const list = selectListNodeOf(child)
+      return { node: list, output: list.Output ?? [] }
+    })
+    if (branches.length < 2) return null
+    const width = branches[0]?.output.length ?? 0
+    if (width === 0) return null
+    // A branch that prints a shorter list than the first is not the set operation's
+    // columns in the same order, and nothing may be read off it positionally.
+    if (branches.some((branch) => branch.output.length !== width)) return null
+    return branches
+  }
+
+  const visit = (node: ExplainPlanNode, insideCrossing: boolean): void => {
+    if (!insideCrossing && SET_OPERATION_NODE_TYPES.has(node['Node Type'])) {
+      const branches = branchesOf(node)
+      if (branches === null) {
+        ambiguous = true
+      } else {
+        for (const branch of branches) {
+          for (const entry of branch.output) {
+            const reference = parseReference(entry)
+            if (reference?.alias != null) aliases.add(reference.alias)
+          }
+        }
+        const width = branches[0]?.output.length ?? 0
+        for (let position = 0; position < width; position++) {
+          const column: UnionColumn = { branches, position }
+          for (const branch of branches) {
+            const entry = branch.output[position] ?? ''
+            const seen = columns.get(entry)
+            if (seen !== undefined && seen !== column) {
+              ambiguous = true
+              continue
+            }
+            columns.set(entry, column)
+          }
+        }
+      }
+    }
+    const crossed =
+      node['Node Type'] === SUBQUERY_SCAN && node.Alias !== undefined && crossable.has(node.Alias)
+    for (const child of node.Plans ?? []) visit(child, insideCrossing || crossed)
+  }
+  visit(root, false)
+  return { columns, aliases, ambiguous }
+}
+
 /**
  * Whether everything this `Subquery Scan` says about itself agrees with the view it
  * would be pinned to. The plan offers the alias and nothing else, so the alias is
@@ -518,7 +607,7 @@ function crossableSubqueries(
     const only = children.length === 1 ? children[0] : undefined
     if (!only) continue
     const selectList = selectListNodeOf(only)
-    if (TUPLE_UNIONING_NODE_TYPES.has(selectList['Node Type'])) {
+    if (SET_OPERATION_NODE_TYPES.has(selectList['Node Type'])) {
       const branches = inputChildren(selectList)
       if (branches.length === 0) continue
       if (!branches.every((branch) => branch.Output?.length === view.columns.length)) continue
@@ -543,6 +632,13 @@ interface Reading {
   /** The plan writes a NULL of its own into this column. */
   nullValue: boolean
   reason: ColumnRefusal | null
+  /**
+   * The expression rules' answer for a column a set operation assembled, where that is
+   * more than the origins say: a branch spelling a literal has no base column yet its
+   * value is never NULL, and the union's column is never NULL where every branch's is.
+   * Absent for a column read off one scan, whose nullability the origins already give.
+   */
+  nullability?: ExpressionNullability
 }
 
 function unknown(reason: ColumnRefusal): Reading {
@@ -639,6 +735,13 @@ class OriginReader {
   private readonly crossable: ReadonlyMap<string, CrossableSubquery>
   private readonly aliasKinds: ReadonlyMap<string, string>
   private readonly catalog: PlanCatalog
+  /** Every column of a set operation whose branches can be told apart, by entry text. */
+  private readonly unionColumns: ReadonlyMap<string, UnionColumn>
+  /** Branch scan aliases of those set operations, by alias. */
+  private readonly unionAliases: ReadonlySet<string>
+  private readonly unionsAmbiguous: boolean
+  private readonly unionMemo = new Map<UnionColumn, Reading>()
+  private readonly unionPending = new Set<UnionColumn>()
 
   constructor(
     root: ExplainPlanNode,
@@ -651,6 +754,10 @@ class OriginReader {
     this.nulledNodes = nullExtended.nodes
     this.crossable = crossableSubqueries(root, candidates)
     this.aliasKinds = aliasNodeTypes(root)
+    const unions = unionColumnsOf(root, this.crossable)
+    this.unionColumns = unions.columns
+    this.unionAliases = unions.aliases
+    this.unionsAmbiguous = unions.ambiguous
     const [sole] = [...this.relations]
     const aliasNodes = countNodes(root, (node) => node.Alias !== undefined)
     this.soleRelation =
@@ -661,6 +768,11 @@ class OriginReader {
   /** `Subquery Scan` nodes this reader descends through, by alias. */
   get crossed(): ReadonlyMap<string, CrossableSubquery> {
     return this.crossable
+  }
+
+  /** Whether a set operation's branches could not be told apart anywhere in the plan. */
+  get ambiguousUnions(): boolean {
+    return this.unionsAmbiguous
   }
 
   /** The alias an unqualified column name belongs to, where there is one. */
@@ -675,7 +787,54 @@ class OriginReader {
    * cycle, which PostgreSQL does not allow between views and this reader does not
    * follow.
    */
-  read(entry: string, crossing: ReadonlySet<string> = new Set()): Reading {
+  read(entry: string, crossing: ReadonlySet<string> = new Set(), branchLocal = false): Reading {
+    if (!branchLocal) {
+      const column = this.unionColumns.get(entry)
+      if (column) return this.readUnionColumn(column, crossing)
+      const reference = parseReference(entry)
+      if (reference?.alias != null && this.unionAliases.has(reference.alias)) {
+        // A column of a set operation's branch reached somewhere its position in the
+        // branch is not the entry itself — inside a larger expression. The same spelling
+        // may stand for another branch's column of a different type, so which value it
+        // is is not said here, and the column stays unknown rather than read off one
+        // branch.
+        return unknown('not-a-column-reference')
+      }
+    }
+    return this.readEntry(entry, crossing)
+  }
+
+  /**
+   * The one value every branch of a set operation answers at this column: one base
+   * column per branch, and a NULL in any branch makes the column nullable there. A key
+   * of the union under a column a branch reads is not carried: the union's own columns
+   * are the union's answer, read by `plan-keys.ts`.
+   */
+  private readUnionColumn(column: UnionColumn, crossing: ReadonlySet<string>): Reading {
+    const memo = this.unionMemo.get(column)
+    if (memo) return memo
+    if (this.unionPending.has(column)) return unknown('not-a-column-reference')
+    this.unionPending.add(column)
+    const merged = mergeReadings(
+      column.branches.map((branch) =>
+        this.readEntry(branch.output[column.position] ?? '', crossing)
+      )
+    )
+    // The origins name the base columns a branch proxies and say nothing where a branch
+    // spells a literal; the nullability is the union's own answer — never NULL only
+    // where every branch's entry is — and is kept beside them.
+    merged.nullability = mergeNullabilities(
+      column.branches.map((branch) =>
+        this.evaluateEntry(branch.output[column.position] ?? '', branch.node, crossing, true)
+      )
+    )
+    this.unionPending.delete(column)
+    this.unionMemo.set(column, merged)
+    return merged
+  }
+
+  /** The reading of one entry that is not itself a set operation's column. */
+  readEntry(entry: string, crossing: ReadonlySet<string> = new Set()): Reading {
     if (NULL_LITERAL.test(entry)) return { origins: [], nullValue: true, reason: null }
     const reference = parseReference(entry)
     if (!reference) return unknown('not-a-column-reference')
@@ -773,7 +932,8 @@ class OriginReader {
   evaluateEntry(
     entry: string,
     node: ExplainPlanNode,
-    crossing: ReadonlySet<string> = new Set()
+    crossing: ReadonlySet<string> = new Set(),
+    branchLocal = false
   ): ExpressionNullability {
     if (this.nulledNodes.has(node)) return 'nullable'
     // A join that nulls one of its inputs can print the very aggregate the nulled
@@ -820,15 +980,18 @@ class OriginReader {
           return this.evaluateCrossed(
             crossable,
             reference.column,
-            new Set([...crossing, reference.alias])
+            new Set([...crossing, reference.alias]),
+            branchLocal
           )
         }
       }
-      return this.readingNullability(this.read(entry, crossing))
+      return this.readingNullability(this.read(entry, crossing, branchLocal))
     }
     return evaluateExpression(parseExpression(entry), {
       column: (referenceText) =>
-        groupingSets ? 'nullable' : this.readingNullability(this.read(referenceText, crossing)),
+        groupingSets
+          ? 'nullable'
+          : this.readingNullability(this.read(referenceText, crossing, branchLocal)),
       hasGroupKey: groupsItsInput(node),
       shadowed: (name) => this.catalog.shadowedNames.has(name)
     })
@@ -837,26 +1000,29 @@ class OriginReader {
   private evaluateCrossed(
     crossable: CrossableSubquery,
     column: string,
-    crossing: ReadonlySet<string>
+    crossing: ReadonlySet<string>,
+    branchLocal = false
   ): ExpressionNullability {
     const position = crossable.view.columns.indexOf(column)
     if (position < 0) return 'unknown'
     if (crossable.branches) {
       return mergeNullabilities(
         crossable.branches.map((branch) =>
-          this.evaluateEntry(branch.Output?.[position] ?? '', branch, crossing)
+          this.evaluateEntry(branch.Output?.[position] ?? '', branch, crossing, branchLocal)
         )
       )
     }
     return this.evaluateEntry(
       crossable.selectList.Output?.[position] ?? '',
       crossable.selectList,
-      crossing
+      crossing,
+      branchLocal
     )
   }
 
   /** The reading of a bare reference, turned into the expression rules' answers. */
   private readingNullability(reading: Reading): ExpressionNullability {
+    if (reading.nullability !== undefined) return reading.nullability
     if (reading.origins === null) return 'unknown'
     if (reading.origins.length === 0) return 'nullable'
     if (reading.nullValue) return 'nullable'
@@ -977,24 +1143,17 @@ export function readPlanOrigins(
   const reader = new OriginReader(root, candidates, catalog)
   const selectListNode = selectListNodeOf(root)
 
-  // A union is readable only where this reader reads its branches one by one: at the
-  // select list of the plan, or at the select list of a view it descends into. A
-  // union anywhere else has a node that projects over it, and that node's `Output` is
-  // spelled with the Vars of one branch out of several — which reads exactly like a
-  // projection over a single scan. A second union is refused for the same reason.
-  const unions = collectNodes(root, (node) => TUPLE_UNIONING_NODE_TYPES.has(node['Node Type']))
-  const readableUnions = new Set<ExplainPlanNode>(
-    [...reader.crossed.values()]
-      .filter((crossable) => crossable.branches !== null)
-      .map((crossable) => crossable.selectList)
-  )
-  if (TUPLE_UNIONING_NODE_TYPES.has(selectListNode['Node Type'])) readableUnions.add(selectListNode)
-  if (unions.some((union) => !readableUnions.has(union))) return 'set-operation-not-a-select-list'
+  // A set operation's branches are read position by position, wherever the operation
+  // stands: at the select list of the plan, under a node that computes over it, or at
+  // the select list of a view the reader descends into. Where the branches cannot be
+  // told apart — a set operation over another, a branch with no select list — the
+  // plan is refused rather than one branch's spelling trusted for the union's.
+  if (reader.ambiguousUnions) return 'set-operation-not-a-select-list'
 
   const readings: Reading[] = []
   const nullabilities: ExpressionNullability[] = []
-  if (TUPLE_UNIONING_NODE_TYPES.has(selectListNode['Node Type'])) {
-    const branches = inputChildren(selectListNode)
+  if (SET_OPERATION_NODE_TYPES.has(selectListNode['Node Type'])) {
+    const branches = inputChildren(selectListNode).map((child) => selectListNodeOf(child))
     if (branches.length === 0) return 'output-not-positional'
     // Each branch prints its own select list, in the set operation's column order. A
     // shorter or longer one is not that list, and nothing may be read off it
@@ -1004,11 +1163,13 @@ export function readPlanOrigins(
     }
     for (let index = 0; index < requestedColumnCount; index++) {
       readings.push(
-        mergeReadings(branches.map((branch) => reader.read(branch.Output?.[index] ?? '')))
+        mergeReadings(branches.map((branch) => reader.readEntry(branch.Output?.[index] ?? '')))
       )
       nullabilities.push(
         mergeNullabilities(
-          branches.map((branch) => reader.evaluateEntry(branch.Output?.[index] ?? '', branch))
+          branches.map((branch) =>
+            reader.evaluateEntry(branch.Output?.[index] ?? '', branch, new Set(), true)
+          )
         )
       )
     }

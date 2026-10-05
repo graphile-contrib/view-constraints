@@ -126,6 +126,17 @@ only where every branch proves it), across a crossed view boundary, and below an
 outer join: a computed column of a nulled side is `NULL` in every padded row,
 whatever the expression promises about the rows it computed over.
 
+A set operation's branches are read wherever the operation stands: at the select
+list, under a node that computes over it — a `GROUP BY`, a `DISTINCT`, an
+`ORDER BY` — or at the select list of a view the reader crosses. The node above prints
+the Vars of one branch, and each column is that branch's entry at the same position;
+a column of the result is therefore never `NULL` only where the entry at that position
+of **every** branch is not (a `UNION`, `UNION ALL`, `INTERSECT` and `EXCEPT` alike,
+each branch printing its own select list in the operation's column order). Where the
+branches cannot be told apart — a set operation standing over another, so the same
+spelling names a column of both — no column is read and the view says
+`set-operation-not-a-select-list`.
+
 ## Plan invariance
 
 The answer must not depend on the plan the planner happened to choose.

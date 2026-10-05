@@ -890,7 +890,7 @@
           "notNull": true
         },
         "cur_code": {
-          "typeId": 151512645,
+          "typeId": 151513666,
           "typeMod": -1,
           "notNull": true
         }
@@ -1430,7 +1430,7 @@
           "notNull": false
         },
         "mystery_id": {
-          "typeId": 151513500,
+          "typeId": 151514539,
           "typeMod": -1,
           "notNull": false
         }
@@ -2569,6 +2569,25 @@
     },
     {
       "schema": "lab",
+      "relation": "v_intersect",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "cur_code": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_invoice",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -3096,6 +3115,25 @@
     },
     {
       "schema": "lab",
+      "relation": "v_recursive",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "bank_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_right_join",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -3556,7 +3594,55 @@
     },
     {
       "schema": "lab",
+      "relation": "v_union_grouped",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "sid": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "cur_code": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "total": {
+          "typeId": 1700,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "n": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_union_limited",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "cur_code": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_union_nested",
       "foreignKeys": [],
       "uniqueKeys": [],
       "partialIndexes": [],
@@ -3895,7 +3981,7 @@
   "coercions": {
     "binary": ["1043>25", "25>1043"],
     "domainBase": {
-      "151512645": 25
+      "151513666": 25
     }
   },
   "strictEquality": true,
@@ -4509,6 +4595,12 @@
     },
     {
       "schema": "lab",
+      "name": "v_intersect",
+      "columns": ["id", "cur_code"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
       "name": "v_invoice",
       "columns": ["id", "merchant_id"],
       "sources": []
@@ -4677,6 +4769,12 @@
     },
     {
       "schema": "lab",
+      "name": "v_recursive",
+      "columns": ["id", "bank_id"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
       "name": "v_right_join",
       "columns": ["t_id", "title"],
       "sources": []
@@ -4827,7 +4925,19 @@
     },
     {
       "schema": "lab",
+      "name": "v_union_grouped",
+      "columns": ["sid", "cur_code", "total", "n"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
       "name": "v_union_limited",
+      "columns": ["id", "cur_code"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_union_nested",
       "columns": ["id", "cur_code"],
       "sources": []
     },
@@ -5771,7 +5881,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151513500,
+          "typeId": 151514539,
           "typeMod": -1
         }
       ],
@@ -7937,6 +8047,46 @@
     },
     {
       "schema": "lab",
+      "view": "v_intersect",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "SetOp",
+        "Output": ["tx.id", "tx.cur_code"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["wallet.id", "wallet.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "wallet",
+            "Alias": "wallet",
+            "Parent Relationship": "Inner"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_invoice",
       "relkind": "v",
       "regime": "default",
@@ -8990,6 +9140,76 @@
             "Relation Name": "tx",
             "Alias": "tx",
             "Parent Relationship": "Subquery"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_recursive",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "CTE Scan",
+        "Output": ["walk.id", "walk.bank_id"],
+        "Alias": "walk",
+        "Plans": [
+          {
+            "Node Type": "Recursive Union",
+            "Parent Relationship": "InitPlan",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.bank_id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer",
+                "Filter": "(t.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Hash Join",
+                "Output": ["t_1.id", "t_1.bank_id"],
+                "Join Type": "Inner",
+                "Parent Relationship": "Inner",
+                "Hash Cond": "(t_1.bank_id = w.id)",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["t_1.id", "t_1.cur_code", "t_1.bank_id", "t_1.amount"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "t_1",
+                    "Parent Relationship": "Outer"
+                  },
+                  {
+                    "Node Type": "Hash",
+                    "Output": ["w.id"],
+                    "Parent Relationship": "Inner",
+                    "Plans": [
+                      {
+                        "Node Type": "WorkTable Scan",
+                        "Output": ["w.id"],
+                        "Alias": "w",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -10288,6 +10508,64 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_grouped",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "sid",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "total",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["t.id", "t.cur_code", "sum(t.amount)", "count(*)"],
+        "Group Key": ["t.id", "t.cur_code"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.cur_code", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["r.id", "r.cur_code", "'0'::numeric"],
+                "Schema": "lab",
+                "Relation Name": "refund",
+                "Alias": "r",
+                "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_limited",
       "relkind": "v",
       "regime": "default",
@@ -10326,6 +10604,68 @@
                 "Relation Name": "wallet",
                 "Alias": "wallet",
                 "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_nested",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx_1.id", "tx_1.cur_code"],
+            "Parent Relationship": "Member",
+            "Group Key": ["tx_1.id", "tx_1.cur_code"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["tx_1.id", "tx_1.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "tx_1",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["wallet.id", "wallet.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "wallet",
+                    "Alias": "wallet",
+                    "Parent Relationship": "Member"
+                  }
+                ]
               }
             ]
           }
@@ -11724,7 +12064,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151513500,
+          "typeId": 151514539,
           "typeMod": -1
         }
       ],
@@ -13890,6 +14230,46 @@
     },
     {
       "schema": "lab",
+      "view": "v_intersect",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "SetOp",
+        "Output": ["tx.id", "tx.cur_code"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["wallet.id", "wallet.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "wallet",
+            "Alias": "wallet",
+            "Parent Relationship": "Inner"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_invoice",
       "relkind": "v",
       "regime": "serial",
@@ -14943,6 +15323,76 @@
             "Relation Name": "tx",
             "Alias": "tx",
             "Parent Relationship": "Subquery"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_recursive",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "CTE Scan",
+        "Output": ["walk.id", "walk.bank_id"],
+        "Alias": "walk",
+        "Plans": [
+          {
+            "Node Type": "Recursive Union",
+            "Parent Relationship": "InitPlan",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.bank_id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer",
+                "Filter": "(t.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Hash Join",
+                "Output": ["t_1.id", "t_1.bank_id"],
+                "Join Type": "Inner",
+                "Parent Relationship": "Inner",
+                "Hash Cond": "(t_1.bank_id = w.id)",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["t_1.id", "t_1.cur_code", "t_1.bank_id", "t_1.amount"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "t_1",
+                    "Parent Relationship": "Outer"
+                  },
+                  {
+                    "Node Type": "Hash",
+                    "Output": ["w.id"],
+                    "Parent Relationship": "Inner",
+                    "Plans": [
+                      {
+                        "Node Type": "WorkTable Scan",
+                        "Output": ["w.id"],
+                        "Alias": "w",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -16241,6 +16691,64 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_grouped",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "sid",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "total",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["t.id", "t.cur_code", "sum(t.amount)", "count(*)"],
+        "Group Key": ["t.id", "t.cur_code"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.cur_code", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["r.id", "r.cur_code", "'0'::numeric"],
+                "Schema": "lab",
+                "Relation Name": "refund",
+                "Alias": "r",
+                "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_limited",
       "relkind": "v",
       "regime": "serial",
@@ -16279,6 +16787,68 @@
                 "Relation Name": "wallet",
                 "Alias": "wallet",
                 "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_nested",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx_1.id", "tx_1.cur_code"],
+            "Parent Relationship": "Member",
+            "Group Key": ["tx_1.id", "tx_1.cur_code"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["tx_1.id", "tx_1.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "tx_1",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["wallet.id", "wallet.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "wallet",
+                    "Alias": "wallet",
+                    "Parent Relationship": "Member"
+                  }
+                ]
               }
             ]
           }
@@ -17862,7 +18432,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151513500,
+          "typeId": 151514539,
           "typeMod": -1
         }
       ],
@@ -20482,6 +21052,60 @@
     },
     {
       "schema": "lab",
+      "view": "v_intersect",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "SetOp",
+        "Output": ["tx.id", "tx.cur_code"],
+        "Plans": [
+          {
+            "Node Type": "Gather",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["tx.id", "tx.cur_code"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          },
+          {
+            "Node Type": "Gather",
+            "Output": ["wallet.id", "wallet.cur_code"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["wallet.id", "wallet.cur_code"],
+                "Schema": "lab",
+                "Relation Name": "wallet",
+                "Alias": "wallet",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_invoice",
       "relkind": "v",
       "regime": "parallel-forced",
@@ -21737,6 +22361,90 @@
                 "Relation Name": "tx",
                 "Alias": "tx",
                 "Parent Relationship": "Subquery"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_recursive",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "CTE Scan",
+        "Output": ["walk.id", "walk.bank_id"],
+        "Alias": "walk",
+        "Plans": [
+          {
+            "Node Type": "Recursive Union",
+            "Parent Relationship": "InitPlan",
+            "Plans": [
+              {
+                "Node Type": "Gather",
+                "Output": ["t.id", "t.bank_id"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["t.id", "t.bank_id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "t",
+                    "Parent Relationship": "Outer",
+                    "Filter": "(t.bank_id IS NULL)"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Hash Join",
+                "Output": ["t_1.id", "t_1.bank_id"],
+                "Join Type": "Inner",
+                "Parent Relationship": "Inner",
+                "Hash Cond": "(t_1.bank_id = w.id)",
+                "Plans": [
+                  {
+                    "Node Type": "Gather",
+                    "Output": ["t_1.id", "t_1.bank_id"],
+                    "Parent Relationship": "Outer",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["t_1.id", "t_1.bank_id"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "t_1",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  },
+                  {
+                    "Node Type": "Hash",
+                    "Output": ["w.id"],
+                    "Parent Relationship": "Inner",
+                    "Plans": [
+                      {
+                        "Node Type": "WorkTable Scan",
+                        "Output": ["w.id"],
+                        "Alias": "w",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           }
@@ -23213,6 +23921,80 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_grouped",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "sid",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "total",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["r.id", "r.cur_code", "sum(('0'::numeric))", "count(*)"],
+        "Group Key": ["r.id", "r.cur_code"],
+        "Partial Mode": "Finalize",
+        "Plans": [
+          {
+            "Node Type": "Gather",
+            "Output": ["r.id", "r.cur_code", "(PARTIAL sum(('0'::numeric)))", "(PARTIAL count(*))"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Aggregate",
+                "Output": ["r.id", "r.cur_code", "PARTIAL sum(('0'::numeric))", "PARTIAL count(*)"],
+                "Parent Relationship": "Outer",
+                "Group Key": ["r.id", "r.cur_code"],
+                "Partial Mode": "Partial",
+                "Plans": [
+                  {
+                    "Node Type": "Append",
+                    "Parent Relationship": "Outer",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["r.id", "r.cur_code", "'0'::numeric"],
+                        "Schema": "lab",
+                        "Relation Name": "refund",
+                        "Alias": "r",
+                        "Parent Relationship": "Member"
+                      },
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["t.id", "t.cur_code", "t.amount"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "t",
+                        "Parent Relationship": "Member"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_limited",
       "relkind": "v",
       "regime": "parallel-forced",
@@ -23256,6 +24038,75 @@
                     "Relation Name": "tx",
                     "Alias": "tx",
                     "Parent Relationship": "Member"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_nested",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Aggregate",
+            "Output": ["wallet.id", "wallet.cur_code"],
+            "Parent Relationship": "Member",
+            "Group Key": ["wallet.id", "wallet.cur_code"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Gather",
+                "Output": ["wallet.id", "wallet.cur_code"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Append",
+                    "Parent Relationship": "Outer",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["wallet.id", "wallet.cur_code"],
+                        "Schema": "lab",
+                        "Relation Name": "wallet",
+                        "Alias": "wallet",
+                        "Parent Relationship": "Member"
+                      },
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["tx_1.id", "tx_1.cur_code"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "tx_1",
+                        "Parent Relationship": "Member"
+                      }
+                    ]
                   }
                 ]
               }
@@ -24752,7 +25603,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151513500,
+          "typeId": 151514539,
           "typeMod": -1
         }
       ],
@@ -27016,6 +27867,60 @@
     },
     {
       "schema": "lab",
+      "view": "v_intersect",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "SetOp",
+        "Output": ["tx.id", "tx.cur_code"],
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["tx.id", "tx.cur_code"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          },
+          {
+            "Node Type": "Sort",
+            "Output": ["wallet.id", "wallet.cur_code"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["wallet.id", "wallet.cur_code"],
+                "Schema": "lab",
+                "Relation Name": "wallet",
+                "Alias": "wallet",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_invoice",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -28074,6 +28979,76 @@
             "Relation Name": "tx",
             "Alias": "tx",
             "Parent Relationship": "Subquery"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_recursive",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "CTE Scan",
+        "Output": ["walk.id", "walk.bank_id"],
+        "Alias": "walk",
+        "Plans": [
+          {
+            "Node Type": "Recursive Union",
+            "Parent Relationship": "InitPlan",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.bank_id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer",
+                "Filter": "(t.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Hash Join",
+                "Output": ["t_1.id", "t_1.bank_id"],
+                "Join Type": "Inner",
+                "Parent Relationship": "Inner",
+                "Hash Cond": "(t_1.bank_id = w.id)",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["t_1.id", "t_1.cur_code", "t_1.bank_id", "t_1.amount"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "t_1",
+                    "Parent Relationship": "Outer"
+                  },
+                  {
+                    "Node Type": "Hash",
+                    "Output": ["w.id"],
+                    "Parent Relationship": "Inner",
+                    "Plans": [
+                      {
+                        "Node Type": "WorkTable Scan",
+                        "Output": ["w.id"],
+                        "Alias": "w",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -29378,6 +30353,71 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_grouped",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "sid",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "total",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["t.id", "t.cur_code", "sum(t.amount)", "count(*)"],
+        "Group Key": ["t.id", "t.cur_code"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Output": ["t.id", "t.cur_code", "t.amount"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["t.id", "t.cur_code", "t.amount"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "t",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["r.id", "r.cur_code", "'0'::numeric"],
+                    "Schema": "lab",
+                    "Relation Name": "refund",
+                    "Alias": "r",
+                    "Parent Relationship": "Member"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_limited",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -29416,6 +30456,80 @@
                 "Relation Name": "wallet",
                 "Alias": "wallet",
                 "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_nested",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Unique",
+            "Output": ["tx_1.id", "tx_1.cur_code"],
+            "Parent Relationship": "Member",
+            "Plans": [
+              {
+                "Node Type": "Merge Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Sort",
+                    "Output": ["tx_1.id", "tx_1.cur_code"],
+                    "Parent Relationship": "Member",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["tx_1.id", "tx_1.cur_code"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "tx_1",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  },
+                  {
+                    "Node Type": "Sort",
+                    "Output": ["wallet.id", "wallet.cur_code"],
+                    "Parent Relationship": "Member",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["wallet.id", "wallet.cur_code"],
+                        "Schema": "lab",
+                        "Relation Name": "wallet",
+                        "Alias": "wallet",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  }
+                ]
               }
             ]
           }
@@ -30814,7 +31928,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151513500,
+          "typeId": 151514539,
           "typeMod": -1
         }
       ],
@@ -32966,6 +34080,46 @@
     },
     {
       "schema": "lab",
+      "view": "v_intersect",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "SetOp",
+        "Output": ["tx.id", "tx.cur_code"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["wallet.id", "wallet.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "wallet",
+            "Alias": "wallet",
+            "Parent Relationship": "Inner"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_invoice",
       "relkind": "v",
       "regime": "no-sort",
@@ -34018,6 +35172,76 @@
             "Relation Name": "tx",
             "Alias": "tx",
             "Parent Relationship": "Subquery"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_recursive",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "CTE Scan",
+        "Output": ["walk.id", "walk.bank_id"],
+        "Alias": "walk",
+        "Plans": [
+          {
+            "Node Type": "Recursive Union",
+            "Parent Relationship": "InitPlan",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.bank_id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer",
+                "Filter": "(t.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Hash Join",
+                "Output": ["t_1.id", "t_1.bank_id"],
+                "Join Type": "Inner",
+                "Parent Relationship": "Inner",
+                "Hash Cond": "(t_1.bank_id = w.id)",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["t_1.id", "t_1.cur_code", "t_1.bank_id", "t_1.amount"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "t_1",
+                    "Parent Relationship": "Outer"
+                  },
+                  {
+                    "Node Type": "Hash",
+                    "Output": ["w.id"],
+                    "Parent Relationship": "Inner",
+                    "Plans": [
+                      {
+                        "Node Type": "WorkTable Scan",
+                        "Output": ["w.id"],
+                        "Alias": "w",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -35304,6 +36528,64 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_grouped",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "sid",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "total",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["t.id", "t.cur_code", "sum(t.amount)", "count(*)"],
+        "Group Key": ["t.id", "t.cur_code"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.cur_code", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["r.id", "r.cur_code", "'0'::numeric"],
+                "Schema": "lab",
+                "Relation Name": "refund",
+                "Alias": "r",
+                "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_limited",
       "relkind": "v",
       "regime": "no-sort",
@@ -35342,6 +36624,68 @@
                 "Relation Name": "wallet",
                 "Alias": "wallet",
                 "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_nested",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx_1.id", "tx_1.cur_code"],
+            "Parent Relationship": "Member",
+            "Group Key": ["tx_1.id", "tx_1.cur_code"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["tx_1.id", "tx_1.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "tx_1",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["wallet.id", "wallet.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "wallet",
+                    "Alias": "wallet",
+                    "Parent Relationship": "Member"
+                  }
+                ]
               }
             ]
           }
@@ -36756,7 +38100,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151513500,
+          "typeId": 151514539,
           "typeMod": -1
         }
       ],
@@ -38971,6 +40315,48 @@
     },
     {
       "schema": "lab",
+      "view": "v_intersect",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "SetOp",
+        "Output": ["tx.id", "tx.cur_code"],
+        "Plans": [
+          {
+            "Node Type": "Index Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer",
+            "Index Name": "tx_pkey"
+          },
+          {
+            "Node Type": "Index Scan",
+            "Output": ["wallet.id", "wallet.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "wallet",
+            "Alias": "wallet",
+            "Parent Relationship": "Inner",
+            "Index Name": "wallet_pkey"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_invoice",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -40075,6 +41461,76 @@
             "Relation Name": "tx",
             "Alias": "tx",
             "Parent Relationship": "Subquery"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_recursive",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "CTE Scan",
+        "Output": ["walk.id", "walk.bank_id"],
+        "Alias": "walk",
+        "Plans": [
+          {
+            "Node Type": "Recursive Union",
+            "Parent Relationship": "InitPlan",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.bank_id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer",
+                "Filter": "(t.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Hash Join",
+                "Output": ["t_1.id", "t_1.bank_id"],
+                "Join Type": "Inner",
+                "Parent Relationship": "Inner",
+                "Hash Cond": "(t_1.bank_id = w.id)",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["t_1.id", "t_1.cur_code", "t_1.bank_id", "t_1.amount"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "t_1",
+                    "Parent Relationship": "Outer"
+                  },
+                  {
+                    "Node Type": "Hash",
+                    "Output": ["w.id"],
+                    "Parent Relationship": "Inner",
+                    "Plans": [
+                      {
+                        "Node Type": "WorkTable Scan",
+                        "Output": ["w.id"],
+                        "Alias": "w",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -41419,6 +42875,66 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_grouped",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "sid",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "total",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["t.id", "t.cur_code", "sum(t.amount)", "count(*)"],
+        "Group Key": ["t.id", "t.cur_code"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Index Scan",
+                "Output": ["t.id", "t.cur_code", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Member",
+                "Index Name": "tx_pkey"
+              },
+              {
+                "Node Type": "Index Scan",
+                "Output": ["r.id", "r.cur_code", "'0'::numeric"],
+                "Schema": "lab",
+                "Relation Name": "refund",
+                "Alias": "r",
+                "Parent Relationship": "Member",
+                "Index Name": "refund_pkey"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_limited",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -41457,6 +42973,70 @@
                 "Relation Name": "wallet",
                 "Alias": "wallet",
                 "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_nested",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx_1.id", "tx_1.cur_code"],
+            "Parent Relationship": "Member",
+            "Group Key": ["tx_1.id", "tx_1.cur_code"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Output": ["tx_1.id", "tx_1.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "tx_1",
+                    "Parent Relationship": "Member",
+                    "Index Name": "tx_pkey"
+                  },
+                  {
+                    "Node Type": "Index Scan",
+                    "Output": ["wallet.id", "wallet.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "wallet",
+                    "Alias": "wallet",
+                    "Parent Relationship": "Member",
+                    "Index Name": "wallet_pkey"
+                  }
+                ]
               }
             ]
           }
@@ -42920,7 +44500,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151513500,
+          "typeId": 151514539,
           "typeMod": -1
         }
       ],
@@ -45020,6 +46600,46 @@
     },
     {
       "schema": "lab",
+      "view": "v_intersect",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "SetOp",
+        "Output": ["tx.id", "tx.cur_code"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["wallet.id", "wallet.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "wallet",
+            "Alias": "wallet",
+            "Parent Relationship": "Inner"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_invoice",
       "relkind": "v",
       "regime": "nestloop-only",
@@ -46024,6 +47644,76 @@
             "Relation Name": "tx",
             "Alias": "tx",
             "Parent Relationship": "Subquery"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_recursive",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "CTE Scan",
+        "Output": ["walk.id", "walk.bank_id"],
+        "Alias": "walk",
+        "Plans": [
+          {
+            "Node Type": "Recursive Union",
+            "Parent Relationship": "InitPlan",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.bank_id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer",
+                "Filter": "(t.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Nested Loop",
+                "Output": ["t_1.id", "t_1.bank_id"],
+                "Join Type": "Inner",
+                "Parent Relationship": "Inner",
+                "Join Filter": "(t_1.bank_id = w.id)",
+                "Plans": [
+                  {
+                    "Node Type": "WorkTable Scan",
+                    "Output": ["w.id", "w.bank_id"],
+                    "Alias": "w",
+                    "Parent Relationship": "Outer"
+                  },
+                  {
+                    "Node Type": "Materialize",
+                    "Output": ["t_1.id", "t_1.bank_id"],
+                    "Parent Relationship": "Inner",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["t_1.id", "t_1.bank_id"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "t_1",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -47258,6 +48948,64 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_grouped",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "sid",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "total",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["t.id", "t.cur_code", "sum(t.amount)", "count(*)"],
+        "Group Key": ["t.id", "t.cur_code"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.cur_code", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["r.id", "r.cur_code", "'0'::numeric"],
+                "Schema": "lab",
+                "Relation Name": "refund",
+                "Alias": "r",
+                "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_limited",
       "relkind": "v",
       "regime": "nestloop-only",
@@ -47296,6 +49044,68 @@
                 "Relation Name": "wallet",
                 "Alias": "wallet",
                 "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_nested",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx_1.id", "tx_1.cur_code"],
+            "Parent Relationship": "Member",
+            "Group Key": ["tx_1.id", "tx_1.cur_code"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["tx_1.id", "tx_1.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "tx_1",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["wallet.id", "wallet.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "wallet",
+                    "Alias": "wallet",
+                    "Parent Relationship": "Member"
+                  }
+                ]
               }
             ]
           }
@@ -48694,7 +50504,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151513500,
+          "typeId": 151514539,
           "typeMod": -1
         }
       ],
@@ -50860,6 +52670,46 @@
     },
     {
       "schema": "lab",
+      "view": "v_intersect",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "SetOp",
+        "Output": ["tx.id", "tx.cur_code"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["wallet.id", "wallet.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "wallet",
+            "Alias": "wallet",
+            "Parent Relationship": "Inner"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_invoice",
       "relkind": "v",
       "regime": "genetic-join-order",
@@ -51913,6 +53763,76 @@
             "Relation Name": "tx",
             "Alias": "tx",
             "Parent Relationship": "Subquery"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_recursive",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "CTE Scan",
+        "Output": ["walk.id", "walk.bank_id"],
+        "Alias": "walk",
+        "Plans": [
+          {
+            "Node Type": "Recursive Union",
+            "Parent Relationship": "InitPlan",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.bank_id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer",
+                "Filter": "(t.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Hash Join",
+                "Output": ["t_1.id", "t_1.bank_id"],
+                "Join Type": "Inner",
+                "Parent Relationship": "Inner",
+                "Hash Cond": "(t_1.bank_id = w.id)",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["t_1.id", "t_1.cur_code", "t_1.bank_id", "t_1.amount"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "t_1",
+                    "Parent Relationship": "Outer"
+                  },
+                  {
+                    "Node Type": "Hash",
+                    "Output": ["w.id"],
+                    "Parent Relationship": "Inner",
+                    "Plans": [
+                      {
+                        "Node Type": "WorkTable Scan",
+                        "Output": ["w.id"],
+                        "Alias": "w",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
           }
         ]
       }
@@ -53211,6 +55131,64 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_grouped",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "sid",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "total",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["t.id", "t.cur_code", "sum(t.amount)", "count(*)"],
+        "Group Key": ["t.id", "t.cur_code"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.cur_code", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["r.id", "r.cur_code", "'0'::numeric"],
+                "Schema": "lab",
+                "Relation Name": "refund",
+                "Alias": "r",
+                "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_limited",
       "relkind": "v",
       "regime": "genetic-join-order",
@@ -53249,6 +55227,68 @@
                 "Relation Name": "wallet",
                 "Alias": "wallet",
                 "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_nested",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx_1.id", "tx_1.cur_code"],
+            "Parent Relationship": "Member",
+            "Group Key": ["tx_1.id", "tx_1.cur_code"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["tx_1.id", "tx_1.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "tx_1",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["wallet.id", "wallet.cur_code"],
+                    "Schema": "lab",
+                    "Relation Name": "wallet",
+                    "Alias": "wallet",
+                    "Parent Relationship": "Member"
+                  }
+                ]
               }
             ]
           }
