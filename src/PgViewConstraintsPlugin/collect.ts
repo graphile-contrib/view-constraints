@@ -787,7 +787,7 @@ export const TREE_FORMAT_UNCHECKED_REASON =
   'stored rewrite tree (pg_rewrite.ev_action) not read: this PostgreSQL major is ' +
   `outside the range the reader is checked against (${TREE_MAJOR_RANGE}), so its stored ` +
   'format is not read, and no `WITH` query of this view is crossed and no column origin ' +
-  'is taken from it'
+  'is taken from it; nothing is derived for this view'
 
 export interface CollectResult {
   derivations: ViewDerivation[]
@@ -867,6 +867,10 @@ export async function collectViewConstraints(
       continue
     }
     const facts = viewTrees.get(`${view.schema}.${view.view}`)
+    // Whether this view's stored tree was read. It is what says which levels a plan may
+    // print two ways, so a view whose tree is not at hand has no answer that holds across
+    // plans and derives nothing (`derive.ts`, `treeRead`).
+    const treeRead = treeSupported && facts !== undefined && facts.ok
     const derivation = deriveViewConstraints(
       view.schema,
       view.view,
@@ -890,18 +894,24 @@ export async function collectViewConstraints(
       coercions,
       deriveUnique,
       resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map()),
-      facts?.optionallyFlattenedColumns ?? new Set()
+      facts?.optionallyFlattenedColumns ?? new Set(),
+      treeRead
     )
     // A tree the walk could not place is said out loud: its CTE map is empty, so a
     // `WITH` query reads as refused, and the reason the map is empty is named here
-    // rather than left to look like a query that has no `WITH` at all.
+    // rather than left to look like a query that has no `WITH` at all — together with the
+    // one thing that follows from it, that this view derives nothing.
     if (!treeSupported) {
       derivation.notes.push(TREE_FORMAT_UNCHECKED_REASON)
     } else if (facts && !facts.ok) {
       derivation.notes.push(
         'stored rewrite tree (pg_rewrite.ev_action) not read: its format was not ' +
           'recognised, so no `WITH` query of this view is crossed and no column origin ' +
-          'is taken from it'
+          'is taken from it; nothing is derived for this view'
+      )
+    } else if (!treeRead) {
+      derivation.notes.push(
+        'stored rewrite tree (pg_rewrite.ev_action) not read: nothing is derived for this ' + 'view'
       )
     }
     derivations.push(derivation)

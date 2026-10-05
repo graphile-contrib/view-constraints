@@ -2385,6 +2385,41 @@ test('a column read from an uncertain WITH query is refused in both plans Postgr
   })
 })
 
+test('a view whose stored tree was not read derives nothing', () => {
+  // The tree is what says which levels a plan may print two ways. Without it the columns
+  // that must be refused cannot even be named, and an answer taken from this plan alone
+  // would move with the planner's choice — so nothing is derived, and the plan's own
+  // readings stay as diagnostics.
+  const view = fixture.views.find(
+    (candidate) => candidate.view === 'v_bare' && candidate.regime === DEFAULT_REGIME
+  )
+  assert.ok(view)
+  // The ordinary derivation of the same view and plan, tags and all.
+  const ordinary = derive('v_bare')
+  assert.deepEqual(ordinary.notNull, ['id', 'cur_code'])
+  assert.equal(ordinary.primaryKey, 'id')
+  const withoutTree = deriveViewConstraints(
+    view.schema,
+    view.view,
+    view.relkind,
+    view.columns,
+    readPlanOrigins(view.plan, view.columns.length, new Map(), planCatalog),
+    catalog,
+    coercions,
+    true,
+    // The tree facts an unread tree leaves: none, and the flag that says so.
+    new Map(),
+    new Set(),
+    false
+  )
+  assert.deepEqual(withoutTree.notNullColumns, [])
+  assert.deepEqual(withoutTree.foreignKeys, [])
+  assert.equal(withoutTree.primaryKey, null)
+  assert.equal(withoutTree.unique, null)
+  // The plan was read, so what it said is still there to be read as a diagnostic.
+  assert.ok(withoutTree.origins)
+})
+
 test('a user object anywhere in the database stands its rule spelling down for every view', () => {
   // A plan prints a name, not the object the name stands for, so a user `count` is
   // printed exactly like the built-in. The stand-down is taken over the whole database
@@ -3003,12 +3038,17 @@ test('the report names the built-in spellings a user object has taken over', asy
   })
   const collected = await collectViewConstraints(surface, ['lab'], null)
   assert.deepEqual(collected.shadowedNames, ['count', 'integer'])
-  // The fake connection answers no version, so the stored tree is left unread and the
-  // view says so rather than looking like one with no `WITH` query at all.
+  // The fake connection answers no version, so the stored tree is left unread: the view
+  // says so rather than looking like one with no `WITH` query at all, and derives nothing
+  // — the plan's own reading stays a diagnostic.
   assert.deepEqual(
     collected.derivations[0]?.notes.filter((note) => note.includes('stored rewrite tree')),
     [TREE_FORMAT_UNCHECKED_REASON]
   )
+  assert.deepEqual(collected.derivations[0]?.notNullColumns, [])
+  assert.deepEqual(collected.derivations[0]?.foreignKeys, [])
+  assert.equal(collected.derivations[0]?.primaryKey, null)
+  assert.equal(collected.derivations[0]?.unique, null)
 })
 
 test('the stored rewrite tree is read only on a major the format is checked against', async () => {

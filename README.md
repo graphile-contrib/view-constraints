@@ -191,16 +191,20 @@ pulling such a query up into the query above means merging that work into it, wh
 does only where it chooses to, and the plan then prints the column flattened (where it resolves
 to a base column) or behind a subquery of the kept query, which this reader does not pin. The
 relation is not refused with it: that comes from the tree (`resorigtbl`), which no plan writes,
-so a `@foreignKey` on such a column stands. A simple query — a bare projection — is pulled up
+so a `@foreignKey` on such a column stands — where the tree lands on a base table that carries
+a key; a trace that stops at a view has no key hanging on it and yields none. A simple query —
+a bare projection — is pulled up
 wherever it stands, and its columns are read as usual, and so are a set operation's, whose
 pull-up is a rule of its own rather than a matter of cost. Which fields say a query is not
 simple is listed in `view-tree.ts`, and the list is one the reader has been checked against on
 PostgreSQL 15 through 18: a field the dump no longer carries is read as the work being done.
 The stored tree
 is read only on a PostgreSQL major whose format this reader has been checked against
-(15 through 18): on any other major it is left unread — the plan's own refusals stand
-where its facts would have, and each view's notes say why — so a format that moved
-between majors is a missed derivation and never a guessed one. The name is not
+(15 through 18), and a view whose tree was not read at all — another major, a format the walk
+does not recognise, or no tree at hand — derives **nothing**: no `@notNull`, no key and no
+`@foreignKey`. Which columns a plan cannot be trusted for is a fact of the tree and cannot be
+named without it, so an answer taken from that plan alone would move with the planner's choice;
+the plan's own readings stand as diagnostics, and each view's notes say why. The name is not
 the plan's to trust: the same `WITH` name can stand in another query the view goes
 through — the same name at two query levels, a view outside the surface, or a SQL
 function the view inlines — and the plan prints one `CTE <name>` subplan whose owner

@@ -70,12 +70,13 @@ const REGIMES = LAB_REGIMES.map((name) => {
 })
 
 // The statistics the planner reads are its other input, and a shape can move with them
-// alone: whether a `WITH` query this view inlines is pulled up is a cost decision, and
-// the row counts are what it costs. The regimes the contract was seen to move on are
-// read again from production-scale counts — the two that meet a grouping flattened and a
-// grouping kept — rather than every one of them, which would double the fixture for the
-// same axis. `ANALYZE` puts the counts back before the database is dropped.
-const PRODUCTION_REGIMES = ['default', 'nestloop-only']
+// alone: whether a query this view reads through is pulled up is a cost decision, and the
+// row counts are what it costs. The regimes the contract was seen to move on are read again
+// from production-scale counts — the ones that meet a level flattened and a level kept, from
+// either side of the join-method choice — rather than every one of them, which would double
+// the fixture for the same axis. `ANALYZE` puts the counts back before the database is
+// dropped.
+const PRODUCTION_REGIMES = ['default', 'nestloop-only', 'no-nestloop']
 const STATISTICS_STATES: { name: string; sql: string | null; regimes: string[] }[] = [
   { name: '', sql: null, regimes: LAB_REGIMES },
   {

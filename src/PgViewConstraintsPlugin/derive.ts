@@ -406,7 +406,8 @@ export function deriveViewConstraints(
     number,
     { schema: string; relation: string; column: string; relkind: string }
   > = new Map(),
-  optionallyFlattenedColumns: ReadonlySet<number> = new Set()
+  optionallyFlattenedColumns: ReadonlySet<number> = new Set(),
+  treeRead = true
 ): ViewDerivation {
   const notes: string[] = []
   const columns = viewColumns.map((column) => column.name)
@@ -707,11 +708,13 @@ export function deriveViewConstraints(
   // traces it to the base column it was written as — through subqueries, joins and
   // `WITH` queries alike — and a bare reference to a base column carries its foreign
   // keys. Only the columns the plan left without a source are read this way, and only
-  // for a relation: the tree says nothing of non-nullness, and a column whose value the
-  // plan did read is judged by the plan. A column the plan and the tree disagreed on is
-  // left out: it was refused whole above, and the tree is the side that may be wrong. A
-  // column refused for a `WITH` query a plan may spell either way is read here: that
-  // refusal is of the plan's reading, and the tree's relation is no plan's answer.
+  // where the tree lands on a table: the tree says nothing of non-nullness, a column
+  // whose value the plan did read is judged by the plan, and a trace that stops at a view
+  // rather than a base table has no key hanging on it, so nothing is emitted for it. A
+  // column the plan and the tree disagreed on is left out: it was refused whole above, and
+  // the tree is the side that may be wrong. A column refused for a query a plan may spell
+  // either way is read here: that refusal is of the plan's reading, and the tree's relation
+  // is no plan's answer.
   for (let index = 0; index < columns.length; index++) {
     const viewColumn = columns[index]
     if (viewColumn === undefined || origins[index] !== null) continue
@@ -852,6 +855,20 @@ export function deriveViewConstraints(
     const viewColumn = columns[index]
     if (!refusal || viewColumn === undefined) continue
     notes.push(`${viewColumn}: ${refusal} — ${COLUMN_REFUSALS[refusal]}`)
+  }
+
+  // A view whose stored tree was not read is left with nothing derived — no non-nullness,
+  // no key and no relation — however readable its plan is. Which levels a plan may print
+  // two ways is a fact of the tree, and has no floor without it: the columns that must be
+  // refused cannot be named, and an answer taken from this plan alone would move with the
+  // planner's choice, which is the one thing this reader must not publish. The plan's own
+  // refusals stay as diagnostics; the tags do not. A caller that knows the reason says it
+  // in the notes (`collect.ts`), where the reason is known.
+  if (!treeRead) {
+    notNullColumns.length = 0
+    foreignKeys.length = 0
+    primaryKey = null
+    unique = null
   }
 
   return {
