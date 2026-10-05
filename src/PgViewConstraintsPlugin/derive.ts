@@ -492,9 +492,15 @@ export function deriveViewConstraints(
   // read differently by two plans, so an answer taken from either alone would move with
   // the planner's choice. Its relation is not refused with it: that comes from the view's
   // stored tree (`resorigtbl`), which no plan writes, so the foreign keys the tree
-  // carries stand below as they do for any column the plan left without a source.
+  // carries stand below as they do for any column the plan left without a source. Nothing
+  // the plan proved is compared with the tree here, and nothing needs to be: the refusal
+  // is the tree's own — a shape of the view's defining query, not a reading of it — so the
+  // tree it falls back on is the one side of the comparison that was never in doubt.
   for (const index of inlinedWithColumns) {
     if (index < 0 || index >= columns.length) continue
+    // A column the plan refused already keeps the plan's own reason: it is the sharper
+    // one, and the column is refused either way.
+    if (columnRefusals[index] !== null) continue
     origins[index] = null
     columnRefusals[index] = 'through-an-inlined-with'
   }

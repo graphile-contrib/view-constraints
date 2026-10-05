@@ -60,6 +60,7 @@ const LAB_REGIMES = [
   'no-sort',
   'no-seqscan',
   'nestloop-only',
+  'no-nestloop',
   'genetic-join-order'
 ]
 const REGIMES = LAB_REGIMES.map((name) => {

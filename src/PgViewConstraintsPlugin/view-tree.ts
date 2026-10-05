@@ -240,6 +240,14 @@ function emptyField(value: Dumped | undefined): boolean {
   return value === undefined || (value.kind === 'token' && value.value === '<>')
 }
 
+/**
+ * How far the walk follows an expression into the queries it reads before it stands down.
+ * The chain an ordinary view builds is a handful of levels deep; a chain longer than this
+ * is refused by the walk rather than followed, so a shape nobody has seen is a refusal
+ * rather than a silent "nothing to see".
+ */
+const WITH_TRACE_DEPTH = 8
+
 /** Whether a boolean field of a query is `true`, a field the dump does not carry included. */
 function saysTrue(query: Extract<Dumped, { kind: 'node' }> | undefined, field: string): boolean {
   if (query === undefined || !query.fields.has(field)) return true
@@ -481,49 +489,65 @@ export function readViewTree(action: string): ViewTree {
   // A column this view reads from a `WITH` query whose columns a plan may spell either
   // way (`uncertain`, above) has no answer that holds across plans: PostgreSQL may print
   // them flattened into the query above — where they resolve to base columns — or behind
-  // a subquery it kept, which is a `Subquery Scan` this reader does not pin. Which entry
-  // of the view's own range table each column's expression stands on is what says it: a
-  // `Var` at this level whose `varno` is such a query. A column the view groups by stands
-  // on the query's `GROUP` range-table entry instead (`:rtekind 9`), whose `:groupexprs`
-  // hold the expression the column was written as — followed there, and no further than a
-  // `SUBLINK`, which stands over a query of its own level and names its own table.
-  const cteByIndex = new Map<number, string>()
-  const groupExprs = new Map<number, Dumped[]>()
-  nodesOf(top.fields.get('rtable')).forEach((entry, index) => {
-    if (entry.kind !== 'node') return
-    if (textOf(entry.fields.get('rtekind')) === '6') {
-      const name = textOf(entry.fields.get('ctename'))
-      if (name !== null) cteByIndex.set(index + 1, name)
-    }
-    if (textOf(entry.fields.get('rtekind')) === '9') {
-      groupExprs.set(index + 1, nodesOf(entry.fields.get('groupexprs')))
-    }
-  })
-  const readsUncertainWith = (value: Dumped, depth = 0): boolean => {
-    if (depth > 8) return false
+  // a subquery it kept, which is a `Subquery Scan` this reader does not pin.
+  // The predicate: whether the value an expression spells is one a plan may spell either
+  // way. A `Var` is followed to the range-table entry it stands on (`:varno`, and
+  // `:varattno` within it), through whatever the entry is made of — a `GROUP` entry's
+  // `:groupexprs`, a subquery's own select list and its own range table — until a `WITH`
+  // query is reached, at any depth and at any level of the tree. A path the reader cannot
+  // follow is refused rather than passed: an entry of a kind that carries no expression
+  // (a function or a `VALUES` list), a name no definition here answers, a reference to an
+  // outer level, and a chain deeper than the walk goes are all the same answer — this
+  // column is not read. A `SUBLINK` is the one exception: it stands over a query of its
+  // own whose value the plan prints as a subplan, which the reader refuses there.
+  const readsEitherWay = (value: Dumped, level: Dumped[], depth: number): boolean => {
+    if (depth > WITH_TRACE_DEPTH) return true
     if (value.kind === 'list') {
-      return value.items.some((item) => readsUncertainWith(item, depth))
+      return value.items.some((item) => readsEitherWay(item, level, depth))
     }
     if (value.kind !== 'node') return false
     if (value.type === 'SUBLINK') return false
-    if (value.type === 'VAR') {
-      if (numberOf(value.fields.get('varlevelsup')) !== 0) return false
-      const varno = numberOf(value.fields.get('varno'))
-      if (varno === null) return false
-      const name = cteByIndex.get(varno)
-      if (name !== undefined && uncertain.has(name)) return true
-      const grouped = groupExprs.get(varno)
-      if (grouped === undefined) return false
-      const attno = numberOf(value.fields.get('varattno'))
-      const expr = attno === null ? undefined : grouped[attno - 1]
-      return expr === undefined ? false : readsUncertainWith(expr, depth + 1)
+    if (value.type !== 'VAR') {
+      return [...value.fields.values()].some((field) => readsEitherWay(field, level, depth))
     }
-    return [...value.fields.values()].some((field) => readsUncertainWith(field, depth))
+    if (numberOf(value.fields.get('varlevelsup')) !== 0) return true
+    const varno = numberOf(value.fields.get('varno'))
+    const attno = numberOf(value.fields.get('varattno'))
+    if (varno === null || attno === null) return true
+    const entry = level[varno - 1]
+    if (entry?.kind !== 'node') return true
+    const kind = textOf(entry.fields.get('rtekind'))
+    // A base relation: the value is a column of a table, and no `WITH` query stands behind it.
+    if (kind === '0') return false
+    if (kind === '6') {
+      const name = textOf(entry.fields.get('ctename'))
+      return name === null || uncertain.has(name)
+    }
+    if (kind === '9') {
+      const expr = nodesOf(entry.fields.get('groupexprs'))[attno - 1]
+      return expr === undefined || readsEitherWay(expr, level, depth + 1)
+    }
+    if (kind === '1') {
+      const subquery = entry.fields.get('subquery')
+      if (subquery?.kind !== 'node') return true
+      const entries = nodesOf(subquery.fields.get('targetList'))
+      const column = entries[attno - 1]
+      if (column?.kind !== 'node') return true
+      const expr = column.fields.get('expr')
+      if (expr === undefined) return true
+      return readsEitherWay(expr, nodesOf(subquery.fields.get('rtable')), depth + 1)
+    }
+    // A function, a `VALUES` list, a join, a table function, a kind the reader does not
+    // know: the value comes from something this walk can say nothing about.
+    return true
   }
   for (const [position, entry] of nodesOf(top.fields.get('targetList')).entries()) {
     if (entry.kind !== 'node') continue
     const expr = entry.fields.get('expr')
-    if (expr !== undefined && readsUncertainWith(expr)) tree.inlinedWithColumns.add(position)
+    if (expr === undefined) continue
+    if (readsEitherWay(expr, nodesOf(top.fields.get('rtable')), 0)) {
+      tree.inlinedWithColumns.add(position)
+    }
   }
 
   const ambiguousAliases = new Set<string>()

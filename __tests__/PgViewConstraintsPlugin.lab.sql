@@ -508,6 +508,21 @@ create view v_sale_store_totals as
   from sale s
   left join (select store_id, count(*) as n from sale group by store_id) totals
     on totals.store_id = s.store_id;
+-- NEGATIVE: a grouped `WITH` query read through a `FROM (SELECT …)` wrapper, so the walk
+-- has to follow a `Var` through a subquery's own range table to find the doubt behind it.
+-- A subquery's shape is the planner's to pull up or keep, so a column behind one is no
+-- more settled than the query it reads.
+create view v_inlined_with_wrapper as
+  with totals as (select store_id, count(*) as n from sale group by store_id)
+  select s.id, sub.n
+  from sale s
+       join (select store_id, n from totals) sub on sub.store_id = s.store_id;
+-- NEGATIVE: and the same query read directly, with no wrapper between.
+create view v_inlined_with_direct as
+  with totals as (select store_id, count(*) as n from sale group by store_id)
+  select s.id, totals.n
+  from sale s
+       join totals on totals.store_id = s.store_id;
 
 -- NEGATIVE: a lateral grouping that reaches out to another relation. Once the grouping
 -- is pinned, what stood inside it — the filter tying it to `st` — holds of the rows

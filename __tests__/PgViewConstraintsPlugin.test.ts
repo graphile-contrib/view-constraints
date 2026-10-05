@@ -394,6 +394,24 @@ const CASES: Case[] = [
     primaryKey: null
   },
   {
+    view: 'v_inlined_with_wrapper',
+    about:
+      'the doubt is followed through a FROM (SELECT …) wrapper: the select list reads the ' +
+      'wrapper, whose own column reads the grouped WITH query, and the column is refused',
+    origins: ['id=sale.id', 'n=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_inlined_with_direct',
+    about: 'and the same query read directly, with no wrapper in between',
+    origins: ['id=sale.id', 'n=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.sale (id)'],
+    primaryKey: null
+  },
+  {
     view: 'v_unique_key',
     about: 'a unique index is as good a key of the base table as the primary key',
     origins: ['code=asset.code'],
