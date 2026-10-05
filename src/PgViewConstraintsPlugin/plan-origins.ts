@@ -59,6 +59,13 @@ export interface PlanCatalog extends QualifierCatalog {
    * non-nullness rule that spelling carries does not hold in this database.
    */
   shadowedNames: ReadonlySet<string>
+  /**
+   * Each `WITH` query of this view's defining query, by name, and its column names in
+   * select-list order — the map a `CTE Scan` reads a column by. Read from the view's
+   * stored rewrite tree (`view-tree.ts`); empty where it could not be read, which
+   * leaves a `CTE Scan` refused as before.
+   */
+  cteColumns: ReadonlyMap<string, string[]>
 }
 
 /** One plan node of `EXPLAIN (FORMAT JSON)`, as much of it as this reader uses. */
@@ -79,6 +86,10 @@ export interface ExplainPlanNode {
   'Group Key'?: string[]
   /** `Simple`, or `Partial` / `Finalize` for an aggregate split across workers. */
   'Partial Mode'?: string
+  /** On a `CTE Scan`: the `WITH` query it reads. */
+  'CTE Name'?: string
+  /** On the subplan computing a `WITH` query: `CTE <name>`. */
+  'Subplan Name'?: string
   /** The index an index scan reads, whose predicate may stand in for a qualifier. */
   'Index Name'?: string
   // The conditions a node applies, where `plan-keys.ts` and `plan-qualifiers.ts` read
@@ -141,13 +152,14 @@ export const COLUMN_REFUSALS = {
     'value to it',
   'through-a-materialized-with':
     'the entry is spelled with a materialized `WITH` query’s own column name, and the ' +
-    'map from those names to the positions of its select list is not in the plan',
+    'map from those names to the positions of its select list — read from the view’s ' +
+    'stored rewrite tree — is not at hand',
   'through-an-unpinned-subquery':
     'the entry is spelled with the alias of a `Subquery Scan` the catalog does not pin ' +
     'to one view this relation is built on — a set operation’s own branch ' +
-    '(`*SELECT* 3`), an inline `FROM (SELECT …) x`, or a view the query gave an alias ' +
-    'of its own — or one whose child does not print that view’s select list entry for ' +
-    'entry',
+    '(`*SELECT* 3`), an inline `FROM (SELECT …) x`, or a source view whose alias the ' +
+    'stored tree does not resolve — or one whose child does not print that view’s ' +
+    'select list entry for entry',
   'through-a-row-source-the-catalog-does-not-name':
     'the entry is spelled with an alias that is not a relation scan — a function ' +
     'scan, a `VALUES` list, or a scan the plan does not carry at all because a ' +
@@ -469,6 +481,39 @@ function aliasNodeTypes(root: ExplainPlanNode): Map<string, string> {
   return kinds
 }
 
+// The name a `CTE Scan` prints for the query it reads: `Subplan Name` is `CTE <name>`
+// on the subplan that computes the query, and `CTE Name` is where a scan says which
+// query it reads.
+const CTE_SUBPLAN_PREFIX = 'CTE '
+
+/** The subplan computing each `WITH` query, by the query's name. */
+function cteSubplansIn(root: ExplainPlanNode): Map<string, ExplainPlanNode> {
+  const subplans = new Map<string, ExplainPlanNode>()
+  walk(root, (node) => {
+    const name = node['Subplan Name']
+    if (typeof name === 'string' && name.startsWith(CTE_SUBPLAN_PREFIX)) {
+      const cte = name.slice(CTE_SUBPLAN_PREFIX.length)
+      if (!subplans.has(cte)) subplans.set(cte, node)
+    }
+  })
+  return subplans
+}
+
+/** The `WITH` query each `CTE Scan` alias reads, by alias. */
+function cteAliasesIn(root: ExplainPlanNode): Map<string, string> {
+  const aliases = new Map<string, string>()
+  walk(root, (node) => {
+    if (
+      node['Node Type'] === CTE_SCAN &&
+      node.Alias !== undefined &&
+      node['CTE Name'] !== undefined
+    ) {
+      aliases.set(node.Alias, node['CTE Name'])
+    }
+  })
+  return aliases
+}
+
 /**
  * A `Subquery Scan` this reader may descend through, and the node under it that
  * carries the crossed view's select list.
@@ -698,26 +743,24 @@ function mergeReadings(readings: Reading[]): Reading {
 }
 
 /**
- * Why a materialized `WITH` query is a wall rather than a boundary to cross, where a
- * view is a boundary.
+ * The two boundaries the reader crosses, and where each one's map lives.
  *
  * A `WITH` query referenced once is inlined and leaves no boundary at all; referenced
  * twice it is materialized, and then the reader above it says `live_routes.currency_id`
- * — the name of the `WITH` query's own column, not of any relation. Crossing that
- * needs the map from the `WITH` query's column names to the positions of its select
- * list, and nothing holds that map: the `CTE <name>` subplan node prints the select
- * list in order but never its names; a `CTE Scan` prints names but in the order its
- * own parent asked for, and which columns it prints at all is decided by what the
- * nodes above it happen to need — `live.id, live.cur_code, live.amount` under one
- * join method and `live.id, live.cur_code` under another, for the same view on the
- * same schema. Recovering the map from a scan that happens to print the whole list is
- * an answer that exists on the days the planner is generous, and a reader whose
- * answer depends on that is the reader this plugin exists to replace.
+ * — the name of the `WITH` query's own column, not of any relation. Crossing that needs
+ * the map from the `WITH` query's column names to the positions of its select list, and
+ * the plan does not hold it: the `CTE <name>` subplan node prints the select list in
+ * order but never its names, and a `CTE Scan` prints names in the order its own parent
+ * asked for. Recovering the map from a scan that happens to print the whole list is an
+ * answer that exists on the days the planner is generous; the map the view's stored
+ * rewrite tree holds (`cteColumns`, read by `view-tree.ts`) is a fact about the schema
+ * and is what this reader uses.
  *
- * A view is the case where that map does exist and is not in the plan at all: the
- * catalog holds it, in `attnum` order, and it is a fact about the schema rather than
- * about the day's plan. So a `Subquery Scan` the catalog pins to one view this
- * relation is built on is descended through, and a `CTE Scan` is not.
+ * A view is the other boundary, and there the map — a view's columns in `attnum` order
+ * are the positions of its select list — is in the catalog rather than the plan. So a
+ * `Subquery Scan` the catalog pins to one view this relation is built on is descended
+ * through, and a `CTE Scan` whose tree names the query's columns is descended into its
+ * subplan.
  */
 class OriginReader {
   private readonly relations: Map<string, { schema: string; relation: string }>
@@ -734,6 +777,10 @@ class OriginReader {
   private readonly nulledNodes: ReadonlySet<ExplainPlanNode>
   private readonly crossable: ReadonlyMap<string, CrossableSubquery>
   private readonly aliasKinds: ReadonlyMap<string, string>
+  /** The `WITH` query each `CTE Scan` alias reads, and the subplan computing each. */
+  private readonly cteOfAlias: ReadonlyMap<string, string>
+  private readonly cteSubplans: ReadonlyMap<string, ExplainPlanNode>
+  private readonly cteStack = new Set<string>()
   private readonly catalog: PlanCatalog
   /** Every column of a set operation whose branches can be told apart, by entry text. */
   private readonly unionColumns: ReadonlyMap<string, UnionColumn>
@@ -754,6 +801,8 @@ class OriginReader {
     this.nulledNodes = nullExtended.nodes
     this.crossable = crossableSubqueries(root, candidates)
     this.aliasKinds = aliasNodeTypes(root)
+    this.cteOfAlias = cteAliasesIn(root)
+    this.cteSubplans = cteSubplansIn(root)
     const unions = unionColumnsOf(root, this.crossable)
     this.unionColumns = unions.columns
     this.unionAliases = unions.aliases
@@ -853,9 +902,43 @@ class OriginReader {
       return this.cross(crossable, reference, new Set([...crossing, reference.alias]))
     }
     const kind = this.aliasKinds.get(reference.alias)
-    if (kind === CTE_SCAN) return unknown('through-a-materialized-with')
+    if (kind === CTE_SCAN) {
+      return this.crossCte(reference.alias, reference.column, crossing)
+    }
     if (kind === SUBQUERY_SCAN) return unknown('through-an-unpinned-subquery')
     return unknown('through-a-row-source-the-catalog-does-not-name')
+  }
+
+  /**
+   * Reads one column of a `WITH` query through the subplan that computes it: the stored
+   * tree says which position of the query's select list the column stands at, and the
+   * subplan prints that select list. The value is the entry's value unchanged — a
+   * `WITH` query's column is its select list entry's type — so there is no waypoint to
+   * judge. A `WITH` query whose map or subplan is not in hand stays refused.
+   */
+  private crossCte(alias: string, column: string, crossing: ReadonlySet<string>): Reading {
+    const cte = this.cteOfAlias.get(alias)
+    const columns = cte === undefined ? undefined : this.catalog.cteColumns.get(cte)
+    const subplan = cte === undefined ? undefined : this.cteSubplans.get(cte)
+    if (cte === undefined || !columns || !subplan || this.cteStack.has(cte)) {
+      return unknown('through-a-materialized-with')
+    }
+    const position = columns.indexOf(column)
+    if (position < 0) return unknown('through-a-materialized-with')
+    this.cteStack.add(cte)
+    const inner = this.read(subplan.Output?.[position] ?? '', crossing)
+    this.cteStack.delete(cte)
+    // An outer join nulls the `CTE Scan` instance, not the subplan that computes the
+    // query — the subplan is an `InitPlan` beside the join and is never padded — so the
+    // scan's own null-extension is what the value carries.
+    if (this.nulled.has(alias)) {
+      return {
+        origins: inner.origins?.map((origin) => ({ ...origin, nullExtended: true })) ?? null,
+        nullValue: true,
+        reason: inner.reason
+      }
+    }
+    return inner
   }
 
   private origin(
@@ -970,6 +1053,9 @@ class OriginReader {
     if (reference) {
       if (groupingSets) return 'nullable'
       if (reference.alias !== null) {
+        if (this.aliasKinds.get(reference.alias) === CTE_SCAN) {
+          return this.evaluateCte(reference.alias, reference.column, crossing)
+        }
         const crossable = this.crossable.get(reference.alias)
         if (crossable) {
           // The expression rules reach across a boundary the origin reader
@@ -995,6 +1081,31 @@ class OriginReader {
       hasGroupKey: groupsItsInput(node),
       shadowed: (name) => this.catalog.shadowedNames.has(name)
     })
+  }
+
+  /**
+   * The nullability of one column of a `WITH` query, evaluated at the entry of the
+   * subplan that computes it — where the node that grouped the query, and the plan's
+   * own outer joins around it, are the node's own.
+   */
+  private evaluateCte(
+    alias: string,
+    column: string,
+    crossing: ReadonlySet<string>
+  ): ExpressionNullability {
+    const cte = this.cteOfAlias.get(alias)
+    const columns = cte === undefined ? undefined : this.catalog.cteColumns.get(cte)
+    const subplan = cte === undefined ? undefined : this.cteSubplans.get(cte)
+    if (cte === undefined || !columns || !subplan || this.cteStack.has(cte)) return 'unknown'
+    const position = columns.indexOf(column)
+    if (position < 0) return 'unknown'
+    // An outer join nulls the `CTE Scan` instance even though the subplan beside the
+    // join is never padded, so the scan's own null-extension answers here.
+    if (this.nulled.has(alias)) return 'nullable'
+    this.cteStack.add(cte)
+    const state = this.evaluateEntry(subplan.Output?.[position] ?? '', subplan, crossing)
+    this.cteStack.delete(cte)
+    return state
   }
 
   private evaluateCrossed(

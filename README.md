@@ -150,6 +150,25 @@ branches cannot be told apart — a set operation standing over another, so the 
 spelling names a column of both — no column is read and the view says
 `set-operation-not-a-select-list`.
 
+A `WITH` query referenced twice is materialized, and the plan prints its columns by the
+query's own names in the `CTE Scan` that reads them while the subplan computes the
+query's select list in order — with no map between the two in the plan. That map, and
+where each of the view's own columns was written from, is in the view's stored rewrite
+tree (`pg_rewrite.ev_action`), read field by field and not parsed as SQL: the tree names
+every `WITH` query's columns in order (`:ctename`, `:ctecolnames`), so a `cte.col` is
+read at that column's position in the subplan the plan computes it by. Where the plan
+could not read a column at all — a scan a constant qualifier removed, a `WITH` query
+whose tree is out of reach — the tree's own record of the base column the view column
+was written from (`:resorigtbl`, `:resorigcol`) is taken as a fallback source for a
+relation, and for nothing else: it says nothing of a column's nullness, and a column the
+plan did read is judged by the plan. The tree also names every range-table alias of the
+view's relations (`:alias`, `:relid`), so a source view the query referred to by an
+explicit alias (`FROM deposit.v bank_range`) is a boundary the reader crosses too —
+PostgreSQL spells such a subquery's node with the alias, not the view's name, and the
+tree is what turns the alias back into the view. The tree's format is PostgreSQL-internal
+and carries no cross-version promise, so the lab reads it on every run, a case per shape
+next to the cases that hold the plan's own text format.
+
 ## Plan invariance
 
 The answer must not depend on the plan the planner happened to choose.

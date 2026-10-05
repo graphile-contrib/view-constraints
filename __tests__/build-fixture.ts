@@ -22,12 +22,15 @@ import pg from 'pg'
 import {
   explainStatement,
   readCatalogRelations,
+  readRelationOids,
   readStrictEquality,
   readTables,
   readTypeCoercions,
   readViewObjectNames,
+  readViewTrees,
   readViews,
-  readViewSources
+  readViewSources,
+  resolveTreeColumns
 } from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { RunQuery } from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { ExplainPlanNode } from '../src/PgViewConstraintsPlugin/plan-origins.ts'
@@ -79,6 +82,8 @@ const PLAN_FIELDS = [
   'Index Name',
   'Group Key',
   'Partial Mode',
+  'CTE Name',
+  'Subplan Name',
   'Hash Cond',
   'Merge Cond',
   'Join Filter',
@@ -131,6 +136,10 @@ const coercions = await readTypeCoercions(runQueryOn(lab))
 const strictEquality = await readStrictEquality(runQueryOn(lab))
 // The user objects each lab view names, per view: which rule spellings it shadows.
 const viewObjects = await readViewObjectNames(runQueryOn(lab))
+// Each view's stored rewrite tree: its CTE columns and the base column each of its own
+// columns came from.
+const viewTrees = await readViewTrees(runQueryOn(lab), ['lab'])
+const relationOids = await readRelationOids(runQueryOn(lab))
 const views = await readViews(runQueryOn(lab), ['lab'])
 // The tables of the lab, each a referencing half of a relation to a projection.
 const tables = await readTables(runQueryOn(lab), ['lab'])
@@ -153,12 +162,26 @@ for (const regime of REGIMES) {
     )
     const plan = rows.rows[0]?.['QUERY PLAN']?.[0]?.Plan
     if (!plan) throw new Error(`${view.view}: EXPLAIN returned no plan`)
+    const facts = viewTrees.get(`lab.${view.view}`)
+    // Each range-table alias the view's stored tree names, resolved to the relation it
+    // stands for, so a `Subquery Scan` spelled with an explicit alias is crossable.
+    const viewAliases = Object.fromEntries(
+      [...(facts?.relationAliases ?? [])].flatMap(([alias, relid]) => {
+        const relation = relationOids.get(relid)
+        return relation ? [[alias, relation.relation]] : []
+      })
+    )
     planned.push({
       schema: view.schema,
       view: view.view,
       relkind: view.relkind,
       regime: regime.name,
       columns,
+      cteColumns: Object.fromEntries(facts?.cteColumns ?? new Map()),
+      treeColumns: Object.fromEntries(
+        resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map())
+      ),
+      viewAliases,
       plan: prune(plan)
     })
   }

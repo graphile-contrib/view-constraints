@@ -18,6 +18,8 @@ import type {
 import { readPlanOrigins } from './plan-origins.ts'
 import type { ExplainPlanNode, ViewShape } from './plan-origins.ts'
 import type { PlanCatalog } from './plan-origins.ts'
+import { readCteColumns, readTreeAliases, readTreeOrigins } from './view-tree.ts'
+import type { TreeOrigin } from './view-tree.ts'
 
 /** The one thing this module needs of a connection: run SQL, get rows. */
 export type RunQuery = <Row>(text: string, values?: unknown[]) => Promise<readonly Row[]>
@@ -291,6 +293,21 @@ const VIEW_OBJECTS_QUERY = `
     AND class.relkind IN ('v', 'm')
     AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')`
 
+// The stored analysed body of each view (`pg_node_tree`), read for the facts the plan
+// cannot state: the column names of every `WITH` query, and the base relation and
+// column each of the view's own columns came from. Read field by field
+// (`view-tree.ts`), not parsed as SQL; a view whose tree cannot be read leaves the
+// plan's own refusals in place.
+const VIEW_ACTION_QUERY = `
+  SELECT namespace.nspname    AS schema,
+         class.relname        AS view,
+         rule.ev_action::text AS action
+  FROM pg_rewrite rule
+           JOIN pg_class class ON class.oid = rule.ev_class
+           JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
+  WHERE class.relkind IN ('v', 'm')
+    AND namespace.nspname = ANY ($1)`
+
 // Column types, for the one question the plan cannot answer: whether a cast over a
 // column reference leaves the value alone.
 const COLUMN_QUERY = `
@@ -484,7 +501,8 @@ export function ruleSpellingsShadowedFor(
 export function planCatalogFrom(
   catalog: ReadonlyMap<string, CatalogRelation>,
   strictEquality: boolean,
-  shadowedNames: ReadonlySet<string> = new Set()
+  shadowedNames: ReadonlySet<string> = new Set(),
+  cteColumns: ReadonlyMap<string, string[]> = new Map()
 ): PlanCatalog {
   return {
     uniqueKeysOf: (schema, relation) => catalog.get(`${schema}.${relation}`)?.uniqueKeys ?? [],
@@ -495,7 +513,8 @@ export function planCatalogFrom(
     strictEquality,
     columnNotNull: (schema, relation, column) =>
       catalog.get(`${schema}.${relation}`)?.columns.get(column)?.notNull,
-    shadowedNames
+    shadowedNames,
+    cteColumns
   }
 }
 
@@ -523,6 +542,127 @@ export async function readViewObjectNames(query: RunQuery): Promise<Map<string, 
     else objects.set(key, new Set([row.name]))
   }
   return objects
+}
+
+/** What a view's stored rewrite tree says: its CTE columns and its columns' origins. */
+export interface ViewTreeFacts {
+  cteColumns: Map<string, string[]>
+  treeOrigins: Map<number, TreeOrigin>
+  /** The relation each range-table alias of the view names, by alias. */
+  relationAliases: Map<string, number>
+}
+
+/** One base column a view column's stored tree traced it to. */
+export interface TreeColumn {
+  schema: string
+  relation: string
+  column: string
+}
+
+// The oid, schema, relation and column names of every relation, so a stored tree's
+// `resorigtbl`/`resorigcol` (an oid and an attribute number) resolves to the base
+// column it names.
+const RELATION_OIDS_QUERY = `
+  SELECT class.oid              AS oid,
+         namespace.nspname      AS schema,
+         class.relname          AS relation,
+         attribute.attnum       AS attnum,
+         attribute.attname::text AS column_name
+  FROM pg_class class
+           JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
+           JOIN pg_attribute attribute ON attribute.attrelid = class.oid
+  WHERE attribute.attnum > 0
+    AND NOT attribute.attisdropped
+    AND class.relkind IN ('r', 'p', 'v', 'm', 'f')
+    AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')`
+
+/** An index of every relation by oid, so a stored tree's origin resolves by name. */
+export type RelationOidIndex = ReadonlyMap<
+  number,
+  { schema: string; relation: string; columns: ReadonlyMap<number, string> }
+>
+
+export async function readRelationOids(query: RunQuery): Promise<RelationOidIndex> {
+  const rows = await query<{
+    oid: number
+    schema: string
+    relation: string
+    attnum: number
+    column_name: string
+  }>(RELATION_OIDS_QUERY)
+  const index = new Map<
+    number,
+    { schema: string; relation: string; columns: Map<number, string> }
+  >()
+  for (const row of rows) {
+    let entry = index.get(row.oid)
+    if (!entry) {
+      entry = { schema: row.schema, relation: row.relation, columns: new Map() }
+      index.set(row.oid, entry)
+    }
+    entry.columns.set(row.attnum, row.column_name)
+  }
+  return index
+}
+
+/** Resolves each of a view's tree origins to the base column it names, by position. */
+export function resolveTreeColumns(
+  index: RelationOidIndex,
+  origins: ReadonlyMap<number, TreeOrigin>
+): Map<number, TreeColumn> {
+  const resolved = new Map<number, TreeColumn>()
+  for (const [position, origin] of origins) {
+    const relation = index.get(origin.tableId)
+    const column = relation?.columns.get(origin.attnum)
+    if (relation && column !== undefined) {
+      resolved.set(position, { schema: relation.schema, relation: relation.relation, column })
+    }
+  }
+  return resolved
+}
+
+/** Each view's CTE column map and column origins, by `schema.view`. */
+export async function readViewTrees(
+  query: RunQuery,
+  schemas: string[]
+): Promise<Map<string, ViewTreeFacts>> {
+  const rows = await query<{ schema: string; view: string; action: string | null }>(
+    VIEW_ACTION_QUERY,
+    [schemas]
+  )
+  const trees = new Map<string, ViewTreeFacts>()
+  for (const row of rows) {
+    if (row.action === null) continue
+    trees.set(`${row.schema}.${row.view}`, {
+      cteColumns: readCteColumns(row.action),
+      treeOrigins: readTreeOrigins(row.action),
+      relationAliases: readTreeAliases(row.action)
+    })
+  }
+  return trees
+}
+
+/**
+ * The views a `Subquery Scan` may be pinned to, by the name it carries: the source
+ * views of this relation by their own names, and — for a source the defining query
+ * referred to by an explicit alias (`FROM deposit.v bank_range`) — by that alias, read
+ * from the relation each range-table alias names. The plan spells such a node with the
+ * range-table entry's name, which is the alias, and the alias is no view's name.
+ */
+export function subqueryCandidatesFor(
+  views: readonly ViewSourceRow[],
+  facts: ViewTreeFacts | undefined,
+  oids: RelationOidIndex,
+  schema: string,
+  name: string
+): Map<string, ViewShape> {
+  const candidates = subqueryViewCandidates(views, schema, name)
+  for (const [alias, relid] of facts?.relationAliases ?? []) {
+    const relation = oids.get(relid)
+    const shape = relation === undefined ? undefined : candidates.get(relation.relation)
+    if (shape) candidates.set(alias, shape)
+  }
+  return candidates
 }
 
 /**
@@ -652,6 +792,8 @@ export async function collectViewConstraints(
   const coercions = await readTypeCoercions(query)
   const viewSources = await readViewSources(query)
   const viewObjects = await readViewObjectNames(query)
+  const viewTrees = await readViewTrees(query, schemas)
+  const relationOids = await readRelationOids(query)
   const views = await readViews(query, schemas)
   const derivations: ViewDerivation[] = []
   const failures: CollectResult['failures'] = []
@@ -699,16 +841,27 @@ export async function collectViewConstraints(
         readPlanOrigins(
           plan,
           columns.length,
-          subqueryViewCandidates(viewSources, view.schema, view.view),
+          subqueryCandidatesFor(
+            viewSources,
+            viewTrees.get(`${view.schema}.${view.view}`),
+            relationOids,
+            view.schema,
+            view.view
+          ),
           planCatalogFrom(
             catalog,
             strictEquality,
-            ruleSpellingsShadowedFor(viewSources, viewObjects, view.schema, view.view)
+            ruleSpellingsShadowedFor(viewSources, viewObjects, view.schema, view.view),
+            viewTrees.get(`${view.schema}.${view.view}`)?.cteColumns ?? new Map()
           )
         ),
         catalog,
         coercions,
-        deriveUnique
+        deriveUnique,
+        resolveTreeColumns(
+          relationOids,
+          viewTrees.get(`${view.schema}.${view.view}`)?.treeOrigins ?? new Map()
+        )
       )
     )
   }

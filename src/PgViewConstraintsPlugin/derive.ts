@@ -401,7 +401,8 @@ export function deriveViewConstraints(
   plan: PlanOrigins | PlanRefusal,
   catalog: ReadonlyMap<string, CatalogRelation>,
   coercions: TypeCoercions,
-  deriveUnique = true
+  deriveUnique = true,
+  treeColumns: ReadonlyMap<number, { schema: string; relation: string; column: string }> = new Map()
 ): ViewDerivation {
   const notes: string[] = []
   const columns = viewColumns.map((column) => column.name)
@@ -638,6 +639,40 @@ export function deriveViewConstraints(
           foreignColumns: first.foreignColumns
         },
         candidates.map((candidate) => candidate.via)
+      )
+    }
+  }
+
+  // Where the plan could not read a column at all, the view's own stored tree still
+  // traces it to the base column it was written as — through subqueries, joins and
+  // `WITH` queries alike — and a bare reference to a base column carries its foreign
+  // keys. Only the columns the plan left without a source are read this way, and only
+  // for a relation: the tree says nothing of non-nullness, and a column whose value the
+  // plan did read is judged by the plan.
+  for (let index = 0; index < columns.length; index++) {
+    const viewColumn = columns[index]
+    if (viewColumn === undefined || origins[index] !== null) continue
+    const tree = treeColumns.get(index)
+    if (!tree) continue
+    const origin: ColumnOrigin = {
+      schema: tree.schema,
+      relation: tree.relation,
+      alias: `tree:${tree.schema}.${tree.relation}`,
+      column: tree.column,
+      coerced: false,
+      via: [],
+      nullExtended: false,
+      qualifiedNonNull: false
+    }
+    for (const target of singleColumnTargets(origin, catalog)) {
+      emit(
+        [viewColumn],
+        {
+          foreignSchema: target.foreignSchema,
+          foreignRelation: target.foreignRelation,
+          foreignColumns: target.foreignColumns
+        },
+        [target.via]
       )
     }
   }

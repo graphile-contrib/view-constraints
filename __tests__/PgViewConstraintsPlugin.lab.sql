@@ -62,6 +62,11 @@ create view v_cte as
   select live.id, live.cur_code, max(paired.amount) as top_amount
   from live join live paired on paired.cur_code = live.cur_code
   group by live.id, live.cur_code;
+-- POSITIVE: a computed column of a materialized WITH query is read at the entry the
+-- subplan prints — here a `count` inside the query, never NULL.
+create view v_cte_aggregate as
+  with totals as materialized (select cur_code, count(*) as n from tx group by cur_code)
+  select cur_code, n from totals;
 create view v_unique_key as select code from asset;
 create materialized view m_tx as select id, cur_code, amount from tx;
 
