@@ -22,6 +22,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { test } from 'node:test'
 import {
+  castPreservesNonNull,
   deriveProjectionRelations,
   deriveViewConstraints,
   TARGET_REFUSALS,
@@ -1476,6 +1477,88 @@ const CASES: Case[] = [
     notNull: ['id', 'n'],
     foreignKeys: ['(id) references lab.refund (id)'],
     primaryKey: null
+  },
+
+  // ── What a cast preserves, and what it does not ───────────────────────────────
+  //
+  // A cast is not a shape whose SQL definition is the claim: `jsonb` to `integer`
+  // answers NULL for the `jsonb` null, and a user `CREATE CAST` may answer NULL
+  // wherever its function likes. The plan prints the target type by name and
+  // nothing of the operand's, so a cast is transparent only where both ends are
+  // one family PostgreSQL defines to answer a value for every input.
+  {
+    view: 'v_cast_text_to_varchar',
+    about: 'text to varchar is binary-coercible, so a NOT NULL column stays NOT NULL',
+    origins: ['id=tx.id', 'cur_code=tx.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)', '(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_cast_int_to_numeric',
+    about:
+      'bigint to numeric goes through a function, and that function answers a value ' +
+      'for every input: the value is no longer proxied, but it is never NULL',
+    origins: ['id=document.id', 'scaled=—'],
+    notNull: ['id', 'scaled'],
+    foreignKeys: ['(id) references lab.document (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_cast_jsonb_to_int',
+    about:
+      'jsonb to integer answers NULL for the jsonb null: a NOT NULL column is not ' +
+      'NOT NULL through it',
+    origins: ['id=document.id', 'payload=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.document (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_cast_user_defined',
+    about:
+      'a user-defined cast whose function answers NULL for a non-NULL input proves ' +
+      'nothing about the column',
+    origins: ['id=document.id', 'mystery_id=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.document (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_is_tests',
+    about:
+      'the IS TRUE/FALSE/UNKNOWN tests answer a boolean whatever the operand, however ' +
+      'NULL it is — the deparser prints their targets in upper case',
+    origins: [
+      'id=document.id',
+      'is_true=—',
+      'is_not_true=—',
+      'is_false=—',
+      'is_not_false=—',
+      'is_unknown=—',
+      'is_not_unknown=—'
+    ],
+    notNull: [
+      'id',
+      'is_true',
+      'is_not_true',
+      'is_false',
+      'is_not_false',
+      'is_unknown',
+      'is_not_unknown'
+    ],
+    foreignKeys: ['(id) references lab.document (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_group_by_empty',
+    about:
+      'GROUP BY () groups the whole input into one group that may be empty, so an ' +
+      'aggregate over it answers NULL when the input is empty',
+    origins: ['lo=—', 'mean=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
   }
 ]
 
@@ -1691,6 +1774,28 @@ test('a binary-coercible cast keeps the value; a function cast and a modifier do
   assert.equal(valuePreservingCast(varchar8, asText, coercions), true)
   assert.equal(valuePreservingCast(text, asVarchar4, coercions), false)
   assert.equal(valuePreservingCast(text, asNumeric, coercions), false)
+})
+
+test('a truncating cast kills the value but not the non-nullness; a null-answering one kills both', () => {
+  // Whether a cast may answer NULL is weaker than whether it hands the datum on: a
+  // binary coercion under a type modifier truncates and never NULLs, and the
+  // widening integer casts `pg_cast` runs through a function never NULL either.
+  // Everything else may — `jsonb` to `integer` for the `jsonb` null, a user cast for
+  // whatever its function likes — and there the non-nullness is not preserved.
+  const text = { typeId: 25, typeMod: -1, notNull: true }
+  const bigint = { typeId: 20, typeMod: -1, notNull: true }
+  const jsonb = { typeId: 3802, typeMod: -1, notNull: true }
+  const asVarchar4: ViewColumn = { name: 'c', typeId: 1043, typeMod: 8 }
+  const asNumeric: ViewColumn = { name: 'c', typeId: 1700, typeMod: -1 }
+  const asInteger: ViewColumn = { name: 'c', typeId: 23, typeMod: -1 }
+  // Binary-coercible, modifier ignored.
+  assert.equal(castPreservesNonNull(text, asVarchar4, coercions), true)
+  // Through a function, but a widening that answers a value for every input.
+  assert.equal(castPreservesNonNull(bigint, asNumeric, coercions), true)
+  // `jsonb` to `integer` answers NULL for the `jsonb` null, and `text` to `numeric`
+  // is a function cast none of the families authorises.
+  assert.equal(castPreservesNonNull(jsonb, asInteger, coercions), false)
+  assert.equal(castPreservesNonNull(text, asNumeric, coercions), false)
 })
 
 test('a join type this reader does not know nulls both of its sides', () => {

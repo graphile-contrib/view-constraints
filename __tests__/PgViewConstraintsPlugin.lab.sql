@@ -625,3 +625,44 @@ create view v_expr_group_over_join as
 create view v_expr_ordered_aggregate as
   select cur_code, coalesce(string_agg(cur_code, ',' order by id), ''::text) as glued
   from tx group by cur_code;
+
+-- ── What a cast preserves ───────────────────────────────────────────────────────
+--
+-- A cast is not a shape whose SQL definition is the claim, the way `COALESCE` or
+-- `count` is: the value it answers is the cast's own, and PostgreSQL lets a cast
+-- answer NULL for a non-NULL input. `jsonb` to `integer` answers NULL for the
+-- `jsonb` null; a `CREATE CAST` whose function returns NULL answers NULL wherever
+-- it likes. The plan prints the target type by name and says nothing about the
+-- operand's type, so the pair is read off the operand's own shape, and a cast is
+-- taken for transparent only where both ends are one family PostgreSQL defines to
+-- answer a value for every input of the other — the exact numbers, the text types.
+
+-- POSITIVE: text to varchar is binary-coercible, and a NOT NULL column stays NOT NULL.
+create view v_cast_text_to_varchar as select id, cur_code::varchar as cur_code from tx;
+-- POSITIVE: the widening integer casts `pg_cast` sends through a function answer a
+-- value for every input, so a NOT NULL bigint stays NOT NULL through `bigint` to
+-- `numeric`.
+create table document (id bigint primary key, payload jsonb not null, flag boolean);
+create view v_cast_int_to_numeric as select id, id::numeric as scaled from document;
+-- NEGATIVE: `jsonb` to `integer` answers NULL for the `jsonb` null.
+create view v_cast_jsonb_to_int as select id, payload::int as payload from document;
+-- NEGATIVE: a user-defined cast whose function answers NULL for a non-NULL input.
+create type mystery as enum ('a');
+create function to_mystery(bigint) returns mystery
+  language plpgsql immutable as $$ begin if $1 < 0 then return null; end if; return 'a'; end $$;
+create cast (bigint as mystery) with function to_mystery(bigint);
+create view v_cast_user_defined as select id, id::mystery as mystery_id from document;
+
+-- POSITIVE: the IS TRUE/FALSE/UNKNOWN tests answer a boolean whatever the operand,
+-- however NULL it is.
+create view v_expr_is_tests as
+  select id,
+         flag is true as is_true, flag is not true as is_not_true,
+         flag is false as is_false, flag is not false as is_not_false,
+         flag is unknown as is_unknown, flag is not unknown as is_not_unknown
+  from document;
+
+-- NEGATIVE: `GROUP BY ()` groups the whole input into one group that may be empty,
+-- so an aggregate over it answers NULL when the input is empty.
+create view v_expr_group_by_empty as
+  select min(amount) as lo, avg(amount) as mean from tx group by ();

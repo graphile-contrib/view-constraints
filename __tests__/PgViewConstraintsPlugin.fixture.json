@@ -269,6 +269,36 @@
     },
     {
       "schema": "lab",
+      "relation": "document",
+      "foreignKeys": [],
+      "uniqueKeys": [
+        {
+          "name": "document_pkey",
+          "isPrimary": true,
+          "columns": ["id"]
+        }
+      ],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "payload": {
+          "typeId": 3802,
+          "typeMod": -1,
+          "notNull": true
+        },
+        "flag": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "entry",
       "foreignKeys": [
         {
@@ -860,7 +890,7 @@
           "notNull": true
         },
         "cur_code": {
-          "typeId": 150846693,
+          "typeId": 151152883,
           "typeMod": -1,
           "notNull": true
         }
@@ -1313,6 +1343,63 @@
     },
     {
       "schema": "lab",
+      "relation": "v_cast_int_to_numeric",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "scaled": {
+          "typeId": 1700,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cast_jsonb_to_int",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "payload": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cast_text_to_varchar",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "cur_code": {
+          "typeId": 1043,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_cast_truncating",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -1326,6 +1413,25 @@
         "cur_code": {
           "typeId": 1043,
           "typeMod": 8,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_cast_user_defined",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "mystery_id": {
+          "typeId": 151153738,
+          "typeMod": -1,
           "notNull": false
         }
       }
@@ -1841,6 +1947,25 @@
     },
     {
       "schema": "lab",
+      "relation": "v_expr_group_by_empty",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "lo": {
+          "typeId": 1700,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "mean": {
+          "typeId": 1700,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_expr_group_count",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -1973,6 +2098,50 @@
         },
         "mean": {
           "typeId": 1700,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_expr_is_tests",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "is_true": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "is_not_true": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "is_false": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "is_not_false": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "is_unknown": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "is_not_unknown": {
+          "typeId": 16,
           "typeMod": -1,
           "notNull": false
         }
@@ -3664,7 +3833,7 @@
   "coercions": {
     "binary": ["1043>25", "25>1043"],
     "domainBase": {
-      "150846693": 25
+      "151152883": 25
     }
   },
   "strictEquality": true,
@@ -3709,6 +3878,10 @@
     {
       "schema": "lab",
       "table": "depot"
+    },
+    {
+      "schema": "lab",
+      "table": "document"
     },
     {
       "schema": "lab",
@@ -3912,8 +4085,32 @@
     },
     {
       "schema": "lab",
+      "name": "v_cast_int_to_numeric",
+      "columns": ["id", "scaled"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_cast_jsonb_to_int",
+      "columns": ["id", "payload"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_cast_text_to_varchar",
+      "columns": ["id", "cur_code"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
       "name": "v_cast_truncating",
       "columns": ["id", "cur_code"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_cast_user_defined",
+      "columns": ["id", "mystery_id"],
       "sources": []
     },
     {
@@ -4074,6 +4271,12 @@
     },
     {
       "schema": "lab",
+      "name": "v_expr_group_by_empty",
+      "columns": ["lo", "mean"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
       "name": "v_expr_group_count",
       "columns": ["cur_code", "n", "nb", "nd"],
       "sources": []
@@ -4106,6 +4309,20 @@
       "schema": "lab",
       "name": "v_expr_group_values",
       "columns": ["cur_code", "lo", "hi", "total", "mean"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_expr_is_tests",
+      "columns": [
+        "id",
+        "is_true",
+        "is_not_true",
+        "is_false",
+        "is_not_false",
+        "is_unknown",
+        "is_not_unknown"
+      ],
       "sources": []
     },
     {
@@ -5363,6 +5580,81 @@
     },
     {
       "schema": "lab",
+      "view": "v_cast_int_to_numeric",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "scaled",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::numeric"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_jsonb_to_int",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "payload",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.payload)::integer"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_text_to_varchar",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 1043,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.cur_code)::character varying"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_truncating",
       "relkind": "v",
       "regime": "default",
@@ -5384,6 +5676,31 @@
         "Schema": "lab",
         "Relation Name": "tx",
         "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_user_defined",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "mystery_id",
+          "typeId": 151153738,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::mystery"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -6362,6 +6679,44 @@
     },
     {
       "schema": "lab",
+      "view": "v_expr_group_by_empty",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "lo",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "mean",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["min(tx.amount)", "avg(tx.amount)"],
+        "Grouping Sets": [
+          {
+            "Group Keys": [[]]
+          }
+        ],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_expr_group_count",
       "relkind": "v",
       "regime": "default",
@@ -6664,6 +7019,64 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_expr_is_tests",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "is_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "document.id",
+          "(document.flag IS TRUE)",
+          "(document.flag IS NOT TRUE)",
+          "(document.flag IS FALSE)",
+          "(document.flag IS NOT FALSE)",
+          "(document.flag IS UNKNOWN)",
+          "(document.flag IS NOT UNKNOWN)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -10995,6 +11408,81 @@
     },
     {
       "schema": "lab",
+      "view": "v_cast_int_to_numeric",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "scaled",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::numeric"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_jsonb_to_int",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "payload",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.payload)::integer"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_text_to_varchar",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 1043,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.cur_code)::character varying"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_truncating",
       "relkind": "v",
       "regime": "serial",
@@ -11016,6 +11504,31 @@
         "Schema": "lab",
         "Relation Name": "tx",
         "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_user_defined",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "mystery_id",
+          "typeId": 151153738,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::mystery"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -11994,6 +12507,44 @@
     },
     {
       "schema": "lab",
+      "view": "v_expr_group_by_empty",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "lo",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "mean",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["min(tx.amount)", "avg(tx.amount)"],
+        "Grouping Sets": [
+          {
+            "Group Keys": [[]]
+          }
+        ],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_expr_group_count",
       "relkind": "v",
       "regime": "serial",
@@ -12296,6 +12847,64 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_expr_is_tests",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "is_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "document.id",
+          "(document.flag IS TRUE)",
+          "(document.flag IS NOT TRUE)",
+          "(document.flag IS FALSE)",
+          "(document.flag IS NOT FALSE)",
+          "(document.flag IS UNKNOWN)",
+          "(document.flag IS NOT UNKNOWN)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -16784,6 +17393,102 @@
     },
     {
       "schema": "lab",
+      "view": "v_cast_int_to_numeric",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "scaled",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["document.id", "((document.id)::numeric)"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["document.id", "(document.id)::numeric"],
+            "Schema": "lab",
+            "Relation Name": "document",
+            "Alias": "document",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_jsonb_to_int",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "payload",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["document.id", "((document.payload)::integer)"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["document.id", "(document.payload)::integer"],
+            "Schema": "lab",
+            "Relation Name": "document",
+            "Alias": "document",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_text_to_varchar",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 1043,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["tx.id", "((tx.cur_code)::character varying)"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "(tx.cur_code)::character varying"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_truncating",
       "relkind": "v",
       "regime": "parallel-forced",
@@ -16812,6 +17517,31 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_user_defined",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "mystery_id",
+          "typeId": 151153738,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::mystery"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -18027,6 +18757,51 @@
     },
     {
       "schema": "lab",
+      "view": "v_expr_group_by_empty",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "lo",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "mean",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["min(tx.amount)", "avg(tx.amount)"],
+        "Grouping Sets": [
+          {
+            "Group Keys": [[]]
+          }
+        ],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Gather",
+            "Output": ["tx.amount"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["tx.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_expr_group_count",
       "relkind": "v",
       "regime": "parallel-forced",
@@ -18383,6 +19158,79 @@
                 "Parent Relationship": "Outer"
               }
             ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_expr_is_tests",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "is_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": [
+          "document.id",
+          "((document.flag IS TRUE))",
+          "((document.flag IS NOT TRUE))",
+          "((document.flag IS FALSE))",
+          "((document.flag IS NOT FALSE))",
+          "((document.flag IS UNKNOWN))",
+          "((document.flag IS NOT UNKNOWN))"
+        ],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": [
+              "document.id",
+              "(document.flag IS TRUE)",
+              "(document.flag IS NOT TRUE)",
+              "(document.flag IS FALSE)",
+              "(document.flag IS NOT FALSE)",
+              "(document.flag IS UNKNOWN)",
+              "(document.flag IS NOT UNKNOWN)"
+            ],
+            "Schema": "lab",
+            "Relation Name": "document",
+            "Alias": "document",
+            "Parent Relationship": "Outer"
           }
         ]
       }
@@ -23317,6 +24165,81 @@
     },
     {
       "schema": "lab",
+      "view": "v_cast_int_to_numeric",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "scaled",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::numeric"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_jsonb_to_int",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "payload",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.payload)::integer"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_text_to_varchar",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 1043,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.cur_code)::character varying"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_truncating",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -23338,6 +24261,31 @@
         "Schema": "lab",
         "Relation Name": "tx",
         "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_user_defined",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "mystery_id",
+          "typeId": 151153738,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::mystery"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -24357,6 +25305,44 @@
     },
     {
       "schema": "lab",
+      "view": "v_expr_group_by_empty",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "lo",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "mean",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["min(tx.amount)", "avg(tx.amount)"],
+        "Grouping Sets": [
+          {
+            "Group Keys": [[]]
+          }
+        ],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_expr_group_count",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -24694,6 +25680,64 @@
             ]
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_expr_is_tests",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "is_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "document.id",
+          "(document.flag IS TRUE)",
+          "(document.flag IS NOT TRUE)",
+          "(document.flag IS FALSE)",
+          "(document.flag IS NOT FALSE)",
+          "(document.flag IS UNKNOWN)",
+          "(document.flag IS NOT UNKNOWN)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -29062,6 +30106,81 @@
     },
     {
       "schema": "lab",
+      "view": "v_cast_int_to_numeric",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "scaled",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::numeric"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_jsonb_to_int",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "payload",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.payload)::integer"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_text_to_varchar",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 1043,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.cur_code)::character varying"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_truncating",
       "relkind": "v",
       "regime": "no-sort",
@@ -29083,6 +30202,31 @@
         "Schema": "lab",
         "Relation Name": "tx",
         "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_user_defined",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "mystery_id",
+          "typeId": 151153738,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::mystery"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -30047,6 +31191,44 @@
     },
     {
       "schema": "lab",
+      "view": "v_expr_group_by_empty",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "lo",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "mean",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["min(tx.amount)", "avg(tx.amount)"],
+        "Grouping Sets": [
+          {
+            "Group Keys": [[]]
+          }
+        ],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_expr_group_count",
       "relkind": "v",
       "regime": "no-sort",
@@ -30349,6 +31531,64 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_expr_is_tests",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "is_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "document.id",
+          "(document.flag IS TRUE)",
+          "(document.flag IS NOT TRUE)",
+          "(document.flag IS FALSE)",
+          "(document.flag IS NOT FALSE)",
+          "(document.flag IS UNKNOWN)",
+          "(document.flag IS NOT UNKNOWN)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -34676,6 +35916,88 @@
     },
     {
       "schema": "lab",
+      "view": "v_cast_int_to_numeric",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "scaled",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Bitmap Heap Scan",
+        "Output": ["document.id", "(document.id)::numeric"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document",
+        "Plans": [
+          {
+            "Node Type": "Bitmap Index Scan",
+            "Parent Relationship": "Outer",
+            "Index Name": "document_pkey"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_jsonb_to_int",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "payload",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.payload)::integer"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_text_to_varchar",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 1043,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.cur_code)::character varying"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_truncating",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -34697,6 +36019,38 @@
         "Schema": "lab",
         "Relation Name": "tx",
         "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_user_defined",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "mystery_id",
+          "typeId": 151153738,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Bitmap Heap Scan",
+        "Output": ["document.id", "(document.id)::mystery"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document",
+        "Plans": [
+          {
+            "Node Type": "Bitmap Index Scan",
+            "Parent Relationship": "Outer",
+            "Index Name": "document_pkey"
+          }
+        ]
       }
     },
     {
@@ -35699,6 +37053,44 @@
     },
     {
       "schema": "lab",
+      "view": "v_expr_group_by_empty",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "lo",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "mean",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["min(tx.amount)", "avg(tx.amount)"],
+        "Grouping Sets": [
+          {
+            "Group Keys": [[]]
+          }
+        ],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_expr_group_count",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -36015,6 +37407,64 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_expr_is_tests",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "is_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "document.id",
+          "(document.flag IS TRUE)",
+          "(document.flag IS NOT TRUE)",
+          "(document.flag IS FALSE)",
+          "(document.flag IS NOT FALSE)",
+          "(document.flag IS UNKNOWN)",
+          "(document.flag IS NOT UNKNOWN)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -40516,6 +41966,81 @@
     },
     {
       "schema": "lab",
+      "view": "v_cast_int_to_numeric",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "scaled",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::numeric"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_jsonb_to_int",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "payload",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.payload)::integer"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_text_to_varchar",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 1043,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.cur_code)::character varying"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_truncating",
       "relkind": "v",
       "regime": "nestloop-only",
@@ -40537,6 +42062,31 @@
         "Schema": "lab",
         "Relation Name": "tx",
         "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_user_defined",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "mystery_id",
+          "typeId": 151153738,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::mystery"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -41455,6 +43005,44 @@
     },
     {
       "schema": "lab",
+      "view": "v_expr_group_by_empty",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "lo",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "mean",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["min(tx.amount)", "avg(tx.amount)"],
+        "Grouping Sets": [
+          {
+            "Group Keys": [[]]
+          }
+        ],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_expr_group_count",
       "relkind": "v",
       "regime": "nestloop-only",
@@ -41757,6 +43345,64 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_expr_is_tests",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "is_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "document.id",
+          "(document.flag IS TRUE)",
+          "(document.flag IS NOT TRUE)",
+          "(document.flag IS FALSE)",
+          "(document.flag IS NOT FALSE)",
+          "(document.flag IS UNKNOWN)",
+          "(document.flag IS NOT UNKNOWN)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -45969,6 +47615,81 @@
     },
     {
       "schema": "lab",
+      "view": "v_cast_int_to_numeric",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "scaled",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::numeric"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_jsonb_to_int",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "payload",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.payload)::integer"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_text_to_varchar",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "cur_code",
+          "typeId": 1043,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.cur_code)::character varying"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_cast_truncating",
       "relkind": "v",
       "regime": "genetic-join-order",
@@ -45990,6 +47711,31 @@
         "Schema": "lab",
         "Relation Name": "tx",
         "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_cast_user_defined",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "mystery_id",
+          "typeId": 151153738,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["document.id", "(document.id)::mystery"],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
@@ -46968,6 +48714,44 @@
     },
     {
       "schema": "lab",
+      "view": "v_expr_group_by_empty",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "lo",
+          "typeId": 1700,
+          "typeMod": -1
+        },
+        {
+          "name": "mean",
+          "typeId": 1700,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["min(tx.amount)", "avg(tx.amount)"],
+        "Grouping Sets": [
+          {
+            "Group Keys": [[]]
+          }
+        ],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_expr_group_count",
       "relkind": "v",
       "regime": "genetic-join-order",
@@ -47270,6 +49054,64 @@
             "Parent Relationship": "Outer"
           }
         ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_expr_is_tests",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "is_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_true",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_false",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "is_not_unknown",
+          "typeId": 16,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "document.id",
+          "(document.flag IS TRUE)",
+          "(document.flag IS NOT TRUE)",
+          "(document.flag IS FALSE)",
+          "(document.flag IS NOT FALSE)",
+          "(document.flag IS UNKNOWN)",
+          "(document.flag IS NOT UNKNOWN)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "document",
+        "Alias": "document"
       }
     },
     {
