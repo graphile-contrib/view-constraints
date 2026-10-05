@@ -22,6 +22,7 @@ import pg from 'pg'
 import {
   explainStatement,
   readCatalogRelations,
+  readShadowedNames,
   readStrictEquality,
   readTables,
   readTypeCoercions,
@@ -128,6 +129,7 @@ await lab.query(readFileSync(LAB_SQL, 'utf8'))
 const catalog = await readCatalogRelations(runQueryOn(lab))
 const coercions = await readTypeCoercions(runQueryOn(lab))
 const strictEquality = await readStrictEquality(runQueryOn(lab))
+const shadowedNames = await readShadowedNames(runQueryOn(lab))
 const views = await readViews(runQueryOn(lab), ['lab'])
 // The tables of the lab, each a referencing half of a relation to a projection.
 const tables = await readTables(runQueryOn(lab), ['lab'])
@@ -209,6 +211,7 @@ writeFileSync(
         )
       },
       strictEquality,
+      shadowedNames: [...shadowedNames].sort(),
       tables,
       viewSources,
       views: planned

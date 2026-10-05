@@ -29,10 +29,13 @@
 // Non-nullness is the two sides meeting over one column rather than over a key. A
 // view column is NOT NULL when it proxies a base column that is never NULL where it is
 // read — `pg_attribute.attnotnull` says so, or a qualifier of the plan rejects a NULL
-// in it (`plan-qualifiers.ts`) — and the plan puts no NULL of its own into it. No
-// expression is evaluated, so `COALESCE(a, b)`, `count(*)`, a constant and a strict
-// function of non-null arguments are nullable here, derivable in principle and not
-// derived. The
+// in it (`plan-qualifiers.ts`) — and the plan puts no NULL of its own into it. A
+// column the select list spells as an expression has no base column to ask, and what
+// it has instead is the expression's own shape: a literal, `count`, a `COALESCE` over
+// a never-NULL argument prove non-nullness on their own (`plan-expressions.ts`), and
+// everything else stays nullable rather than guessed. No expression is computed and
+// no function's strictness is trusted; only the shapes whose SQL definition is the
+// claim are read. The
 // asymmetry is deliberate. A relation claimed wrongly costs an empty related object;
 // a `notNull` claimed wrongly puts a NULL in a non-null GraphQL field, and the rules
 // of GraphQL then null the whole parent object — so the answer is destroyed rather
@@ -219,6 +222,46 @@ export function valuePreservingCast(
   return target.typeMod === -1 || target.typeMod === source.typeMod
 }
 
+// The built-in casts that answer a value for every non-NULL input although
+// `pg_cast` sends them through a function rather than passing the datum on: the
+// widening integer conversions and the integer-to-numeric ones. Each converts an
+// exact integer to a wider exact representation — `int4` to `int8`, `int4` to
+// `numeric` — which PostgreSQL defines to answer the widened value and which
+// raises on nothing. They are named by base type oid, the one thing `pg_cast`
+// states that the plan does not print: `int2` 21, `int8` 20, `int4` 23,
+// `numeric` 1700. Every other function or I/O cast may answer NULL for a
+// non-NULL input — `jsonb` to `integer`, a user `CREATE CAST` — and is left
+// nullable.
+const NON_NULL_FUNCTION_CASTS = new Set([
+  '21>23',
+  '21>20',
+  '23>20',
+  '21>1700',
+  '23>1700',
+  '20>1700'
+])
+
+/**
+ * Whether a cast cannot turn a non-NULL value into NULL — the weaker question
+ * than `valuePreservingCast`, which also asks whether the datum is handed on
+ * untouched. A binary-coercible cast passes the datum through, and a type
+ * modifier on the target then only narrows it (`text` to `varchar(4)` truncates
+ * and never NULLs), so the modifier is no part of this question. The `int`-family
+ * widening casts that `pg_cast` implements with a function answer a value too;
+ * everything else may answer NULL.
+ */
+export function castPreservesNonNull(
+  source: { typeId: number; typeMod: number },
+  target: { typeId: number; typeMod: number },
+  coercions: TypeCoercions
+): boolean {
+  const from = baseTypeOf(source.typeId, coercions)
+  const to = baseTypeOf(target.typeId, coercions)
+  if (from === to) return true
+  if (coercions.binary.has(`${from}>${to}`)) return true
+  return NON_NULL_FUNCTION_CASTS.has(`${from}>${to}`)
+}
+
 /** A relation a single base column authorises on its own: a one-column key. */
 interface SingleColumnTarget {
   foreignSchema: string
@@ -361,9 +404,23 @@ export function deriveViewConstraints(
   // otherwise read as the base column itself. So the whole chain of types the value
   // took — the base column, each crossed view's own column, the view column being
   // derived — is walked step by step, and every step must hand the datum on untouched.
+  //
+  // Whether a cast may answer NULL is a weaker question than whether it changes the
+  // value, and the two are answered apart: a cast that truncates but cannot NULL
+  // (a binary coercion under a type modifier) refuses the proxy above, yet the column
+  // is still never NULL wherever its base column is. So each column carries both
+  // readings, and the non-nullness pass reads the second.
+  const valuePreserved: boolean[] = []
+  const nonNullPreserved: boolean[] = []
   const origins: ColumnSources[] = plan.columns.map((sources, index) => {
     const viewColumn = viewColumns[index]
-    if (!sources || !viewColumn) return null
+    if (!sources || !viewColumn) {
+      valuePreserved[index] = true
+      nonNullPreserved[index] = true
+      return null
+    }
+    let value = true
+    let notNull = true
     for (const origin of sources) {
       if (!origin.coerced && origin.via.length === 0) continue
       const chain: ({ typeId: number; typeMod: number } | undefined)[] = [
@@ -373,14 +430,23 @@ export function deriveViewConstraints(
         ),
         viewColumn
       ]
-      const broken = chain.slice(0, -1).some((step, at) => {
+      for (let at = 0; at < chain.length - 1; at++) {
+        const step = chain[at]
         const next = chain[at + 1]
-        return !step || !next || !valuePreservingCast(step, next, coercions)
-      })
-      if (broken) {
-        columnRefusals[index] = 'cast-not-value-preserving'
-        return null
+        if (!step || !next) {
+          value = false
+          notNull = false
+          continue
+        }
+        if (!valuePreservingCast(step, next, coercions)) value = false
+        if (!castPreservesNonNull(step, next, coercions)) notNull = false
       }
+    }
+    valuePreserved[index] = value
+    nonNullPreserved[index] = notNull
+    if (!value) {
+      columnRefusals[index] = 'cast-not-value-preserving'
+      return null
     }
     return sources
   })
@@ -391,19 +457,34 @@ export function deriveViewConstraints(
     origin.qualifiedNonNull ||
     catalog.get(`${origin.schema}.${origin.relation}`)?.columns.get(origin.column)?.notNull === true
 
-  // Non-nullness, column by column: the base column is NOT NULL and the plan puts no
-  // NULL of its own over it. A materialized view is left out — its stored row
-  // outlives the row it was copied from, and the copy is the only thing this reader
-  // ever sees of it.
+  // Non-nullness, column by column: the base column is NOT NULL where it is read and
+  // every cast over it may only answer that value or NULL it cannot; or the entry is
+  // no reference at all and the expression it spells proves the value never NULL. A
+  // materialized view is left out — its stored row outlives the row it was copied
+  // from, and the copy is the only thing this reader ever sees of it. A `GROUPING
+  // SETS` superaggregate row is all-NULL grouping columns, and nothing says this
+  // column is not one of them, so it stands over the expression's own answer too.
+  //
+  // The origin path reads the raw sources, not the origins a value-preserving cast
+  // leaves: a cast that refuses the proxy (a truncation) is still read for
+  // non-nullness, and one that may answer NULL (`jsonb` to `integer`) refuses the
+  // column here as it refused it above. The expression path is never reached over a
+  // column the plan does resolve to base columns, so nothing it says can repair a
+  // cast that may NULL.
   const notNullColumns: string[] = []
-  for (const [index, sources] of origins.entries()) {
+  for (let index = 0; index < columns.length; index++) {
     const viewColumn = columns[index]
     if (viewColumn === undefined) continue
     if (relkind !== 'v') continue
-    if (!sources || sources.length === 0) continue
-    if (plan.nullIntroduced[index] !== false) continue
-    const everyBranchNotNull = sources.every((origin) => neverNullOrigin(origin))
-    if (everyBranchNotNull) notNullColumns.push(viewColumn)
+    const sources = plan.columns[index]
+    if (sources && sources.length > 0) {
+      if (plan.nullIntroduced[index] !== false) continue
+      if (nonNullPreserved[index] !== true) continue
+      if (sources.every((origin) => neverNullOrigin(origin))) notNullColumns.push(viewColumn)
+      continue
+    }
+    if (plan.groupingSets) continue
+    if (plan.expressionNotNull[index] === true) notNullColumns.push(viewColumn)
   }
 
   // Scan instances the columns actually came from, in first-appearance order. Only

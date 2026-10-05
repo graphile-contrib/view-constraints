@@ -208,6 +208,49 @@ const STRICT_EQUALITY_QUERY = `
                      WHERE operator.oprname = '='
                        AND NOT procedure.proisstrict) AS strict`
 
+// The built-in spellings the non-nullness rules of `plan-expressions.ts` lean on —
+// `count`, `min`, `max`, `sum`, `avg` as functions, `+ - * / % || = <> < <= > >=` as
+// operators, and `smallint`/`integer`/`bigint`/`numeric`/`text`/`character` as the
+// type families a cast is read by — taken over by a user-defined object. The plan
+// prints a name, not an oid, so a user function called `count`, or a user type
+// called `integer` printed where the built-in's name would be, is printed exactly
+// like the built-in, and the rule it does not obey has to stand down for the whole
+// database. Keywords (`COALESCE`, `CASE`, `AND`, …) cannot be shadowed: the grammar
+// reserves them. Everything PostgreSQL itself defines sits below the first normal
+// object id.
+const SHADOWED_NAMES = [
+  'count',
+  'min',
+  'max',
+  'sum',
+  'avg',
+  '+',
+  '-',
+  '*',
+  '/',
+  '%',
+  '||',
+  '=',
+  '<>',
+  '<',
+  '<=',
+  '>',
+  '>=',
+  'smallint',
+  'integer',
+  'bigint',
+  'numeric',
+  'text',
+  'character',
+  'character varying'
+]
+const SHADOWED_NAMES_QUERY = `
+  SELECT proname AS name FROM pg_proc WHERE oid >= 16384 AND proname = ANY ($1)
+  UNION
+  SELECT oprname FROM pg_operator WHERE oid >= 16384 AND oprname = ANY ($1)
+  UNION
+  SELECT typname FROM pg_type WHERE oid >= 16384 AND typname = ANY ($1)`
+
 // Column types, for the one question the plan cannot answer: whether a cast over a
 // column reference leaves the value alone.
 const COLUMN_QUERY = `
@@ -362,10 +405,17 @@ export async function readStrictEquality(query: RunQuery): Promise<boolean> {
   return row?.strict === true
 }
 
+/** The built-in spellings a user-defined function or operator has taken over. */
+export async function readShadowedNames(query: RunQuery): Promise<Set<string>> {
+  const rows = await query<{ name: string }>(SHADOWED_NAMES_QUERY, [SHADOWED_NAMES])
+  return new Set(rows.map((row) => row.name))
+}
+
 /** What a plan reader asks of the catalog, out of what `readCatalogRelations` read. */
 export function planCatalogFrom(
   catalog: ReadonlyMap<string, CatalogRelation>,
-  strictEquality: boolean
+  strictEquality: boolean,
+  shadowedNames: ReadonlySet<string> = new Set()
 ): PlanCatalog {
   return {
     uniqueKeysOf: (schema, relation) => catalog.get(`${schema}.${relation}`)?.uniqueKeys ?? [],
@@ -373,7 +423,10 @@ export function planCatalogFrom(
       catalog
         .get(`${schema}.${relation}`)
         ?.partialIndexes.find((candidate) => candidate.name === index)?.predicate ?? null,
-    strictEquality
+    strictEquality,
+    columnNotNull: (schema, relation, column) =>
+      catalog.get(`${schema}.${relation}`)?.columns.get(column)?.notNull,
+    shadowedNames
   }
 }
 
@@ -512,7 +565,11 @@ export async function collectViewConstraints(
   declaredRowIdentity?: DeclaredRowIdentity
 ): Promise<CollectResult> {
   const catalog = await readCatalogRelations(query)
-  const planCatalog = planCatalogFrom(catalog, await readStrictEquality(query))
+  const planCatalog = planCatalogFrom(
+    catalog,
+    await readStrictEquality(query),
+    await readShadowedNames(query)
+  )
   const coercions = await readTypeCoercions(query)
   const viewSources = await readViewSources(query)
   const views = await readViews(query, schemas)

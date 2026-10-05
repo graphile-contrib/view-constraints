@@ -45,11 +45,20 @@ import { readPlanKeys } from './plan-keys.ts'
 import type { PlanKey, UniqueKeysOf } from './plan-keys.ts'
 import { qualifiedReference, readQualifiedNonNull } from './plan-qualifiers.ts'
 import type { QualifierCatalog } from './plan-qualifiers.ts'
+import { evaluateExpression, parseExpression } from './plan-expressions.ts'
+import type { ExpressionNullability } from './plan-expressions.ts'
 
-/** What the catalog answers for the plan: the keys a relation has, and the qualifiers
- * a scan applies without printing them. */
+/** What the catalog answers for the plan: the keys a relation has, the qualifiers
+ * a scan applies without printing them, and what the expression rules ask. */
 export interface PlanCatalog extends QualifierCatalog {
   uniqueKeysOf: UniqueKeysOf
+  /** Whether a base column of a catalog relation is NOT NULL in `pg_attribute`. */
+  columnNotNull: (schema: string, relation: string, column: string) => boolean | undefined
+  /**
+   * Built-in spellings a user-defined function or operator has taken over, so the
+   * non-nullness rule that spelling carries does not hold in this database.
+   */
+  shadowedNames: ReadonlySet<string>
 }
 
 /** One plan node of `EXPLAIN (FORMAT JSON)`, as much of it as this reader uses. */
@@ -311,16 +320,26 @@ const JOIN_INPUT_RELATIONSHIPS: ReadonlySet<string> = new Set(['Outer', 'Inner']
 
 /**
  * Every scan instance, by alias, that stands on the nulled side of an outer join
- * somewhere between itself and the root of the plan.
+ * somewhere between itself and the root of the plan — and every plan node,
+ * computed columns included, that stands on one.
  *
  * An alias reached on a nulled path anywhere is nulled everywhere it is read: two
  * scan instances the plan gave one name are not told apart here, and the side that
- * loses is the claim of non-nullness.
+ * loses is the claim of non-nullness. The nodes are the same answer for the
+ * expressions a node prints: a `count(*)` computed below an outer join is NULL in
+ * every row the join padded, whatever `count` promises about the rows it counted.
  */
-function nullExtendedAliases(root: ExplainPlanNode): Set<string> {
-  const nulled = new Set<string>()
+function nullExtendedIn(root: ExplainPlanNode): {
+  aliases: Set<string>
+  nodes: Set<ExplainPlanNode>
+} {
+  const aliases = new Set<string>()
+  const nodes = new Set<ExplainPlanNode>()
   const visit = (node: ExplainPlanNode, underNull: boolean): void => {
-    if (node.Alias !== undefined && underNull) nulled.add(node.Alias)
+    if (underNull) {
+      nodes.add(node)
+      if (node.Alias !== undefined) aliases.add(node.Alias)
+    }
     const joinType = node['Join Type']
     const nulledSides =
       joinType === undefined ? undefined : (JOIN_TYPE_NULLED_SIDES.get(joinType) ?? BOTH_JOIN_SIDES)
@@ -334,7 +353,7 @@ function nullExtendedAliases(root: ExplainPlanNode): Set<string> {
     }
   }
   visit(root, false)
-  return nulled
+  return { aliases, nodes }
 }
 
 // `quote_identifier` spelling: either a bare lower-case identifier, or a
@@ -615,18 +634,28 @@ class OriginReader {
   private readonly soleRelation: { alias: string; schema: string; relation: string } | null
   /** Scan instances an outer join above them can null. */
   private readonly nulled: ReadonlySet<string>
+  /** Plan nodes an outer join above them can null the whole output of. */
+  private readonly nulledNodes: ReadonlySet<ExplainPlanNode>
   private readonly crossable: ReadonlyMap<string, CrossableSubquery>
   private readonly aliasKinds: ReadonlyMap<string, string>
+  private readonly catalog: PlanCatalog
 
-  constructor(root: ExplainPlanNode, candidates: ReadonlyMap<string, ViewShape>) {
+  constructor(
+    root: ExplainPlanNode,
+    candidates: ReadonlyMap<string, ViewShape>,
+    catalog: PlanCatalog
+  ) {
     this.relations = scanAliases(root)
-    this.nulled = nullExtendedAliases(root)
+    const nullExtended = nullExtendedIn(root)
+    this.nulled = nullExtended.aliases
+    this.nulledNodes = nullExtended.nodes
     this.crossable = crossableSubqueries(root, candidates)
     this.aliasKinds = aliasNodeTypes(root)
     const [sole] = [...this.relations]
     const aliasNodes = countNodes(root, (node) => node.Alias !== undefined)
     this.soleRelation =
       aliasNodes === 1 && this.relations.size === 1 && sole ? { alias: sole[0], ...sole[1] } : null
+    this.catalog = catalog
   }
 
   /** `Subquery Scan` nodes this reader descends through, by alias. */
@@ -733,6 +762,148 @@ class OriginReader {
       reason: null
     }
   }
+
+  /**
+   * Whether the expression one `Output` entry spells can be NULL: the same
+   * reading `read` gives of the column references in it, evaluated by the
+   * expression rules of `plan-expressions.ts`. `node` is the node printing the
+   * entry — it says whether the plan has nulled the entry's whole row, and
+   * whether its aggregates group their input.
+   */
+  evaluateEntry(
+    entry: string,
+    node: ExplainPlanNode,
+    crossing: ReadonlySet<string> = new Set()
+  ): ExpressionNullability {
+    if (this.nulledNodes.has(node)) return 'nullable'
+    // A join that nulls one of its inputs can print the very aggregate the nulled
+    // input computed — the planner inlines a grouped subquery under it whole, and the
+    // aggregate lands in the join's own `Output`. In every row the join padded, that
+    // value is NULL however `count` reads, and which side the entry came from is not
+    // in the entry. A column reference is safe here — the alias it names says the
+    // side, and `readingNullability` reads it — and so is everything else built of
+    // references, whose own reading carries the side; a `count` is the one shape
+    // that answers never-NULL of itself and so cannot be told apart. A join type
+    // this map does not know nulls both sides, so it reads the same.
+    const joinType = node['Join Type']
+    if (
+      joinType !== undefined &&
+      (JOIN_TYPE_NULLED_SIDES.get(joinType) ?? BOTH_JOIN_SIDES).size > 0 &&
+      computesCount(entry)
+    ) {
+      return 'unknown'
+    }
+    if (NULL_LITERAL.test(entry)) return 'nullable'
+    const reference = parseReference(entry)
+    if (reference) {
+      if (reference.alias !== null) {
+        const crossable = this.crossable.get(reference.alias)
+        if (crossable) {
+          // The expression rules reach across a boundary the origin reader
+          // crosses too: a computed column of a crossed view is the same
+          // expression one step down, read there where the node printing it
+          // says what the plan does around it.
+          if (crossing.has(reference.alias)) return 'unknown'
+          return this.evaluateCrossed(
+            crossable,
+            reference.column,
+            new Set([...crossing, reference.alias])
+          )
+        }
+      }
+      return this.readingNullability(this.read(entry, crossing))
+    }
+    return evaluateExpression(parseExpression(entry), {
+      column: (referenceText) => this.readingNullability(this.read(referenceText, crossing)),
+      hasGroupKey: groupsItsInput(node),
+      shadowed: (name) => this.catalog.shadowedNames.has(name)
+    })
+  }
+
+  private evaluateCrossed(
+    crossable: CrossableSubquery,
+    column: string,
+    crossing: ReadonlySet<string>
+  ): ExpressionNullability {
+    const position = crossable.view.columns.indexOf(column)
+    if (position < 0) return 'unknown'
+    if (crossable.branches) {
+      return mergeNullabilities(
+        crossable.branches.map((branch) =>
+          this.evaluateEntry(branch.Output?.[position] ?? '', branch, crossing)
+        )
+      )
+    }
+    return this.evaluateEntry(
+      crossable.selectList.Output?.[position] ?? '',
+      crossable.selectList,
+      crossing
+    )
+  }
+
+  /** The reading of a bare reference, turned into the expression rules' answers. */
+  private readingNullability(reading: Reading): ExpressionNullability {
+    if (reading.origins === null) return 'unknown'
+    if (reading.origins.length === 0) return 'nullable'
+    if (reading.nullValue) return 'nullable'
+    let unknown = false
+    for (const origin of reading.origins) {
+      if (origin.nullExtended) return 'nullable'
+      const notNull = this.catalog.columnNotNull(origin.schema, origin.relation, origin.column)
+      if (notNull === undefined) {
+        unknown = true
+        continue
+      }
+      if (!notNull) return 'nullable'
+    }
+    return unknown ? 'unknown' : 'never-null'
+  }
+}
+
+/**
+ * Whether the entry may compute a lifted aggregate: a `count`, the one aggregate
+ * whose value is never NULL of itself, or an opaque fragment that could be one. On
+ * a join that nulls an input, an aggregate the nulled input computed is NULL in
+ * every padded row, and nothing in the entry says which side it came from.
+ */
+function computesCount(entry: string): boolean {
+  const contains = (node: ReturnType<typeof parseExpression>): boolean => {
+    if (!node) return false
+    switch (node.kind) {
+      case 'opaque':
+        return true
+      case 'call':
+        return node.name === 'count' || node.args.some(contains)
+      case 'case':
+        return node.arms.some(contains) || (node.otherwise !== null && contains(node.otherwise))
+      case 'chain':
+        return node.operands.some(contains)
+      case 'unary':
+        return contains(node.operand)
+      case 'cast':
+        return contains(node.operand)
+      default:
+        return false
+    }
+  }
+  return contains(parseExpression(entry))
+}
+
+/** A node whose every output row stands for a non-empty group of its input. */
+function groupsItsInput(node: ExplainPlanNode): boolean {
+  const keys = node['Group Key']
+  return node['Grouping Sets'] === undefined && Array.isArray(keys) && keys.length > 0
+}
+
+/**
+ * The nullability of a value several branches each produce one shape of: NULL in
+ * any branch makes the column nullable there, and only a column no branch can
+ * NULL is never NULL — the intersection, as the origins of a union are.
+ */
+function mergeNullabilities(states: readonly ExpressionNullability[]): ExpressionNullability {
+  if (states.some((state) => state === 'nullable')) return 'nullable'
+  if (states.every((state) => state === 'never-null')) return 'never-null'
+  return 'unknown'
 }
 
 export interface PlanOrigins {
@@ -747,6 +918,15 @@ export interface PlanOrigins {
    * the base column promises about its own values does not reach the view.
    */
   nullIntroduced: boolean[]
+  /**
+   * One entry per requested column: the select-list expression itself proves the
+   * value never NULL — a literal, `count`, a `COALESCE` over a never-NULL argument
+   * — without any base column it may read. A `GROUPING SETS` row can still put a
+   * NULL where the expression does not, which `groupingSets` below says apart.
+   */
+  expressionNotNull: boolean[]
+  /** The plan computes `GROUPING SETS` / `ROLLUP` / `CUBE`, whose superaggregate row is all-NULL grouping columns. */
+  groupingSets: boolean
   /**
    * Every set of the requested columns the plan proves no two rows share; see
    * `plan-keys.ts`. Whether a column of one can be NULL is `derive.ts`'s question.
@@ -780,7 +960,7 @@ export function readPlanOrigins(
   // not hold is that every row of the view answers to a row of the base relation —
   // so neither a non-null column nor a row identity survives it.
   const groupingSets = countNodes(root, (node) => node['Grouping Sets'] !== undefined) > 0
-  const reader = new OriginReader(root, candidates)
+  const reader = new OriginReader(root, candidates, catalog)
   const selectListNode = selectListNodeOf(root)
 
   // A union is readable only where this reader reads its branches one by one: at the
@@ -798,6 +978,7 @@ export function readPlanOrigins(
   if (unions.some((union) => !readableUnions.has(union))) return 'set-operation-not-a-select-list'
 
   const readings: Reading[] = []
+  const nullabilities: ExpressionNullability[] = []
   if (TUPLE_UNIONING_NODE_TYPES.has(selectListNode['Node Type'])) {
     const branches = inputChildren(selectListNode)
     if (branches.length === 0) return 'output-not-positional'
@@ -811,11 +992,19 @@ export function readPlanOrigins(
       readings.push(
         mergeReadings(branches.map((branch) => reader.read(branch.Output?.[index] ?? '')))
       )
+      nullabilities.push(
+        mergeNullabilities(
+          branches.map((branch) => reader.evaluateEntry(branch.Output?.[index] ?? '', branch))
+        )
+      )
     }
   } else {
     const output = selectListNode.Output
     if (!output || output.length !== requestedColumnCount) return 'output-not-positional'
-    for (const entry of output) readings.push(reader.read(entry))
+    for (const entry of output) {
+      readings.push(reader.read(entry))
+      nullabilities.push(reader.evaluateEntry(entry, selectListNode))
+    }
   }
 
   const context = {
@@ -858,6 +1047,8 @@ export function readPlanOrigins(
         reading.nullValue ||
         reading.origins.some((origin) => origin.nullExtended)
     ),
+    expressionNotNull: nullabilities.map((state) => state === 'never-null'),
+    groupingSets,
     rowIdentities: readPlanKeys(root, selectListNode, context)
   }
 }

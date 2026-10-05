@@ -75,6 +75,41 @@ disjunction's arm, not a subplan. The predicate of a partial index a scan names 
 read as a qualifier of that scan, since the scan drops what the predicate implies
 from its `Filter`.
 
+A column the select list spells as an expression has no base column to ask, and
+what it has instead is the expression's own shape. The `Output` entry the origins
+are read from is parsed and evaluated bottom-up, and a shape whose SQL definition
+is the claim proves the column never `NULL`:
+
+| Expression                                                                       | Never `NULL` when                                                                                                                                                                                                                                                                                                                                                                                                              |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| a literal (a string, a number, `true`, `false`), cast or not                     | always: the planner folds a cast of a constant, so the constant is its value                                                                                                                                                                                                                                                                                                                                                   |
+| `NULL`, `NULL::type`                                                             | never                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `count(…)`, with `DISTINCT` or a `FILTER` alike                                  | always: `count` answers `0` over no rows                                                                                                                                                                                                                                                                                                                                                                                       |
+| `COALESCE(a, b, …)`, `GREATEST`, `LEAST`                                         | one argument never `NULL`                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `CASE` with an `ELSE`                                                            | every `THEN` arm and the `ELSE` never `NULL`                                                                                                                                                                                                                                                                                                                                                                                   |
+| `CASE` without an `ELSE`                                                         | never                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `min`/`max`/`sum`/`avg`, no `FILTER`                                             | the argument never `NULL` and the node groups (`Group Key`): a grouping's every row stands for a non-empty group; over the whole input an empty input answers `NULL`                                                                                                                                                                                                                                                           |
+| `x IS [NOT] NULL`, `IS [NOT] TRUE`/`FALSE`/`UNKNOWN`, `IS [NOT] DISTINCT FROM y` | always: SQL defines each as a boolean, whatever the operands come out as                                                                                                                                                                                                                                                                                                                                                       |
+| `a + b`, `a \|\| b`, the other whitelisted operators                             | every operand never `NULL` — the built-ins answer a value or an error, never `NULL`; a user-defined operator that takes a whitelisted spelling stands the rule down, as a non-strict `=` stands the qualifier down                                                                                                                                                                                                             |
+| `expr::type`                                                                     | `expr` never `NULL` and the cast cannot turn a non-`NULL` value into `NULL`: it is binary-coercible (`pg_cast.castmethod = 'b'` — a type modifier then truncates but does not null), or one of the few widening integer-to-integer and integer-to-`numeric` casts PostgreSQL sends through a function; any other cast — `jsonb` to `integer`, a user `CREATE CAST`, a second cast — may answer `NULL` and stands the rule down |
+| anything else — a function by name, a window function, a subscript, a subplan    | never claimed: `unknown`, and the column stays nullable                                                                                                                                                                                                                                                                                                                                                                        |
+
+No expression is computed and no function's strictness is trusted: strictness says
+`NULL` in, `NULL` out and nothing about non-`NULL` in (`lower()` over an empty range
+is `NULL` from a non-`NULL` argument), which is why a function's name gives no
+answer at all. A cast is another such shape: the plan names the type it casts to and
+nothing about the operand's type, and a cast is free to answer `NULL` for a non-`NULL`
+input, so a cast stands the rule down unless both ends are one family PostgreSQL
+defines to answer a value for every input of the other — the exact numbers, the text
+types. `jsonb` to `integer` and a user `CREATE CAST` are not, and may answer `NULL`,
+and neither is a cast to a type a user has named after one of those, whose name is
+then no promise at all.
+An entry that does not parse is `unknown` too — the reader never
+guesses. The same answer holds across a union's branches (a column is never `NULL`
+only where every branch proves it), across a crossed view boundary, and below an
+outer join: a computed column of a nulled side is `NULL` in every padded row,
+whatever the expression promises about the rows it computed over.
+
 ## Plan invariance
 
 The answer must not depend on the plan the planner happened to choose.
