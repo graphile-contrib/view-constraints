@@ -1,22 +1,26 @@
-// A view's stored rewrite tree, read for two facts the plan cannot state: the column
-// names of each `WITH` query, and where each of the view's own columns came from.
+// A view's stored rewrite tree, read for the facts the plan cannot state: the column
+// names of each `WITH` query, the base column each of the view's own columns came from,
+// and the relation each range-table alias names.
 //
 // PostgreSQL keeps the analysed body of a view in `pg_rewrite.ev_action`, a
 // `pg_node_tree`: the node tree printed by the server's own `outfuncs`, bracketed and
 // labelled by field name. It is not SQL and no grammar is parsed here — the text is
 // walked bracket by bracket, and only fields this reader needs are taken, by name, in
-// place of everything else. The fields read are stable across many major versions
-// (`:ctename`, `:ctecolnames`, `:resname`, `:resorigtbl`, `:resorigcol`), but the
-// format is internal and carries no cross-version promise, so `__tests__` holds a
-// case that fails on a major-version change to it.
+// place of everything else. The format is internal and carries no cross-version promise,
+// so the whole tree is read closed by default: everything this walk does not recognise
+// fails it, and a failed tree yields nothing rather than a partial answer, which the
+// caller turns into a named refusal (see `plan-origins.ts`). `__tests__` reads the lab
+// views through it on every run, so a major-version change to the format fails a case.
 //
-// Two questions it answers:
+// Three questions it answers:
 //
 //   * `:ctename` and `:ctecolnames` give, for every `WITH` query, its column names in
 //     select-list order. That is the map a `CTE Scan` in the plan does not print, and
 //     it is what lets `plan-origins.ts` read a `WITH` query's column off the subplan
 //     that computes it. A `WITH` query referenced once is inlined and leaves no CTE at
-//     all; a materialized one is the wall this map takes down.
+//     all; a materialized one is the wall this map takes down. A name two `WITH`
+//     queries share — the same name at two query levels, which the plan does not tell
+//     apart — is dropped, so neither is read.
 //   * `:resname`, `:resorigtbl`, `:resorigcol` give, per column of the view, the base
 //     relation and column the parser traced it to (`markTargetListOrigins`). It is a
 //     fact frozen at the view's creation and carried through subqueries, joins and
@@ -24,27 +28,33 @@
 //     set operation, and it names an inner view rather than a base table where the
 //     column came through one. This reader takes it only as a fallback source for a
 //     relation, where the plan's own reading did not reach.
+//   * `:rtable` gives, per range-table alias, the relation it names (`:rtekind 0`,
+//     `:relid`). A `Subquery Scan` in the plan is spelled with its range-table entry's
+//     name, which is the alias where the query wrote one (`FROM deposit.v bank_range`);
+//     this is what turns that alias back into the relation.
 
-/** One value of a `pg_node_tree`: a node, a list, a string, or a bare token. */
+/** One value of a `pg_node_tree`: a node, a list, an array, a string, or a bare token. */
 type Dumped =
   | { kind: 'node'; type: string; fields: Map<string, Dumped> }
   | { kind: 'list'; items: Dumped[] }
   | { kind: 'string'; value: string }
   | { kind: 'token'; value: string }
 
-const TOKEN_END = new Set([' ', '\t', '\n', '\r', '{', '}', '(', ')', ':'])
+const TOKEN_END = new Set([' ', '\t', '\n', '\r', '{', '}', '(', ')', ':', '[', ']'])
 
 class DumpReader {
   private at = 0
   private readonly text: string
+  /** Set where the walk meets a character it cannot place: the tree is then untrusted. */
+  private failed = false
 
   constructor(text: string) {
     this.text = text
   }
 
-  parse(): Dumped | null {
+  parse(): { ok: boolean; value: Dumped | null } {
     const value = this.parseValue()
-    return value
+    return { ok: !this.failed, value }
   }
 
   private skipSpace(): void {
@@ -90,22 +100,30 @@ class DumpReader {
     return { kind: 'string', value }
   }
 
-  private parseList(): Dumped {
+  /** A bracketed run of values: `( … )` for a list, `[ … ]` for a constant array. */
+  private parseBracketed(open: '(' | '[', close: ')' | ']'): Dumped {
+    if (this.text[this.at] !== open) this.failed = true
     this.at += 1
     const items: Dumped[] = []
     for (;;) {
       this.skipSpace()
       const char = this.text[this.at]
-      if (char === undefined) break
-      if (char === ')') {
+      if (char === undefined) {
+        this.failed = true
+        break
+      }
+      if (char === close) {
         this.at += 1
         break
       }
       const before = this.at
       items.push(this.parseValue())
       // A value this reader cannot place must still move the cursor on, or a format it
-      // does not know would spin; the walk then ends at the next bracket.
-      if (this.at === before) this.at += 1
+      // does not know would spin; the tree is marked unread instead.
+      if (this.at === before) {
+        this.at += 1
+        this.failed = true
+      }
     }
     return { kind: 'list', items }
   }
@@ -118,20 +136,33 @@ class DumpReader {
       const before = this.at
       this.skipSpace()
       const char = this.text[this.at]
-      if (char === undefined || char === '}') {
-        if (char === '}') this.at += 1
+      if (char === undefined) {
+        this.failed = true
         break
       }
+      if (char === '}') {
+        this.at += 1
+        break
+      }
+      // `:constvalue <count> [ <values> ]` prints the array as the field's value and a
+      // bracketed run after it; the run is read and the walk goes on to the next field.
+      if (char === '[') {
+        this.parseBracketed('[', ']')
+        continue
+      }
       if (char !== ':') {
-        // Anything unexpected (a future format) stops the field walk; what was read
-        // stands, and the caller reads a field it did not find as absent.
+        // Anything unexpected (a future format) stops the field walk and fails it.
+        this.failed = true
         break
       }
       this.at += 1
       const name = this.parseToken()
       this.skipSpace()
       fields.set(name, this.parseValue())
-      if (this.at === before) break
+      if (this.at === before) {
+        this.failed = true
+        break
+      }
     }
     return { kind: 'node', type, fields }
   }
@@ -140,7 +171,8 @@ class DumpReader {
     this.skipSpace()
     const char = this.text[this.at]
     if (char === '{') return this.parseNode()
-    if (char === '(') return this.parseList()
+    if (char === '(') return this.parseBracketed('(', ')')
+    if (char === '[') return this.parseBracketed('[', ']')
     if (char === '"') return this.parseString()
     return { kind: 'token', value: this.parseToken() }
   }
@@ -172,52 +204,6 @@ function stringsOf(value: Dumped | undefined): string[] {
   return value.items.map((item) => textOf(item)).filter((item): item is string => item !== null)
 }
 
-/**
- * The `WITH` query column map of a view: each CTE name to its column names in
- * select-list order. Empty where the tree cannot be read, which leaves the plan's own
- * refusals in place rather than inventing a map.
- */
-export function readCteColumns(action: string): Map<string, string[]> {
-  const columns = new Map<string, string[]>()
-  const tree = new DumpReader(action).parse()
-  const query = tree?.kind === 'list' ? nodesOf(tree)[0] : undefined
-  if (query?.kind !== 'node') return columns
-  for (const cte of nodesOf(query.fields.get('cteList'))) {
-    if (cte.kind !== 'node') continue
-    const name = textOf(cte.fields.get('ctename'))
-    const names = stringsOf(cte.fields.get('ctecolnames'))
-    if (name !== null && names.length > 0) columns.set(name, names)
-  }
-  return columns
-}
-
-/** One column of a view, as its own stored tree traced it: `schema.relation.column`. */
-export interface TreeOrigin {
-  tableId: number
-  attnum: number
-}
-
-/**
- * Per view column, the base relation oid and attribute number the stored tree traced
- * it to, by the column's position in the view (its `resno` order is the select list's).
- * A column the tree did not trace (an expression, a set operation) has no entry.
- */
-export function readTreeOrigins(action: string): Map<number, TreeOrigin> {
-  const origins = new Map<number, TreeOrigin>()
-  const tree = new DumpReader(action).parse()
-  const query = tree?.kind === 'list' ? nodesOf(tree)[0] : undefined
-  if (query?.kind !== 'node') return origins
-  const targetList = nodesOf(query.fields.get('targetList'))
-  for (const [position, entry] of targetList.entries()) {
-    if (entry.kind !== 'node') continue
-    const tableId = numberOf(entry.fields.get('resorigtbl'))
-    const attnum = numberOf(entry.fields.get('resorigcol'))
-    if (tableId === null || tableId === 0 || attnum === null || attnum === 0) continue
-    origins.set(position, { tableId, attnum })
-  }
-  return origins
-}
-
 /** Every node of a value, however deep, so nested queries' range tables are reached. */
 function walkDumped(value: Dumped, visit: (node: Extract<Dumped, { kind: 'node' }>) => void): void {
   if (value.kind === 'node') {
@@ -246,35 +232,86 @@ function aliasOf(entry: Extract<Dumped, { kind: 'node' }>): string | null {
   return null
 }
 
+/** One column of a view, as its own stored tree traced it. */
+export interface TreeOrigin {
+  tableId: number
+  attnum: number
+}
+
+/** Everything this reader takes from a view's stored tree. */
+export interface ViewTree {
+  /** Whether the whole tree parsed. `false` means none of the rest is trusted. */
+  ok: boolean
+  /** CTE name → its column names in select-list order. */
+  cteColumns: Map<string, string[]>
+  /** CTE names the tree defines at more than one query level, so the plan cannot tell them apart. */
+  cteAmbiguous: Set<string>
+  /** View column position → the base relation oid and attribute number it came from. */
+  treeOrigins: Map<number, TreeOrigin>
+  /** Range-table alias → the relation oid it names. */
+  relationAliases: Map<string, number>
+}
+
 /**
- * The relation each range-table alias of the view names, by alias: `alias → oid`.
- *
- * A `Subquery Scan` in the plan is spelled with its range-table entry's name, which is
- * the view's own name where the query wrote it bare and the alias where it wrote one
- * (`FROM deposit.v bank_range`). The tree's `:rtable` holds both — `:alias` and, on an
- * `RTE_RELATION` entry, `:relid` — so the alias resolves to the relation it stands for
- * rather than to a guess by column names. The walk is over the whole tree, because the
- * alias may stand in any query the view holds, a `WITH` query's body included; an alias
- * two relations share is dropped rather than guessed between.
+ * Reads a view's whole stored tree. A tree the walk cannot fully place is `ok: false`
+ * with every map empty — the caller refuses rather than reading a partial answer.
  */
-export function readTreeAliases(action: string): Map<string, number> {
-  const aliases = new Map<string, number>()
-  const ambiguous = new Set<string>()
-  const tree = new DumpReader(action).parse()
-  if (tree === null) return aliases
-  walkDumped(tree, (node) => {
+export function readViewTree(action: string): ViewTree {
+  const tree: ViewTree = {
+    ok: false,
+    cteColumns: new Map(),
+    cteAmbiguous: new Set(),
+    treeOrigins: new Map(),
+    relationAliases: new Map()
+  }
+  const parsed = new DumpReader(action).parse()
+  if (!parsed.ok || parsed.value === null) return tree
+  const root = parsed.value
+  const top = root.kind === 'list' ? nodesOf(root)[0] : root
+  if (top?.kind !== 'node' || top.type !== 'QUERY') return tree
+  tree.ok = true
+
+  // The whole tree, so a `WITH` query nested in another query's body is reached: a name
+  // two of them share is dropped, because the plan spells both by that name and cannot
+  // say which a `CTE Scan` reads.
+  walkDumped(root, (node) => {
+    for (const cte of nodesOf(node.fields.get('cteList'))) {
+      if (cte.kind !== 'node') continue
+      const name = textOf(cte.fields.get('ctename'))
+      const names = stringsOf(cte.fields.get('ctecolnames'))
+      if (name === null || names.length === 0) continue
+      if (tree.cteColumns.has(name)) {
+        tree.cteAmbiguous.add(name)
+        continue
+      }
+      tree.cteColumns.set(name, names)
+    }
+  })
+  for (const name of tree.cteAmbiguous) tree.cteColumns.delete(name)
+
+  for (const [position, entry] of nodesOf(top.fields.get('targetList')).entries()) {
+    if (entry.kind !== 'node') continue
+    const tableId = numberOf(entry.fields.get('resorigtbl'))
+    const attnum = numberOf(entry.fields.get('resorigcol'))
+    if (tableId === null || tableId === 0 || attnum === null || attnum === 0) continue
+    tree.treeOrigins.set(position, { tableId, attnum })
+  }
+
+  const ambiguousAliases = new Set<string>()
+  walkDumped(root, (node) => {
     if (node.type !== 'RANGETBLENTRY') return
     if (textOf(node.fields.get('rtekind')) !== '0') return
     const relid = numberOf(node.fields.get('relid'))
     const alias = aliasOf(node)
     if (relid === null || relid === 0 || alias === null) return
-    const seen = aliases.get(alias)
+    const seen = tree.relationAliases.get(alias)
     if (seen !== undefined && seen !== relid) {
-      ambiguous.add(alias)
+      ambiguousAliases.add(alias)
       return
     }
-    aliases.set(alias, relid)
+    tree.relationAliases.set(alias, relid)
   })
-  for (const alias of ambiguous) aliases.delete(alias)
-  return aliases
+  for (const alias of ambiguousAliases) tree.relationAliases.delete(alias)
+
+  return tree
 }

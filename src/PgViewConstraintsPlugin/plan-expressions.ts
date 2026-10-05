@@ -159,6 +159,24 @@ function literalFamily(token: Token, target: string | undefined): LiteralFamily 
 }
 
 /**
+ * Whether a call is the built-in its name means, rather than a user function that took
+ * the spelling. A call the deparser qualified `pg_catalog.` is that built-in — it
+ * qualifies it precisely because a same-named function shadows it in the search path,
+ * so the qualified spelling is the promise the bare one lost — and is read as the
+ * built-in whatever the view's objects say. A call qualified with any other schema is
+ * that schema's own function, and a bare name is the built-in only where no user object
+ * of the view took it (`ask.shadowed`).
+ */
+function isBuiltinCall(
+  node: Extract<ExpressionNode, { kind: 'call' }>,
+  ask: ExpressionAsker
+): boolean {
+  if (node.quoted) return false
+  if (node.schema !== null) return node.schema.toLowerCase() === 'pg_catalog'
+  return !ask.shadowed(node.name)
+}
+
+/**
  * The family an expression's value is of, as far as its shape says — nothing where
  * the shape does not say (a column reference, whose type is the catalog's answer
  * and not the plan's). Used only to read the cast around it.
@@ -172,7 +190,7 @@ function operandTypeFamily(node: ExpressionNode, ask: ExpressionAsker): 'exact' 
     case 'unary':
       return node.operator === 'NOT' ? null : operandTypeFamily(node.operand, ask)
     case 'call': {
-      if (node.quoted || ask.shadowed(node.name)) return null
+      if (!isBuiltinCall(node, ask)) return null
       if (node.name === 'count') return 'exact'
       return commonFamily(node.args.map((argument) => operandTypeFamily(argument, ask)))
     }
@@ -313,6 +331,12 @@ type ExpressionNode =
   | { kind: 'reference'; text: string }
   | {
       kind: 'call'
+      /**
+       * The schema the function name was qualified with (`pg_catalog` where the
+       * deparser had to qualify it, because a same-named user function shadows it in
+       * the search path), or `null` where it was printed bare.
+       */
+      schema: string | null
       /** The function name as printed, unquoted only where the deparser left it unquoted. */
       name: string
       quoted: boolean
@@ -609,7 +633,10 @@ class Parser {
         const name = token.text
         this.at += 1
         const { args, filter } = this.parseArguments()
-        return this.wrapCasts({ kind: 'call', name, quoted: false, args, filter }, this.takeCasts())
+        return this.wrapCasts(
+          { kind: 'call', schema: null, name, quoted: false, args, filter },
+          this.takeCasts()
+        )
       }
       throw new ExpressionParseError()
     }
@@ -620,10 +647,34 @@ class Parser {
     }
     if (token.kind === 'identifier') {
       this.at += 1
+      // `schema.function(args)` — the deparser qualifies a function with its schema
+      // where a same-named object shadows it in the search path (`pg_catalog.count`)
+      // or the user wrote the schema. A `.` not followed by a call goes on to the
+      // reference path below, where `alias.column` is read.
+      if (this.isPunctuation('.') && this.tokens[this.at + 1]?.kind === 'identifier') {
+        const dot = this.at
+        this.at += 1
+        const part = this.take()
+        if (part.kind === 'identifier' && this.isPunctuation('(')) {
+          const { args, filter } = this.parseArguments()
+          return this.wrapCasts(
+            {
+              kind: 'call',
+              schema: token.text,
+              name: part.text,
+              quoted: token.quoted || part.quoted,
+              args,
+              filter
+            },
+            this.takeCasts()
+          )
+        }
+        this.at = dot
+      }
       if (this.isPunctuation('(')) {
         const { args, filter } = this.parseArguments()
         return this.wrapCasts(
-          { kind: 'call', name: token.text, quoted: token.quoted, args, filter },
+          { kind: 'call', schema: null, name: token.text, quoted: token.quoted, args, filter },
           this.takeCasts()
         )
       }
@@ -806,7 +857,7 @@ function evaluate(node: ExpressionNode, ask: ExpressionAsker): ExpressionNullabi
       // value is a value, and of a boolean a boolean.
       return evaluate(node.operand, ask)
     case 'call': {
-      if (node.quoted || ask.shadowed(node.name)) return 'unknown'
+      if (!isBuiltinCall(node, ask)) return 'unknown'
       if (node.name === 'NULLIF') return 'nullable'
       if (FIRST_NON_NULL.has(node.name)) {
         const states = node.args.map((argument) => evaluate(argument, ask))

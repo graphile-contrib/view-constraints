@@ -177,7 +177,9 @@ for (const regime of REGIMES) {
       relkind: view.relkind,
       regime: regime.name,
       columns,
+      treeOk: facts?.ok ?? false,
       cteColumns: Object.fromEntries(facts?.cteColumns ?? new Map()),
+      cteAmbiguous: [...(facts?.cteAmbiguous ?? [])].sort(),
       treeColumns: Object.fromEntries(
         resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map())
       ),

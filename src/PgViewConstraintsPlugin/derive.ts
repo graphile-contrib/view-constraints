@@ -402,7 +402,10 @@ export function deriveViewConstraints(
   catalog: ReadonlyMap<string, CatalogRelation>,
   coercions: TypeCoercions,
   deriveUnique = true,
-  treeColumns: ReadonlyMap<number, { schema: string; relation: string; column: string }> = new Map()
+  treeColumns: ReadonlyMap<
+    number,
+    { schema: string; relation: string; column: string; relkind: string }
+  > = new Map()
 ): ViewDerivation {
   const notes: string[] = []
   const columns = viewColumns.map((column) => column.name)
@@ -478,6 +481,29 @@ export function deriveViewConstraints(
     }
     return sources
   })
+
+  // The plan and the view's stored rewrite tree each say where a column came from. Where
+  // both name a base column and they are not the same, the column is refused rather than
+  // either trusted — the tree is read only where the plan named nothing (below), so the
+  // two are never mixed. The tree names a view rather than a base table where the column
+  // came through one, and is left out of the comparison then: a view boundary is exactly
+  // the step the plan crosses to the base column and the tree does not.
+  for (let index = 0; index < columns.length; index++) {
+    const sources = origins[index]
+    const tree = treeColumns.get(index)
+    if (!tree || sources === null || sources.length !== 1) continue
+    if (tree.relkind !== 'r' && tree.relkind !== 'p' && tree.relkind !== 'f') continue
+    const origin = sources[0]
+    if (!origin) continue
+    if (
+      origin.schema !== tree.schema ||
+      origin.relation !== tree.relation ||
+      origin.column !== tree.column
+    ) {
+      origins[index] = null
+      columnRefusals[index] = 'plan-and-tree-disagree'
+    }
+  }
 
   // A base column is never NULL in the rows a value is read from when the catalog says
   // so, or when a qualifier of the plan rejects a NULL in it there.

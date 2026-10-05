@@ -18,7 +18,7 @@ import type {
 import { readPlanOrigins } from './plan-origins.ts'
 import type { ExplainPlanNode, ViewShape } from './plan-origins.ts'
 import type { PlanCatalog } from './plan-origins.ts'
-import { readCteColumns, readTreeAliases, readTreeOrigins } from './view-tree.ts'
+import { readViewTree } from './view-tree.ts'
 import type { TreeOrigin } from './view-tree.ts'
 
 /** The one thing this module needs of a connection: run SQL, get rows. */
@@ -546,7 +546,11 @@ export async function readViewObjectNames(query: RunQuery): Promise<Map<string, 
 
 /** What a view's stored rewrite tree says: its CTE columns and its columns' origins. */
 export interface ViewTreeFacts {
+  /** Whether the tree parsed; `false` means none of the rest is trusted. */
+  ok: boolean
   cteColumns: Map<string, string[]>
+  /** CTE names the tree defines at more than one query level. */
+  cteAmbiguous: Set<string>
   treeOrigins: Map<number, TreeOrigin>
   /** The relation each range-table alias of the view names, by alias. */
   relationAliases: Map<string, number>
@@ -557,6 +561,8 @@ export interface TreeColumn {
   schema: string
   relation: string
   column: string
+  /** `pg_class.relkind` of the relation — a base table or a view the tree stops at. */
+  relkind: string
 }
 
 // The oid, schema, relation and column names of every relation, so a stored tree's
@@ -566,6 +572,7 @@ const RELATION_OIDS_QUERY = `
   SELECT class.oid              AS oid,
          namespace.nspname      AS schema,
          class.relname          AS relation,
+         class.relkind::text    AS relkind,
          attribute.attnum       AS attnum,
          attribute.attname::text AS column_name
   FROM pg_class class
@@ -579,7 +586,7 @@ const RELATION_OIDS_QUERY = `
 /** An index of every relation by oid, so a stored tree's origin resolves by name. */
 export type RelationOidIndex = ReadonlyMap<
   number,
-  { schema: string; relation: string; columns: ReadonlyMap<number, string> }
+  { schema: string; relation: string; relkind: string; columns: ReadonlyMap<number, string> }
 >
 
 export async function readRelationOids(query: RunQuery): Promise<RelationOidIndex> {
@@ -587,17 +594,23 @@ export async function readRelationOids(query: RunQuery): Promise<RelationOidInde
     oid: number
     schema: string
     relation: string
+    relkind: string
     attnum: number
     column_name: string
   }>(RELATION_OIDS_QUERY)
   const index = new Map<
     number,
-    { schema: string; relation: string; columns: Map<number, string> }
+    { schema: string; relation: string; relkind: string; columns: Map<number, string> }
   >()
   for (const row of rows) {
     let entry = index.get(row.oid)
     if (!entry) {
-      entry = { schema: row.schema, relation: row.relation, columns: new Map() }
+      entry = {
+        schema: row.schema,
+        relation: row.relation,
+        relkind: row.relkind,
+        columns: new Map()
+      }
       index.set(row.oid, entry)
     }
     entry.columns.set(row.attnum, row.column_name)
@@ -615,7 +628,12 @@ export function resolveTreeColumns(
     const relation = index.get(origin.tableId)
     const column = relation?.columns.get(origin.attnum)
     if (relation && column !== undefined) {
-      resolved.set(position, { schema: relation.schema, relation: relation.relation, column })
+      resolved.set(position, {
+        schema: relation.schema,
+        relation: relation.relation,
+        column,
+        relkind: relation.relkind
+      })
     }
   }
   return resolved
@@ -633,10 +651,13 @@ export async function readViewTrees(
   const trees = new Map<string, ViewTreeFacts>()
   for (const row of rows) {
     if (row.action === null) continue
+    const tree = readViewTree(row.action)
     trees.set(`${row.schema}.${row.view}`, {
-      cteColumns: readCteColumns(row.action),
-      treeOrigins: readTreeOrigins(row.action),
-      relationAliases: readTreeAliases(row.action)
+      ok: tree.ok,
+      cteColumns: tree.cteColumns,
+      cteAmbiguous: tree.cteAmbiguous,
+      treeOrigins: tree.treeOrigins,
+      relationAliases: tree.relationAliases
     })
   }
   return trees
@@ -832,38 +853,39 @@ export async function collectViewConstraints(
       })
       continue
     }
-    derivations.push(
-      deriveViewConstraints(
-        view.schema,
-        view.view,
-        view.relkind,
-        columns,
-        readPlanOrigins(
-          plan,
-          columns.length,
-          subqueryCandidatesFor(
-            viewSources,
-            viewTrees.get(`${view.schema}.${view.view}`),
-            relationOids,
-            view.schema,
-            view.view
-          ),
-          planCatalogFrom(
-            catalog,
-            strictEquality,
-            ruleSpellingsShadowedFor(viewSources, viewObjects, view.schema, view.view),
-            viewTrees.get(`${view.schema}.${view.view}`)?.cteColumns ?? new Map()
-          )
-        ),
-        catalog,
-        coercions,
-        deriveUnique,
-        resolveTreeColumns(
-          relationOids,
-          viewTrees.get(`${view.schema}.${view.view}`)?.treeOrigins ?? new Map()
+    const facts = viewTrees.get(`${view.schema}.${view.view}`)
+    const derivation = deriveViewConstraints(
+      view.schema,
+      view.view,
+      view.relkind,
+      columns,
+      readPlanOrigins(
+        plan,
+        columns.length,
+        subqueryCandidatesFor(viewSources, facts, relationOids, view.schema, view.view),
+        planCatalogFrom(
+          catalog,
+          strictEquality,
+          ruleSpellingsShadowedFor(viewSources, viewObjects, view.schema, view.view),
+          facts?.cteColumns ?? new Map()
         )
-      )
+      ),
+      catalog,
+      coercions,
+      deriveUnique,
+      resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map())
     )
+    // A tree the walk could not place is said out loud: its CTE map is empty, so a
+    // `WITH` query reads as refused, and the reason the map is empty is named here
+    // rather than left to look like a query that has no `WITH` at all.
+    if (facts && !facts.ok) {
+      derivation.notes.push(
+        'stored rewrite tree (pg_rewrite.ev_action) not read: its format was not ' +
+          'recognised, so no `WITH` query of this view is crossed and no column origin ' +
+          'is taken from it'
+      )
+    }
+    derivations.push(derivation)
   }
   const tables: TableDerivation[] = (await readTables(query, schemas)).map((table) => ({
     schema: table.schema,

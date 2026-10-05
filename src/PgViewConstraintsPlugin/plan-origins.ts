@@ -166,7 +166,10 @@ export const COLUMN_REFUSALS = {
     'constant-false qualifier removed it',
   'cast-not-value-preserving':
     'the value passed through a cast that builds a new datum or narrows it, so it is ' +
-    'no longer the base column’s value'
+    'no longer the base column’s value',
+  'plan-and-tree-disagree':
+    'the plan and the view’s stored rewrite tree name different base columns for the ' +
+    'column, and neither is trusted over the other'
 } as const
 
 export type ColumnRefusal = keyof typeof COLUMN_REFUSALS
@@ -486,16 +489,24 @@ function aliasNodeTypes(root: ExplainPlanNode): Map<string, string> {
 // query it reads.
 const CTE_SUBPLAN_PREFIX = 'CTE '
 
-/** The subplan computing each `WITH` query, by the query's name. */
+/**
+ * The subplan computing each `WITH` query, by the query's name. A name two subplans
+ * carry — the same `WITH` name at two query levels — is dropped rather than picked
+ * between: the plan spells both by that name and does not say which a `CTE Scan` reads,
+ * so crossing either would be a guess.
+ */
 function cteSubplansIn(root: ExplainPlanNode): Map<string, ExplainPlanNode> {
   const subplans = new Map<string, ExplainPlanNode>()
+  const ambiguous = new Set<string>()
   walk(root, (node) => {
     const name = node['Subplan Name']
     if (typeof name === 'string' && name.startsWith(CTE_SUBPLAN_PREFIX)) {
       const cte = name.slice(CTE_SUBPLAN_PREFIX.length)
-      if (!subplans.has(cte)) subplans.set(cte, node)
+      if (subplans.has(cte)) ambiguous.add(cte)
+      else subplans.set(cte, node)
     }
   })
+  for (const cte of ambiguous) subplans.delete(cte)
   return subplans
 }
 

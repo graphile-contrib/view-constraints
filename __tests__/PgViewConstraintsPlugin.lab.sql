@@ -744,3 +744,47 @@ create view v_user_operator as select id, (id operator(lab.+) 1) as plus from tx
 -- NEGATIVE: a user type spelled `integer` is no longer the built-in's promise: the
 -- cast the family rule would have trusted stands down for the view that names it.
 create view v_user_type as select id, coalesce(amount, 0)::lab.integer as ii from tx;
+
+-- ── A `WITH` name at two query levels ───────────────────────────────────────────
+--
+-- The plan spells a `CTE Scan` with the `WITH` query's own name and never says which
+-- level it reads, so a name two `WITH` queries share is ambiguous: the reader takes
+-- neither rather than read one level's column off another level's subplan. The tables
+-- carry rows so that a case which crossed the wrong level would emit a tag the rows
+-- contradict.
+
+create table need (id int primary key, nn int not null, nul int);
+insert into need values (1, 10, null), (2, 20, 5);
+create table need_ref (id int primary key, need_id int not null references need(id), note text);
+insert into need_ref values (1, 1, 'a'), (2, 2, 'b');
+
+-- NEGATIVE: the outer `live` and the lateral `live` share a name. The true `inner_x.y`
+-- is `need.nul` (nullable), but the top `live`'s subplan computes `need.nn`; a reader
+-- that picked the first subplan would call it never NULL.
+create view v_cte_name_shadowed as
+  with live as materialized (select id as x, nn as y from need)
+  select outer_live.x, inner_x.y
+  from live outer_live
+  join lateral (
+    with live as materialized (select n.nul as y, n.id as x from need n)
+    select il.x, il.y from live il
+  ) inner_x on inner_x.x = outer_live.x;
+
+-- NEGATIVE: the same shape with a relation in play. The true `inner_x.inner_v` is
+-- `need.nn` (no foreign key); the top `live`'s subplan computes `need_ref.need_id`
+-- (which references `need`), so a reader that picked the first subplan would lead a
+-- foreign key the rows do not carry.
+create view v_cte_name_shadowed_fk as
+  with live as materialized (select need_ref.need_id as v from need_ref)
+  select outer_live.v, inner_x.inner_v
+  from live outer_live
+  join lateral (
+    with live as materialized (select n.nn as v from need n)
+    select il.v as inner_v from live il
+  ) inner_x on inner_x.inner_v = outer_live.v;
+
+-- POSITIVE: a constant array in the stored tree (`:constvalue … [ … ]`, what a
+-- `WHERE false` writes) does not break the walk, so the `WITH` query still reads.
+create view v_cte_where_false as
+  with live as materialized (select id, cur_code from tx)
+  select live.id, live.cur_code from live where false;

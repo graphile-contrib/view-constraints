@@ -52,11 +52,7 @@ import {
   readPlanOrigins
 } from '../src/PgViewConstraintsPlugin/plan-origins.ts'
 import { conditionEqualities } from '../src/PgViewConstraintsPlugin/plan-keys.ts'
-import {
-  readCteColumns,
-  readTreeAliases,
-  readTreeOrigins
-} from '../src/PgViewConstraintsPlugin/view-tree.ts'
+import { readViewTree } from '../src/PgViewConstraintsPlugin/view-tree.ts'
 import {
   evaluateExpression,
   parseExpression
@@ -89,10 +85,17 @@ interface Fixture {
     /** The planner regime the plan was taken under; see build-fixture.ts. */
     regime: string
     columns: ViewColumn[]
+    /** Whether the view's stored rewrite tree parsed. */
+    treeOk: boolean
     /** The view's `WITH` query column map, from its stored rewrite tree. */
     cteColumns: Record<string, string[]>
+    /** `WITH` names the tree defines at more than one query level. */
+    cteAmbiguous: string[]
     /** Each view column's traced base column, by position, from the stored tree. */
-    treeColumns: Record<string, { schema: string; relation: string; column: string }>
+    treeColumns: Record<
+      string,
+      { schema: string; relation: string; column: string; relkind: string }
+    >
     /** Each range-table alias of the view, resolved to the relation it names. */
     viewAliases: Record<string, string>
     plan: ExplainPlanNode
@@ -222,6 +225,14 @@ interface Case {
    * may be NULL. Left out on the cases that prove none, which is asserted to be none.
    */
   unique?: string
+  /**
+   * A whole-plan refusal a reader on another PostgreSQL major gives this view instead of
+   * the expectations above, which is accepted. A plan shape that moved between majors
+   * (a set operation the older one wraps in a subquery) makes the column unread either
+   * way; both answers are the conservative one, and the lab is read on every supported
+   * major in CI.
+   */
+  alsoPlanRefusal?: PlanRefusal
 }
 
 const CASES: Case[] = [
@@ -823,7 +834,11 @@ const CASES: Case[] = [
     origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
     notNull: ['id', 'cur_code'],
     foreignKeys: ['(cur_code) references lab.currency (code)'],
-    primaryKey: null
+    primaryKey: null,
+    // PostgreSQL 17 and earlier wrap the `SetOp` in a `Subquery Scan`, so the columns
+    // are not read and the view is refused whole; both answers hold back rather than
+    // claim.
+    alsoPlanRefusal: 'set-operation-not-a-select-list'
   },
   {
     view: 'v_intersect',
@@ -831,7 +846,8 @@ const CASES: Case[] = [
     origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
     notNull: ['id', 'cur_code'],
     foreignKeys: ['(cur_code) references lab.currency (code)'],
-    primaryKey: null
+    primaryKey: null,
+    alsoPlanRefusal: 'set-operation-not-a-select-list'
   },
   {
     view: 'v_union_grouped',
@@ -1728,12 +1744,52 @@ const CASES: Case[] = [
     notNull: [],
     foreignKeys: [],
     primaryKey: null
+  },
+  {
+    view: 'v_cte_name_shadowed',
+    about:
+      'a WITH name two query levels share cannot be told apart in the plan, so neither ' +
+      '`live` is read: a reader that took the first subplan would call `inner_x.y` — ' +
+      'really `need.nul` — never NULL',
+    origins: ['x=—', 'y=—'],
+    notNull: [],
+    foreignKeys: ['(x) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_name_shadowed_fk',
+    about:
+      'and a reader that took the first subplan would lead `inner_x.inner_v` — really ' +
+      '`need.nn`, no key — to `need` over `need_ref.need_id`’s foreign key',
+    origins: ['v=—', 'inner_v=—'],
+    notNull: [],
+    foreignKeys: ['(v) references lab.need (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_where_false',
+    about:
+      'a constant array in the stored tree (what `WHERE false` writes) does not break ' +
+      'the walk: the WITH query is read into the map and the columns’ origins resolve, ' +
+      'while the plan carries no scan a constant-false qualifier removed',
+    origins: ['id=—', 'cur_code=—'],
+    notNull: [],
+    foreignKeys: ['(cur_code) references lab.currency (code)', '(id) references lab.tx (id)'],
+    primaryKey: null
   }
 ]
 
 for (const testCase of CASES) {
   test(`${testCase.view}: ${testCase.about}`, () => {
     const derived = derive(testCase.view)
+    // A plan shape the running major builds differently may refuse the view whole; the
+    // expectations are for the major the fixture here was built on.
+    if (
+      testCase.alsoPlanRefusal !== undefined &&
+      derived.planRefusal === testCase.alsoPlanRefusal
+    ) {
+      return
+    }
     assert.deepEqual(derived.origins, testCase.origins)
     assert.deepEqual(derived.notNull, testCase.notNull)
     assert.deepEqual(derived.foreignKeys, testCase.foreignKeys)
@@ -1761,12 +1817,25 @@ test('every view in the fixture is a case, and every case is in the fixture', ()
 // `Unique` over a `Sort`. None of it may change the answer — including the cases
 // where the answer is "nothing", which have to be nothing every time rather than
 // nothing on the days the plan is shaped wrong.
+// The contract is what reaches the published schema — the origins a column has, the
+// relations and keys derived, and whether the plan was read at all — and it is what
+// `invariance.ts` holds across regimes. The per-column refusal *text* and the notes are
+// diagnostics, and the same shape of plan may name a different reason for the same
+// outcome (a column with no source either way); they are left out of the comparison.
+const contractOf = (derived: ReturnType<typeof derive>): unknown => ({
+  origins: derived.origins,
+  notNull: derived.notNull,
+  foreignKeys: derived.foreignKeys,
+  primaryKey: derived.primaryKey,
+  unique: derived.unique,
+  planRefusal: derived.planRefusal
+})
 for (const regime of REGIMES.filter((name) => name !== DEFAULT_REGIME)) {
   test(`the derivation of every lab view is the same under ${regime}`, () => {
     for (const testCase of CASES) {
       assert.deepEqual(
-        derive(testCase.view, regime),
-        derive(testCase.view),
+        contractOf(derive(testCase.view, regime)),
+        contractOf(derive(testCase.view)),
         `${testCase.view} derives differently under ${regime}`
       )
     }
@@ -1812,6 +1881,31 @@ test('uniqueness derivation can be turned off, and the refusal of a key is named
   )
 })
 
+test('where the plan and the stored tree name different base columns, the column is refused', () => {
+  const view = fixture.views.find(
+    (candidate) => candidate.view === 'v_bare' && candidate.regime === DEFAULT_REGIME
+  )
+  assert.ok(view)
+  const plan = readPlanOrigins(view.plan, view.columns.length, new Map(), planCatalog)
+  const derived = deriveViewConstraints(
+    view.schema,
+    view.view,
+    view.relkind,
+    view.columns,
+    plan,
+    catalog,
+    coercions,
+    true,
+    // The tree traces column 0 to a different base table than the plan did.
+    new Map([[0, { schema: 'lab', relation: 'currency', column: 'code', relkind: 'r' }]])
+  )
+  assert.equal(derived.columns[0], 'id')
+  assert.equal(derived.origins?.[0], null)
+  assert.equal(derived.columnRefusals[0], 'plan-and-tree-disagree')
+  // A column with no tree entry is left exactly as the plan read it.
+  assert.ok(derived.origins?.[1])
+})
+
 test('a user object shadows a rule spelling for its view and the views built on it, and no other', () => {
   const shadowedOf = (view: string): string[] => [...shadowedFor('lab', view)].sort()
   assert.deepEqual(shadowedOf('v_user_count'), ['count'])
@@ -1834,31 +1928,103 @@ test('a view’s stored tree is read by field name, and a format it does not kno
     '({QUERY :targetList ({TARGETENTRY :expr <> :resno 1 :resname id :resorigtbl 99 :resorigcol 3}' +
     ' {TARGETENTRY :expr <> :resno 2 :resname nm :resorigtbl 0 :resorigcol 0})' +
     ' :cteList ({COMMONTABLEEXPR :ctename live :ctecolnames ("a" "b")})})'
-  assert.deepEqual(Object.fromEntries(readCteColumns(action)), { live: ['a', 'b'] })
-  assert.deepEqual([...readTreeOrigins(action).entries()], [[0, { tableId: 99, attnum: 3 }]])
+  const tree = readViewTree(action)
+  assert.equal(tree.ok, true)
+  assert.deepEqual(Object.fromEntries(tree.cteColumns), { live: ['a', 'b'] })
+  assert.deepEqual([...tree.treeOrigins.entries()], [[0, { tableId: 99, attnum: 3 }]])
   // A range-table alias resolves to the relation it stands for, wherever in the tree
   // the entry stands; an entry that is not a relation names none.
   assert.deepEqual(
     Object.fromEntries(
-      readTreeAliases(
+      readViewTree(
         '({QUERY :rtable ({RANGETBLENTRY :alias {ALIAS :aliasname bank_range :colnames <>}' +
           ' :rtekind 0 :relid 42} {RANGETBLENTRY :alias {ALIAS :aliasname s :colnames <>}' +
           ' :rtekind 1 :relid 0})})'
-      )
+      ).relationAliases
     ),
     { bank_range: 42 }
   )
   // An identifier with a space is one escaped token, not two.
   assert.deepEqual(
     Object.fromEntries(
-      readCteColumns('({QUERY :cteList ({COMMONTABLEEXPR :ctename *S*\\ 1 :ctecolnames ("x")})})')
+      readViewTree('({QUERY :cteList ({COMMONTABLEEXPR :ctename *S*\\ 1 :ctecolnames ("x")})})')
+        .cteColumns
     ),
     { '*S* 1': ['x'] }
   )
-  for (const garbage of ['', 'not a tree', '({QUERY])']) {
-    assert.deepEqual(Object.fromEntries(readCteColumns(garbage)), {})
-    assert.deepEqual([...readTreeOrigins(garbage)], [])
+  // A `WITH` name at two query levels is ambiguous: the plan spells both by it and
+  // cannot say which a `CTE Scan` reads, so neither is taken.
+  const shadowed = readViewTree(
+    '({QUERY :cteList ({COMMONTABLEEXPR :ctename live :ctecolnames ("a")})' +
+      ' :rtable ({RANGETBLENTRY :rtekind 6 :ctequery {QUERY :cteList' +
+      ' ({COMMONTABLEEXPR :ctename live :ctecolnames ("b")})}})})'
+  )
+  assert.deepEqual(Object.fromEntries(shadowed.cteColumns), {})
+  assert.deepEqual([...shadowed.cteAmbiguous], ['live'])
+  // A constant array (`:constvalue […]`) is read, not treated as a format break.
+  assert.equal(
+    readViewTree('({QUERY :jointree {FROMEXPR :quals {CONST :constvalue 1 [ 0 0 ]}}})').ok,
+    true
+  )
+  for (const garbage of ['', 'not a tree', '({QUERY])', '({QUERY :x (unclosed}']) {
+    const broken = readViewTree(garbage)
+    assert.equal(broken.ok, false, JSON.stringify(garbage))
+    assert.deepEqual(Object.fromEntries(broken.cteColumns), {})
+    assert.deepEqual([...broken.treeOrigins], [])
   }
+})
+
+test('the lab holds the stored-tree shapes the reader must survive', () => {
+  const facts = (view: string) =>
+    fixture.views.find(
+      (candidate) => candidate.view === view && candidate.regime === DEFAULT_REGIME
+    )
+  assert.equal(facts('v_cte_where_false')?.treeOk, true)
+  assert.deepEqual(facts('v_cte_where_false')?.cteColumns, { live: ['id', 'cur_code'] })
+  assert.deepEqual(facts('v_cte_name_shadowed')?.cteAmbiguous, ['live'])
+  assert.deepEqual(facts('v_cte_name_shadowed')?.cteColumns, {})
+})
+
+test('a built-in the deparser qualified pg_catalog is the built-in; another schema is a user function', () => {
+  // Where a same-named function shadows the built-in in the search path, the deparser
+  // prints the built-in qualified — `pg_catalog.count(...)` — precisely because the bare
+  // spelling no longer resolves to it. That qualified call is the built-in, so its rule
+  // holds; a call under another schema is that schema's own function and holds nothing.
+  const asker = (shadowed: (name: string) => boolean) => ({
+    column: () => 'never-null' as const,
+    hasGroupKey: false,
+    shadowed
+  })
+  assert.equal(
+    evaluateExpression(
+      parseExpression('pg_catalog.count((x)::integer)'),
+      asker(() => false)
+    ),
+    'never-null'
+  )
+  // The rule holds even where the view took a user `count` elsewhere: the qualified
+  // spelling is the built-in regardless.
+  assert.equal(
+    evaluateExpression(
+      parseExpression('pg_catalog.count((x)::integer)'),
+      asker((name) => name === 'count')
+    ),
+    'never-null'
+  )
+  assert.equal(
+    evaluateExpression(
+      parseExpression('adv.count((x)::integer)'),
+      asker(() => false)
+    ),
+    'unknown'
+  )
+  assert.equal(
+    evaluateExpression(
+      parseExpression('count((x)::integer)'),
+      asker((name) => name === 'count')
+    ),
+    'unknown'
+  )
 })
 
 test('a reference parses; anything with structure does not', () => {
@@ -2273,7 +2439,8 @@ const REFUSAL_CASES: Record<PlanRefusal | ColumnRefusal, string> = {
   'through-a-materialized-with': 'a plan built by hand, below',
   'through-an-unpinned-subquery': 'v_sale_store_totals',
   'through-a-row-source-the-catalog-does-not-name': 'v_function_scan',
-  'cast-not-value-preserving': 'v_over_barrier_narrowing'
+  'cast-not-value-preserving': 'v_over_barrier_narrowing',
+  'plan-and-tree-disagree': 'a plan and a tree built by hand, below'
 }
 
 test('the closed list of refusals is exactly the list with cases', () => {
