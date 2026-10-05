@@ -83,9 +83,13 @@ const KEYWORDS = new Set([
   'LEAST',
   'NULLIF',
   'NULL',
-  // The deparser prints a boolean constant lower-case, unlike every keyword.
+  // The deparser prints a boolean constant lower-case, unlike every keyword, and
+  // the target of an `IS` test in upper case — `b IS TRUE`, `b IS UNKNOWN`.
   'true',
   'false',
+  'TRUE',
+  'FALSE',
+  'UNKNOWN',
   'NOT',
   'AND',
   'OR',
@@ -115,6 +119,79 @@ const OPERATOR_CHARACTERS = new Set([
   '&',
   '?'
 ])
+
+// ── The cast rule ──────────────────────────────────────────────────────────────
+//
+// A cast is not a shape whose SQL definition is the claim, the way `COALESCE` or
+// `count` is: the value it answers is the cast's own, and PostgreSQL lets a cast
+// answer NULL for a non-NULL input. `jsonb` to `integer` answers NULL for the
+// `jsonb` null, and a `CREATE CAST` whose function returns NULL answers NULL
+// wherever it likes. The plan prints the target type by name and says nothing
+// about the operand's type, so the pair (source → target) is read off the
+// operand's own shape, and a cast is taken for transparent — the operand's answer
+// with nothing added — only where both ends are one family PostgreSQL defines to
+// answer a value for every input of the other: the exact-number types, and the
+// text types. Every other cast, however plainly its operand is never NULL, may
+// answer NULL, and there the column is nullable.
+const EXACT_TYPE_NAMES = new Set(['smallint', 'integer', 'bigint', 'numeric'])
+const TEXT_TYPE_NAMES = new Set(['text', 'character varying', 'character'])
+
+/** Which family a type name printed by the deparser belongs to, if either. */
+function castTypeFamily(name: string): 'exact' | 'text' | null {
+  if (EXACT_TYPE_NAMES.has(name)) return 'exact'
+  if (TEXT_TYPE_NAMES.has(name)) return 'text'
+  return null
+}
+
+/** The family every member shares, or `null` where they do not or none is known. */
+function commonFamily(families: readonly ('exact' | 'text' | null)[]): 'exact' | 'text' | null {
+  const [first] = families
+  if (first === null || first === undefined) return null
+  return families.every((family) => family === first) ? first : null
+}
+
+/** The family of a constant: its own type, or the last cast's where it carries one. */
+function literalFamily(token: Token, target: string | undefined): LiteralFamily {
+  if (token.kind === 'number') return 'exact'
+  // A string constant is text unless a cast names another type.
+  return target === undefined ? 'text' : (castTypeFamily(target) ?? 'unknown')
+}
+
+/**
+ * The family an expression's value is of, as far as its shape says — nothing where
+ * the shape does not say (a column reference, whose type is the catalog's answer
+ * and not the plan's). Used only to read the cast around it.
+ */
+function operandTypeFamily(node: ExpressionNode, ask: ExpressionAsker): 'exact' | 'text' | null {
+  switch (node.kind) {
+    case 'literal':
+      return node.family === 'exact' || node.family === 'text' ? node.family : null
+    case 'cast':
+      return castTypeFamily(node.target)
+    case 'unary':
+      return node.operator === 'NOT' ? null : operandTypeFamily(node.operand, ask)
+    case 'call': {
+      if (node.quoted || ask.shadowed(node.name)) return null
+      if (node.name === 'count') return 'exact'
+      return commonFamily(node.args.map((argument) => operandTypeFamily(argument, ask)))
+    }
+    case 'case':
+      return commonFamily(
+        [...node.arms, ...(node.otherwise === null ? [] : [node.otherwise])].map((arm) =>
+          operandTypeFamily(arm, ask)
+        )
+      )
+    case 'chain': {
+      if (node.operators.every((operator) => operator === '||')) return 'text'
+      if (!node.operators.every((operator) => ['+', '-', '*', '/', '%'].includes(operator))) {
+        return null
+      }
+      return commonFamily(node.operands.map((operand) => operandTypeFamily(operand, ask)))
+    }
+    default:
+      return null
+  }
+}
 
 function tokenize(entry: string): Token[] | null {
   const tokens: Token[] = []
@@ -229,7 +306,8 @@ function tokenize(entry: string): Token[] | null {
 type ExpressionNode =
   /** A fragment the parser could not read; its bounds are known and its content is not. */
   | { kind: 'opaque' }
-  | { kind: 'literal' }
+  /** A constant, `family` a coarse reading of its type for the cast rule below. */
+  | { kind: 'literal'; family: LiteralFamily }
   | { kind: 'null' }
   | { kind: 'reference'; text: string }
   | {
@@ -247,6 +325,11 @@ type ExpressionNode =
   | { kind: 'is-test' }
   /** `a IS [NOT] DISTINCT FROM b`: a boolean whatever the operands are. */
   | { kind: 'is-distinct-from' }
+  /** `expr::type`. The value may be NULL whatever the operand is; see `evaluate`. */
+  | { kind: 'cast'; operand: ExpressionNode; target: string }
+
+/** A coarse reading of a value's type, for the cast rule and nothing else. */
+type LiteralFamily = 'exact' | 'text' | 'boolean' | 'unknown'
 
 class Parser {
   private readonly tokens: Token[]
@@ -322,9 +405,9 @@ class Parser {
   }
 
   /** One `::type` suffix, its name as complex as `character varying(4)[]`. */
-  private takeCast(): void {
+  private takeCast(): string {
     this.takePunctuation('::')
-    let words = 0
+    const words: string[] = []
     for (;;) {
       const token = this.peek()
       if (token?.kind !== 'identifier') break
@@ -340,7 +423,7 @@ class Parser {
         break
       }
       this.at += 1
-      words += 1
+      words.push(token.quoted ? token.text : token.text.toLowerCase())
       if (this.isPunctuation('(')) {
         this.at += 1
         for (;;) {
@@ -355,15 +438,26 @@ class Parser {
         this.takePunctuation(')')
       }
     }
-    if (words === 0) throw new ExpressionParseError()
+    if (words.length === 0) throw new ExpressionParseError()
     while (this.isPunctuation('[')) {
       this.at += 1
       this.takePunctuation(']')
     }
+    return words.join(' ')
   }
 
-  private takeCasts(): void {
-    while (this.isPunctuation('::')) this.takeCast()
+  /** Every `::type` suffix in a row, outermost last, as the type names printed. */
+  private takeCasts(): string[] {
+    const targets: string[] = []
+    while (this.isPunctuation('::')) targets.push(this.takeCast())
+    return targets
+  }
+
+  /** `cast(c…(operand))` for the suffixes taken, innermost first, operand unchanged if none. */
+  private wrapCasts(operand: ExpressionNode, targets: readonly string[]): ExpressionNode {
+    let node = operand
+    for (const target of targets) node = { kind: 'cast', operand: node, target }
+    return node
   }
 
   private parseArguments(): { args: ExpressionNode[]; filter: boolean } {
@@ -476,15 +570,17 @@ class Parser {
       this.at += 1
       const inner = this.parseExpression()
       this.takePunctuation(')')
-      this.takeCasts()
-      return inner
+      return this.wrapCasts(inner, this.takeCasts())
     }
     const token = this.peek()
     if (token === undefined) throw new ExpressionParseError()
     if (token.kind === 'string' || token.kind === 'number') {
       this.at += 1
-      this.takeCasts()
-      return { kind: 'literal' }
+      const targets = this.takeCasts()
+      // A constant is a constant however it is cast — the planner folds a cast of
+      // one — so `'0'::numeric` and `'usdt'::text` are values, never NULL. The
+      // target of the last cast, where there is one, is the constant's type.
+      return { kind: 'literal', family: literalFamily(token, targets.at(-1)) }
     }
     if (token.kind === 'keyword') {
       if (token.text === 'NULL') {
@@ -495,7 +591,7 @@ class Parser {
       if (token.text === 'true' || token.text === 'false') {
         this.at += 1
         this.takeCasts()
-        return { kind: 'literal' }
+        return { kind: 'literal', family: 'boolean' }
       }
       if (token.text === 'NOT') {
         this.at += 1
@@ -512,8 +608,7 @@ class Parser {
         const name = token.text
         this.at += 1
         const { args, filter } = this.parseArguments()
-        this.takeCasts()
-        return { kind: 'call', name, quoted: false, args, filter }
+        return this.wrapCasts({ kind: 'call', name, quoted: false, args, filter }, this.takeCasts())
       }
       throw new ExpressionParseError()
     }
@@ -526,8 +621,10 @@ class Parser {
       this.at += 1
       if (this.isPunctuation('(')) {
         const { args, filter } = this.parseArguments()
-        this.takeCasts()
-        return { kind: 'call', name: token.text, quoted: token.quoted, args, filter }
+        return this.wrapCasts(
+          { kind: 'call', name: token.text, quoted: token.quoted, args, filter },
+          this.takeCasts()
+        )
       }
       // `alias.column` is as far as a column reference goes; `alias.*` is a
       // whole row and `alias.column[1]` a subscript, neither a bare reference.
@@ -545,8 +642,7 @@ class Parser {
       const text = names
         .map((part) => (part.quoted ? `"${part.text.replaceAll('"', '""')}"` : part.text))
         .join('.')
-      this.takeCasts()
-      return { kind: 'reference', text }
+      return this.wrapCasts({ kind: 'reference', text }, this.takeCasts())
     }
     throw new ExpressionParseError()
   }
@@ -579,8 +675,7 @@ class Parser {
       this.isKeyword('UNKNOWN')
     ) {
       this.at += 1
-      this.takeCasts()
-      return { kind: 'is-test' }
+      return this.wrapCasts({ kind: 'is-test' }, this.takeCasts())
     }
     throw new ExpressionParseError()
   }
@@ -694,6 +789,14 @@ function evaluate(node: ExpressionNode, ask: ExpressionAsker): ExpressionNullabi
     case 'is-test':
     case 'is-distinct-from':
       return 'never-null'
+    case 'cast': {
+      const operand = evaluate(node.operand, ask)
+      // A cast adds nothing to a nullable operand's answer: it stays nullable.
+      if (operand !== 'never-null') return operand
+      const target = castTypeFamily(node.target)
+      if (target !== null && target === operandTypeFamily(node.operand, ask)) return 'never-null'
+      return 'nullable'
+    }
     case 'unary':
       // `-x` and `NOT x` answer NULL exactly when `x` does: negation of a
       // value is a value, and of a boolean a boolean.

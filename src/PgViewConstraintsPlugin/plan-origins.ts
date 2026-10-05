@@ -880,6 +880,8 @@ function computesCount(entry: string): boolean {
         return node.operands.some(contains)
       case 'unary':
         return contains(node.operand)
+      case 'cast':
+        return contains(node.operand)
       default:
         return false
     }
