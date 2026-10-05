@@ -56,11 +56,14 @@ key carried without a multiplying join, a group key, a `DISTINCT` — and a
 makes a `@primaryKey` column non-null and leaves a `@unique` column as it is, and
 PostgreSQL's own uniqueness admits a `NULL` beside anything (a `UNIQUE` index admits
 any number of `NULL`s), so declaring a nullable key is sound where declaring it
-non-null would not be. A view gets a `@primaryKey` or a `@unique`, never both: a key
-whose every column is never `NULL` is the `@primaryKey` of "Row identity", and only
-where no such key exists does the `@unique` stand. Pass `deriveUnique: false` to
-`PgViewConstraintsPlugin` to leave `@unique` underived, for instance to keep the
-generated schema's row-lookup fields to the primary keys alone.
+non-null would not be. Of the keys it **derives**, a view gets the `@primaryKey` or the
+`@unique` and never both: a key whose every column is never `NULL` is the `@primaryKey`
+of "Row identity", and only where no such key exists does the `@unique` stand. This is
+the derived pair alone. A hand-written `@primaryKey` the derivation does not match is
+left where it is, and a derived `@unique` may stand beside it — a table carries a
+primary key and a unique constraint at once, and the two say different things. Pass
+`deriveUnique: false` to `PgViewConstraintsPlugin` to leave `@unique` underived, for
+instance to keep the generated schema's row-lookup fields to the primary keys alone.
 
 ## A relation to a projection
 
@@ -132,7 +135,11 @@ other: a user `count`, `+` or type `integer` elsewhere in the database — in an
 schema, or another view — leaves the built-in's rule in force. The resolution is at
 the object, not the individual call: the plan prints a name, and a view that names a
 user `count` anywhere stands the `count` rule down wherever that name is printed in
-its plan, which is the conservative reading.
+its plan, which is the conservative reading. Where the deparser had to qualify a
+call because a same-named function shadows the built-in in the search path, it prints
+the built-in as `pg_catalog.count(…)`; that qualified spelling **is** the built-in, so
+its rule holds there whatever the view's own objects say, while a call under any other
+schema is that schema's function and claims nothing.
 An entry that does not parse is `unknown` too — the reader never
 guesses. The same answer holds across a union's branches (a column is never `NULL`
 only where every branch proves it), across a crossed view boundary, and below an
@@ -148,7 +155,10 @@ of **every** branch is not (a `UNION`, `UNION ALL`, `INTERSECT` and `EXCEPT` ali
 each branch printing its own select list in the operation's column order). Where the
 branches cannot be told apart — a set operation standing over another, so the same
 spelling names a column of both — no column is read and the view says
-`set-operation-not-a-select-list`.
+`set-operation-not-a-select-list`. `INTERSECT` and `EXCEPT` are read where the plan
+prints their branches directly; a PostgreSQL major that wraps the operation in a
+subquery the reader leaves unread leaves them refused whole, an under-count taken on
+purpose rather than a claim on a branch the plan does not name.
 
 A `WITH` query referenced twice is materialized, and the plan prints its columns by the
 query's own names in the `CTE Scan` that reads them while the subplan computes the
@@ -156,18 +166,44 @@ query's select list in order — with no map between the two in the plan. That m
 where each of the view's own columns was written from, is in the view's stored rewrite
 tree (`pg_rewrite.ev_action`), read field by field and not parsed as SQL: the tree names
 every `WITH` query's columns in order (`:ctename`, `:ctecolnames`), so a `cte.col` is
-read at that column's position in the subplan the plan computes it by. Where the plan
-could not read a column at all — a scan a constant qualifier removed, a `WITH` query
-whose tree is out of reach — the tree's own record of the base column the view column
-was written from (`:resorigtbl`, `:resorigcol`) is taken as a fallback source for a
-relation, and for nothing else: it says nothing of a column's nullness, and a column the
-plan did read is judged by the plan. The tree also names every range-table alias of the
-view's relations (`:alias`, `:relid`), so a source view the query referred to by an
-explicit alias (`FROM deposit.v bank_range`) is a boundary the reader crosses too —
-PostgreSQL spells such a subquery's node with the alias, not the view's name, and the
-tree is what turns the alias back into the view. The tree's format is PostgreSQL-internal
-and carries no cross-version promise, so the lab reads it on every run, a case per shape
-next to the cases that hold the plan's own text format.
+read at that column's position in the subplan the plan computes it by. A name two `WITH`
+queries share — the same name at two query levels, which the plan spells identically and
+never tells apart — is dropped, so neither is read: reading the wrong level's subplan
+would put a false `@notNull` or `@foreignKey` on a column. Where the plan could not read
+a column at all — a scan a constant qualifier removed, a `WITH` query whose tree is out
+of reach — the tree's own record of the base column the view column was written from
+(`:resorigtbl`, `:resorigcol`) is taken as a fallback source for a relation, and for
+nothing else: it says nothing of a column's nullness, and a column the plan did read is
+judged by the plan. Where both name a base column for the same view column and they are
+not the same, the column is refused (`plan-and-tree-disagree`) rather than either
+trusted; the tree names a view where the column came through one, and is left out of the
+comparison then, since that boundary is exactly the step the plan crosses and the tree
+does not. The tree also names every range-table alias of the view's relations (`:alias`,
+`:relid`), so a source view the query referred to by an explicit alias
+(`FROM deposit.v bank_range`) is a boundary the reader crosses too — PostgreSQL spells
+such a subquery's node with the alias, not the view's name, and the tree is what turns
+the alias back into the view.
+
+The tree is read **closed by default**: the walk takes a fixed set of fields by name and
+fails the whole tree on anything it does not place, and a failed tree yields nothing
+rather than a partial answer — the view's `WITH` queries are then not crossed, no origin
+is taken from it, and a note names the reason instead of leaving an empty map to look
+like a view with no `WITH` at all. Its format is PostgreSQL-internal and carries no
+cross-version promise, so the lab is read against every supported major in CI (the
+`lab` job builds the fixture from a real database of each) and a change to the format
+fails a run.
+
+Beyond the expression shapes above, the plan reader itself knows a closed set of node
+forms and refuses the rest rather than guess. It reads: relation scans; blocks of
+`Inner` joins and the `Left`/`Right`/`Full`/`Semi`/`Anti` joins; `Aggregate` and `Group`
+(each row a non-empty group); `Unique`; `Append`, `Merge Append`, `SetOp` and `HashSetOp`
+(the set operations, branch by branch); `Subquery Scan` (a view boundary the catalog
+pins, including one spelled with an explicit alias); `CTE Scan`; `Result`; `WindowAgg`;
+and the pass-through nodes (`Gather`, `Gather Merge`, `Sort`, `Incremental Sort`,
+`Limit`, `Materialize`, `Memoize`, `LockRows`) that hand their child's select list on. A
+`Recursive Union`, a join type it does not know, a function scan, a `VALUES` list, a
+window frame — anything else — is a named refusal on the columns that reach it, never a
+guess.
 
 ## Plan invariance
 
@@ -176,6 +212,12 @@ The answer must not depend on the plan the planner happened to choose.
 of every target under each of `PLANNER_REGIMES`, with the statistics as found, after
 `ANALYZE` and with production-scale row counts, and reports each rendering that
 differs. `open` opens a session with your driver.
+
+This proof is the plugin's own gate on its shape of reading, and a consumer should run
+it in its own CI: the plans it derives from are the ones that consumer's database
+produces, and a surface whose contract moved with them would publish one schema against
+an empty database and another against production. A consumer wires its services into
+`InvarianceTarget`s and a driver into `open`, and fails the build on a difference.
 
 `reportingPreset(preset, onReport)` and `ViewConstraintsReportRenderer` print what
 is derived beside what the views declare by hand.
