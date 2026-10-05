@@ -66,7 +66,10 @@ any number of `NULL`s), so declaring a nullable key is sound where declaring it
 non-null would not be. A key an outer join can null is no row identity for either tag
 — the padded rows carry the same `NULL`, which tells none of them apart — so the same
 guard a `@primaryKey` is taken under yields neither, and the plan's own set is named
-in the view's notes. Of the keys it **derives**, a view gets the `@primaryKey` or the
+in the view's notes. A key holding a column whose plan reading was refused — one read
+from a `WITH` query a plan may spell either way — yields neither either: whether that
+column is never `NULL` is what the plan cannot say. Of the keys it **derives**, a view
+gets the `@primaryKey` or the
 `@unique` and never both: a key whose every column is never `NULL` is the `@primaryKey`
 of "Row identity", and only where no such key exists does the `@unique` stand. This is
 the derived pair alone. A hand-written `@primaryKey` the derivation does not match is
@@ -180,11 +183,28 @@ query's select list in order — with no map between the two in the plan. That m
 where each of the view's own columns was written from, is in the view's stored rewrite
 tree (`pg_rewrite.ev_action`), read field by field and not parsed as SQL: the tree names
 every `WITH` query's columns in order (`:ctename`, `:ctecolnames`), so a `cte.col` is
-read at that column's position in the subplan the plan computes it by. The stored tree
+read at that column's position in the subplan the plan computes it by. Where a column's
+value stands on a query a plan may print two ways — a `WITH` query the view **inlines**, or
+a `FROM (SELECT …)` subquery, that is not simple (it groups, aggregates, de-duplicates, limits
+or windows), or that reads one of those — the column is refused its non-nullness and its key:
+pulling such a query up into the query above means merging that work into it, which PostgreSQL
+does only where it chooses to, and the plan then prints the column flattened (where it resolves
+to a base column) or behind a subquery of the kept query, which this reader does not pin. The
+relation is not refused with it: that comes from the tree (`resorigtbl`), which no plan writes,
+so a `@foreignKey` on such a column stands — where the tree lands on a base table that carries
+a key; a trace that stops at a view has no key hanging on it and yields none. A simple query —
+a bare projection — is pulled up
+wherever it stands, and its columns are read as usual, and so are a set operation's, whose
+pull-up is a rule of its own rather than a matter of cost. Which fields say a query is not
+simple is listed in `view-tree.ts`, and the list is one the reader has been checked against on
+PostgreSQL 15 through 18: a field the dump no longer carries is read as the work being done.
+The stored tree
 is read only on a PostgreSQL major whose format this reader has been checked against
-(15 through 18): on any other major it is left unread — the plan's own refusals stand
-where its facts would have, and each view's notes say why — so a format that moved
-between majors is a missed derivation and never a guessed one. The name is not
+(15 through 18), and a view whose tree was not read at all — another major, a format the walk
+does not recognise, or no tree at hand — derives **nothing**: no `@notNull`, no key and no
+`@foreignKey`. Which columns a plan cannot be trusted for is a fact of the tree and cannot be
+named without it, so an answer taken from that plan alone would move with the planner's choice;
+the plan's own readings stand as diagnostics, and each view's notes say why. The name is not
 the plan's to trust: the same `WITH` name can stand in another query the view goes
 through — the same name at two query levels, a view outside the surface, or a SQL
 function the view inlines — and the plan prints one `CTE <name>` subplan whose owner
@@ -251,7 +271,15 @@ The answer must not depend on the plan the planner happened to choose.
 `proveInvariance(targets, ownerConnectionString, open, write)` derives every view
 of every target under each of `PLANNER_REGIMES`, with the statistics as found, after
 `ANALYZE` and with production-scale row counts, and reports each rendering that
-differs. `open` opens a session with your driver.
+differs. `open` opens a session with your driver. The lab's own matrix carries the
+same two axes — its regimes, read again from production-scale row counts — since the
+statistics are the planner's other input and a shape can move with them alone.
+
+What the proof holds is the **tags**: `@notNull`, `@foreignKey`, `@primaryKey` and
+`@unique`, and whether the plan was read at all. A refusal's **reason** is a diagnostic
+and may differ between plans for the same outcome — a column with no source either way
+is the same published answer whichever shape of plan named it — so the reasons are
+compared in the report and not in the proof.
 
 This proof is the plugin's own gate on its shape of reading, and a consumer should run
 it in its own CI: the plans it derives from are the ones that consumer's database

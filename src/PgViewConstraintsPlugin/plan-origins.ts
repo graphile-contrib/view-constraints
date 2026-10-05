@@ -185,7 +185,13 @@ export const COLUMN_REFUSALS = {
     'no longer the base column’s value',
   'plan-and-tree-disagree':
     'the plan and the view’s stored rewrite tree name different base columns for the ' +
-    'column, and neither is trusted over the other'
+    'column, and neither is trusted over the other',
+  'through-an-optionally-flattened-query':
+    'the value stands on a query a plan may print two ways — a `WITH` query this view ' +
+    'inlines, or a `FROM (SELECT …)` subquery, that groups, aggregates, de-duplicates, ' +
+    'limits or windows, or reads one that does: whether the planner pulls it up is its ' +
+    'choice, so the column prints flattened into the plan or behind a subquery it kept, ' +
+    'and the two read differently'
 } as const
 
 export type ColumnRefusal = keyof typeof COLUMN_REFUSALS

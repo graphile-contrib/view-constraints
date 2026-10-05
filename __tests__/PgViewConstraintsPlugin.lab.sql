@@ -74,6 +74,26 @@ create view v_cte as
 create view v_cte_aggregate as
   with totals as materialized (select cur_code, count(*) as n from tx group by cur_code)
   select cur_code, n from totals;
+-- NEGATIVE: a column read from a `WITH` query this view inlines that is not simple —
+-- it groups, or reads one that does — is refused its non-nullness and its key, whatever
+-- the plan prints for it; its relation is taken from the tree and stands. PostgreSQL pulls
+-- such a query up into the query above it only where it chooses to merge its grouping,
+-- and where it does not the columns are printed behind a subquery of its own, which this
+-- reader does not pin. `doubled` reads `scaled`, which reads the grouped `totals`;
+-- `title` is read from a base relation and is derived.
+create view v_inlined_with as
+  with totals as (select bank_id, count(*) as n from tx group by bank_id),
+       scaled as (select bank_id, n * 2 as doubled from totals)
+  select scaled.bank_id, piece.n, scaled.doubled, bank.title
+  from scaled
+       cross join lateral unnest(array[scaled.doubled]) piece(n)
+       join bank on bank.id = scaled.bank_id;
+-- NEGATIVE: the same refusal where the plan's own key names the column. The group key
+-- above an uncertain `WITH` query is a row identity of the plan, and neither `@primaryKey`
+-- nor `@unique` may stand on a column whose never-NULLness this plan cannot answer.
+create view v_inlined_with_key as
+  with totals as (select bank_id, count(*) as n from tx group by bank_id)
+  select totals.bank_id, count(*) as k from totals group by totals.bank_id;
 create view v_unique_key as select code from asset;
 create materialized view m_tx as select id, cur_code, amount from tx;
 
@@ -488,6 +508,54 @@ create view v_sale_store_totals as
   from sale s
   left join (select store_id, count(*) as n from sale group by store_id) totals
     on totals.store_id = s.store_id;
+-- NEGATIVE: a grouped `WITH` query read through a `FROM (SELECT …)` wrapper, so the walk
+-- has to follow a `Var` through a subquery's own range table to find the doubt behind it.
+-- A subquery's shape is the planner's to pull up or keep, so a column behind one is no
+-- more settled than the query it reads.
+create view v_inlined_with_wrapper as
+  with totals as (select store_id, count(*) as n from sale group by store_id)
+  select s.id, sub.n
+  from sale s
+       join (select store_id, n from totals) sub on sub.store_id = s.store_id;
+-- NEGATIVE: and the same query read directly, with no wrapper between.
+create view v_inlined_with_direct as
+  with totals as (select store_id, count(*) as n from sale group by store_id)
+  select s.id, totals.n
+  from sale s
+       join totals on totals.store_id = s.store_id;
+-- NEGATIVE, and with no `WITH` at all: the select list reads an ordinary `FROM (SELECT …)`
+-- grouping, which a plan may pull up into the join or keep behind a subquery of its own.
+-- This is the inner join beside `v_sale_store_totals`, whose left join nulls the same
+-- column and puts the doubt behind a refusal that holds on every plan.
+create view v_group_sub_inner as
+  select s.id, tot.n
+  from sale s
+       join (select store_id, count(*) as n from sale group by store_id) tot
+         on tot.store_id = s.store_id;
+-- NEGATIVE: the grouping stands in a subquery a *simple* `WITH` query reads, so the doubt
+-- is the subquery level's, and it travels through the query in between.
+create view v_cte_over_group_sub as
+  with scaled as (
+    select tot.store_id, tot.n * 2 as doubled
+    from (select store_id, count(*) as n from sale group by store_id) tot
+  )
+  select s.id, scaled.doubled
+  from sale s
+       join scaled on scaled.store_id = s.store_id;
+-- NEGATIVE: a subquery over a subquery: the grouping stands two levels down.
+create view v_group_sub_over_group_sub as
+  select s.id, outer_tot.doubled
+  from sale s
+       join (select inner_tot.store_id, inner_tot.n * 2 as doubled
+             from (select store_id, count(*) as n from sale group by store_id) inner_tot) outer_tot
+         on outer_tot.store_id = s.store_id;
+-- NEGATIVE: and the doubt travels the other way: a subquery reads a `WITH` query that
+-- groups, so the level read is the `WITH` and the reading level is the subquery.
+create view v_group_sub_over_cte as
+  with totals as (select store_id, count(*) as n from sale group by store_id)
+  select s.id, wrap.n
+  from sale s
+       join (select store_id, n from totals) wrap on wrap.store_id = s.store_id;
 
 -- NEGATIVE: a lateral grouping that reaches out to another relation. Once the grouping
 -- is pinned, what stood inside it — the filter tying it to `st` — holds of the rows

@@ -60,6 +60,7 @@ const LAB_REGIMES = [
   'no-sort',
   'no-seqscan',
   'nestloop-only',
+  'no-nestloop',
   'genetic-join-order'
 ]
 const REGIMES = LAB_REGIMES.map((name) => {
@@ -67,6 +68,27 @@ const REGIMES = LAB_REGIMES.map((name) => {
   if (!regime) throw new Error(`no planner regime named ${name}`)
   return regime
 })
+
+// The statistics the planner reads are its other input, and a shape can move with them
+// alone: whether a query this view reads through is pulled up is a cost decision, and the
+// row counts are what it costs. The regimes the contract was seen to move on are read again
+// from production-scale counts — the ones that meet a level flattened and a level kept, from
+// either side of the join-method choice — rather than every one of them, which would double
+// the fixture for the same axis. `ANALYZE` puts the counts back before the database is
+// dropped.
+const PRODUCTION_REGIMES = ['default', 'nestloop-only', 'no-nestloop']
+const STATISTICS_STATES: { name: string; sql: string | null; regimes: string[] }[] = [
+  { name: '', sql: null, regimes: LAB_REGIMES },
+  {
+    name: 'production/',
+    regimes: PRODUCTION_REGIMES,
+    sql: `
+      UPDATE pg_class SET reltuples = 5e6, relpages = 200000
+      WHERE relkind IN ('r', 'm', 'i')
+        AND relnamespace NOT IN ('pg_catalog'::regnamespace, 'information_schema'::regnamespace)`
+  }
+]
+const REGIME_COUNT = STATISTICS_STATES.reduce((total, state) => total + state.regimes.length, 0)
 
 // Only the fields `plan-origins.ts` and `plan-keys.ts` read are kept, so that the
 // fixture is the reader's input and not a transcript of everything EXPLAIN happens to
@@ -159,52 +181,61 @@ const tables = await readTables(runQueryOn(lab), ['lab'])
 const viewSources = (await readViewSources(runQueryOn(lab))).filter((view) => view.schema === 'lab')
 
 const planned: unknown[] = []
-for (const regime of REGIMES) {
-  const session = await open(LAB, ['SET search_path = lab', ...regime.settings])
-  for (const view of views) {
-    const columns = (view.columns ?? []).map((column) => ({
-      name: column.name,
-      typeId: column.type_id,
-      typeMod: column.type_mod
-    }))
-    if (columns.length === 0) continue
-    const rows = await session.query<{ 'QUERY PLAN': [{ Plan: Record<string, unknown> }] }>(
-      explainStatement({ ...view, columns })
-    )
-    const plan = rows.rows[0]?.['QUERY PLAN']?.[0]?.Plan
-    if (!plan) throw new Error(`${view.view}: EXPLAIN returned no plan`)
-    const facts = viewTrees.get(`lab.${view.view}`)
-    // Each range-table alias the view's stored tree names, resolved to the relation it
-    // stands for, so a `Subquery Scan` spelled with an explicit alias is crossable.
-    const viewAliases = Object.fromEntries(
-      [...(facts?.relationAliases ?? [])].flatMap(([alias, relid]) => {
-        const relation = relationOids.get(relid)
-        return relation ? [[alias, relation.relation]] : []
+for (const state of STATISTICS_STATES) {
+  if (state.sql !== null) await lab.query(state.sql)
+  for (const name of state.regimes) {
+    const regime = REGIMES.find((candidate) => candidate.name === name)
+    if (!regime) throw new Error(`no planner regime named ${name}`)
+    const session = await open(LAB, ['SET search_path = lab', ...regime.settings])
+    for (const view of views) {
+      const columns = (view.columns ?? []).map((column) => ({
+        name: column.name,
+        typeId: column.type_id,
+        typeMod: column.type_mod
+      }))
+      if (columns.length === 0) continue
+      const rows = await session.query<{ 'QUERY PLAN': [{ Plan: Record<string, unknown> }] }>(
+        explainStatement({ ...view, columns })
+      )
+      const plan = rows.rows[0]?.['QUERY PLAN']?.[0]?.Plan
+      if (!plan) throw new Error(`${view.view}: EXPLAIN returned no plan`)
+      const facts = viewTrees.get(`lab.${view.view}`)
+      // Each range-table alias the view's stored tree names, resolved to the relation it
+      // stands for, so a `Subquery Scan` spelled with an explicit alias is crossable.
+      const viewAliases = Object.fromEntries(
+        [...(facts?.relationAliases ?? [])].flatMap(([alias, relid]) => {
+          const relation = relationOids.get(relid)
+          return relation ? [[alias, relation.relation]] : []
+        })
+      )
+      planned.push({
+        schema: view.schema,
+        view: view.view,
+        relkind: view.relkind,
+        regime: `${state.name}${regime.name}`,
+        columns,
+        treeOk: facts?.ok ?? false,
+        cteColumns: Object.fromEntries(facts?.cteColumns ?? new Map()),
+        cteOrigins: Object.fromEntries(
+          resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map())
+        ),
+        cteAmbiguous: [...(facts?.cteAmbiguous ?? [])].sort(),
+        cteMaterialized: Object.fromEntries(facts?.cteMaterialized ?? new Map()),
+        cteRefCount: Object.fromEntries(facts?.cteRefCount ?? new Map()),
+        treeColumns: Object.fromEntries(
+          resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map())
+        ),
+        optionallyFlattenedColumns: [...(facts?.optionallyFlattenedColumns ?? [])].sort(
+          (left, right) => left - right
+        ),
+        viewAliases,
+        plan: prune(plan)
       })
-    )
-    planned.push({
-      schema: view.schema,
-      view: view.view,
-      relkind: view.relkind,
-      regime: regime.name,
-      columns,
-      treeOk: facts?.ok ?? false,
-      cteColumns: Object.fromEntries(facts?.cteColumns ?? new Map()),
-      cteOrigins: Object.fromEntries(
-        resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map())
-      ),
-      cteAmbiguous: [...(facts?.cteAmbiguous ?? [])].sort(),
-      cteMaterialized: Object.fromEntries(facts?.cteMaterialized ?? new Map()),
-      cteRefCount: Object.fromEntries(facts?.cteRefCount ?? new Map()),
-      treeColumns: Object.fromEntries(
-        resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map())
-      ),
-      viewAliases,
-      plan: prune(plan)
-    })
+    }
+    await session.end()
   }
-  await session.end()
 }
+await lab.query('ANALYZE')
 await lab.end()
 
 // Only the lab's own relations: the fixture is about this schema, and the catalog of
@@ -268,5 +299,5 @@ await adminAgain.query(`DROP DATABASE IF EXISTS ${LAB} WITH (FORCE)`)
 await adminAgain.end()
 
 process.stdout.write(
-  `view-constraints fixture: ${labCatalog.length} relations, ${views.length} views × ${REGIMES.length} regimes\n`
+  `view-constraints fixture: ${labCatalog.length} relations, ${views.length} views × ${REGIME_COUNT} regimes\n`
 )

@@ -513,6 +513,13 @@ export interface ViewTreeFacts {
   /** CTE names the tree defines at more than one query level. */
   cteAmbiguous: Set<string>
   treeOrigins: Map<number, TreeOrigin>
+  /**
+   * The view's columns whose value stands on a query a plan may spell either way — a `WITH`
+   * query it inlines that is not simple, or a subquery that is, or either read through
+   * another: refused, because the plan may print such a query's columns flattened or behind
+   * a kept subquery, and the two are read differently (see `view-tree.ts` and `derive.ts`).
+   */
+  optionallyFlattenedColumns: Set<number>
   /** The relation each range-table alias of the view names, by alias. */
   relationAliases: Map<string, number>
   /** Whether each `WITH` query of the view is materialized (see `view-tree.ts`). */
@@ -640,6 +647,7 @@ export async function readViewTrees(query: RunQuery, schemas: string[]): Promise
       cteOrigins: tree.cteOrigins,
       cteAmbiguous: tree.cteAmbiguous,
       treeOrigins: tree.treeOrigins,
+      optionallyFlattenedColumns: tree.optionallyFlattenedColumns,
       relationAliases: tree.relationAliases,
       cteMaterialized: tree.cteMaterialized,
       cteRefCount: tree.cteRefCount
@@ -779,7 +787,7 @@ export const TREE_FORMAT_UNCHECKED_REASON =
   'stored rewrite tree (pg_rewrite.ev_action) not read: this PostgreSQL major is ' +
   `outside the range the reader is checked against (${TREE_MAJOR_RANGE}), so its stored ` +
   'format is not read, and no `WITH` query of this view is crossed and no column origin ' +
-  'is taken from it'
+  'is taken from it; nothing is derived for this view'
 
 export interface CollectResult {
   derivations: ViewDerivation[]
@@ -859,6 +867,10 @@ export async function collectViewConstraints(
       continue
     }
     const facts = viewTrees.get(`${view.schema}.${view.view}`)
+    // Whether this view's stored tree was read. It is what says which levels a plan may
+    // print two ways, so a view whose tree is not at hand has no answer that holds across
+    // plans and derives nothing (`derive.ts`, `treeRead`).
+    const treeRead = treeSupported && facts !== undefined && facts.ok
     const derivation = deriveViewConstraints(
       view.schema,
       view.view,
@@ -881,18 +893,25 @@ export async function collectViewConstraints(
       catalog,
       coercions,
       deriveUnique,
-      resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map())
+      resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map()),
+      facts?.optionallyFlattenedColumns ?? new Set(),
+      treeRead
     )
     // A tree the walk could not place is said out loud: its CTE map is empty, so a
     // `WITH` query reads as refused, and the reason the map is empty is named here
-    // rather than left to look like a query that has no `WITH` at all.
+    // rather than left to look like a query that has no `WITH` at all — together with the
+    // one thing that follows from it, that this view derives nothing.
     if (!treeSupported) {
       derivation.notes.push(TREE_FORMAT_UNCHECKED_REASON)
     } else if (facts && !facts.ok) {
       derivation.notes.push(
         'stored rewrite tree (pg_rewrite.ev_action) not read: its format was not ' +
           'recognised, so no `WITH` query of this view is crossed and no column origin ' +
-          'is taken from it'
+          'is taken from it; nothing is derived for this view'
+      )
+    } else if (!treeRead) {
+      derivation.notes.push(
+        'stored rewrite tree (pg_rewrite.ev_action) not read: nothing is derived for this ' + 'view'
       )
     }
     derivations.push(derivation)

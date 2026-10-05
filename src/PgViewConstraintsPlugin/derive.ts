@@ -405,7 +405,9 @@ export function deriveViewConstraints(
   treeColumns: ReadonlyMap<
     number,
     { schema: string; relation: string; column: string; relkind: string }
-  > = new Map()
+  > = new Map(),
+  optionallyFlattenedColumns: ReadonlySet<number> = new Set(),
+  treeRead = true
 ): ViewDerivation {
   const notes: string[] = []
   const columns = viewColumns.map((column) => column.name)
@@ -482,6 +484,28 @@ export function deriveViewConstraints(
     return sources
   })
 
+  // A column whose value stands on a query a plan may print two ways is refused its plan
+  // reading — no non-nullness and no key — whatever this plan happens to print for it. A
+  // `WITH` query this view inlines that groups, aggregates, de-duplicates, limits or
+  // windows, and a `FROM (SELECT …)` subquery that does, are pulled up into the query above
+  // only where the planner chooses to merge that work, and where it does not the columns
+  // are printed behind a subquery this reader does not pin: the same view of the same query,
+  // read differently by two plans, so an answer taken from either alone would move with the
+  // planner's choice. Its relation is not refused with it: that comes from the view's stored
+  // tree (`resorigtbl`), which no plan writes, so the foreign keys the tree carries stand
+  // below as they do for any column the plan left without a source. Nothing the plan proved
+  // is compared with the tree here, and nothing needs to be: the refusal is the tree's own —
+  // a shape of the view's defining query, not a reading of it — so the tree it falls back on
+  // is the one side of the comparison that was never in doubt.
+  for (const index of optionallyFlattenedColumns) {
+    if (index < 0 || index >= columns.length) continue
+    // A column the plan refused already keeps the plan's own reason: it is the sharper
+    // one, and the column is refused either way.
+    if (columnRefusals[index] !== null) continue
+    origins[index] = null
+    columnRefusals[index] = 'through-an-optionally-flattened-query'
+  }
+
   // The plan and the view's stored rewrite tree each say where a column came from. Where
   // both name a base column and they are not the same, the column is refused rather than
   // either trusted — the tree is read only where the plan named nothing (below), so the
@@ -538,6 +562,7 @@ export function deriveViewConstraints(
     const viewColumn = columns[index]
     if (viewColumn === undefined) continue
     if (disagreed.has(index)) continue
+    if (optionallyFlattenedColumns.has(index)) continue
     const sources = plan.columns[index]
     if (sources && sources.length > 0) {
       if (plan.nullIntroduced[index] !== false) continue
@@ -683,9 +708,13 @@ export function deriveViewConstraints(
   // traces it to the base column it was written as — through subqueries, joins and
   // `WITH` queries alike — and a bare reference to a base column carries its foreign
   // keys. Only the columns the plan left without a source are read this way, and only
-  // for a relation: the tree says nothing of non-nullness, and a column whose value the
-  // plan did read is judged by the plan. A column the plan and the tree disagreed on is
-  // left out: it was refused whole above, and the tree is the side that may be wrong.
+  // where the tree lands on a table: the tree says nothing of non-nullness, a column
+  // whose value the plan did read is judged by the plan, and a trace that stops at a view
+  // rather than a base table has no key hanging on it, so nothing is emitted for it. A
+  // column the plan and the tree disagreed on is left out: it was refused whole above, and
+  // the tree is the side that may be wrong. A column refused for a query a plan may spell
+  // either way is read here: that refusal is of the plan's reading, and the tree's relation
+  // is no plan's answer.
   for (let index = 0; index < columns.length; index++) {
     const viewColumn = columns[index]
     if (viewColumn === undefined || origins[index] !== null) continue
@@ -733,9 +762,13 @@ export function deriveViewConstraints(
   // discriminator no discriminator: a NULL cannot tell a row it pads. That guard holds
   // for a `@unique` as much as for a `@primaryKey` — a sequence of NULLs is as
   // indistinguishable as a sequence of values — so both tags are taken from the same
-  // keys, and the never-NULL question is the only one that separates them.
+  // keys, and the never-NULL question is the only one that separates them. A key holding
+  // a column whose plan reading was refused is no row identity either: whether the column
+  // is never NULL is exactly what this plan cannot say, so neither tag may stand on it.
   const rowIdentities = plan.rowIdentities.filter((key) =>
-    key.columns.every((index) => plan.entryNullExtended[index] !== true)
+    key.columns.every(
+      (index) => plan.entryNullExtended[index] !== true && !optionallyFlattenedColumns.has(index)
+    )
   )
   const candidates = rowIdentities.filter((key) =>
     key.columns.every((index) => key.discriminators.includes(index) || neverNull[index])
@@ -822,6 +855,20 @@ export function deriveViewConstraints(
     const viewColumn = columns[index]
     if (!refusal || viewColumn === undefined) continue
     notes.push(`${viewColumn}: ${refusal} — ${COLUMN_REFUSALS[refusal]}`)
+  }
+
+  // A view whose stored tree was not read is left with nothing derived — no non-nullness,
+  // no key and no relation — however readable its plan is. Which levels a plan may print
+  // two ways is a fact of the tree, and has no floor without it: the columns that must be
+  // refused cannot be named, and an answer taken from this plan alone would move with the
+  // planner's choice, which is the one thing this reader must not publish. The plan's own
+  // refusals stay as diagnostics; the tags do not. A caller that knows the reason says it
+  // in the notes (`collect.ts`), where the reason is known.
+  if (!treeRead) {
+    notNullColumns.length = 0
+    foreignKeys.length = 0
+    primaryKey = null
+    unique = null
   }
 
   return {
