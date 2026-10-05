@@ -366,15 +366,31 @@ const CASES: Case[] = [
   {
     view: 'v_inlined_with',
     about:
-      'a column read from a WITH query this view inlines is refused whatever the plan ' +
-      'prints — PostgreSQL may flatten it into the plan or keep it behind a subquery of ' +
-      'its own, and the two are read differently — while a column read from a base ' +
-      'relation beside it is derived as usual',
-    // The two columns the view reads from `scaled` are refused, and so is the one under
-    // the `unnest` (no row source of its own); `title` stands on `bank` itself.
+      'a column read from a WITH query this view inlines that is not simple is refused ' +
+      'its non-nullness and its key whatever the plan prints — PostgreSQL may pull it up ' +
+      'or keep it behind a subquery of its own, and the two read differently — while its ' +
+      'relation stands, taken from the tree, and a column read from a base relation ' +
+      'beside it is derived as usual',
+    // The two columns the view reads from `scaled` are refused their plan reading, and so
+    // is the one under the `unnest` (no row source of its own); `title` stands on `bank`
+    // itself. The relation of `bank_id` survives the refusal: the tree traces it to
+    // `tx.bank_id`, which no plan writes.
     origins: ['bank_id=—', 'n=—', 'doubled=—', 'title=bank.title'],
     notNull: ['title'],
-    foreignKeys: [],
+    foreignKeys: ['(bank_id) references lab.bank (id)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_inlined_with_key',
+    about:
+      'the same refusal where the plan’s own key names the column: the group key above an ' +
+      'uncertain WITH query is a row identity of the plan, and neither @primaryKey nor ' +
+      '@unique may stand on a column whose never-NULLness this plan cannot answer',
+    origins: ['bank_id=—', 'k=—'],
+    // `count` is 0 over the rows it counted; the key the plan proves on `bank_id` is not
+    // derived as either tag, and `bank_id`'s relation stands from the tree.
+    notNull: ['k'],
+    foreignKeys: ['(bank_id) references lab.bank (id)'],
     primaryKey: null
   },
   {
@@ -2235,6 +2251,83 @@ test('where the plan and the stored tree name different base columns, the column
   assert.ok(derived.origins?.[1])
 })
 
+test('a column read from an uncertain WITH query is refused in both plans PostgreSQL may print', () => {
+  // The shape no lab regime moves on: the query above either pulled the `WITH` query up —
+  // the column prints as the base column it resolves to — or kept it behind a subquery,
+  // which prints the query's own column name. Both are one view of one query, so the
+  // answer must not move with the planner's choice: without the refusal the pulled-up plan
+  // derives a `@notNull` and a relation the kept one does not, which is exactly what a
+  // consumer's `test:view-constraints-invariance` caught.
+  const columns: ViewColumn[] = [
+    { name: 'cur_code', typeId: 25, typeMod: -1 },
+    { name: 'title', typeId: 25, typeMod: -1 }
+  ]
+  const scan = (relation: string, alias: string, output: string[]): ExplainPlanNode => ({
+    'Node Type': 'Seq Scan',
+    Schema: 'lab',
+    'Relation Name': relation,
+    Alias: alias,
+    Output: output
+  })
+  const pulledUp: ExplainPlanNode = {
+    'Node Type': 'Nested Loop',
+    Output: ['tx.cur_code', 'bank.title'],
+    Plans: [
+      scan('tx', 'tx', ['tx.id', 'tx.cur_code']),
+      scan('bank', 'bank', ['bank.id', 'bank.title'])
+    ]
+  }
+  const kept: ExplainPlanNode = {
+    'Node Type': 'Nested Loop',
+    Output: ['scaled.cur_code', 'bank.title'],
+    Plans: [
+      {
+        'Node Type': 'Subquery Scan',
+        Alias: 'scaled',
+        Output: ['scaled.cur_code'],
+        Plans: [
+          {
+            'Node Type': 'Aggregate',
+            Output: ['tx.cur_code'],
+            'Group Key': ['tx.cur_code'],
+            Plans: [scan('tx', 'tx', ['tx.cur_code'])]
+          }
+        ]
+      },
+      scan('bank', 'bank', ['bank.id', 'bank.title'])
+    ]
+  }
+  const deriveOf = (plan: ExplainPlanNode) =>
+    deriveViewConstraints(
+      'lab',
+      'v_inlined_with_key',
+      'v',
+      columns,
+      readPlanOrigins(plan, columns.length, new Map(), planCatalog),
+      catalog,
+      coercions,
+      true,
+      // The tree traces the refused column to `tx.cur_code`, whatever the plan prints.
+      new Map([[0, { schema: 'lab', relation: 'tx', column: 'cur_code', relkind: 'r' }]]),
+      new Set([0])
+    )
+  const contract = (derived: ReturnType<typeof deriveOf>): unknown => ({
+    notNull: derived.notNullColumns,
+    foreignKeys: derived.foreignKeys.map((foreignKey) => foreignKey.tag),
+    primaryKey: derived.primaryKey?.tag ?? null,
+    unique: derived.unique?.tag ?? null
+  })
+  assert.deepEqual(contract(deriveOf(pulledUp)), contract(deriveOf(kept)))
+  // The refused column carries neither non-nullness nor a key in either plan, and its
+  // relation stands in both — from the tree, which no plan writes.
+  assert.deepEqual(contract(deriveOf(pulledUp)), {
+    notNull: ['title'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: null,
+    unique: null
+  })
+})
+
 test('a user object anywhere in the database stands its rule spelling down for every view', () => {
   // A plan prints a name, not the object the name stands for, so a user `count` is
   // printed exactly like the built-in. The stand-down is taken over the whole database
@@ -2343,6 +2436,26 @@ test('a view’s stored tree is read by field name, and a format it does not kno
   )
   assert.deepEqual(Object.fromEntries(shadowed.cteColumns), {})
   assert.deepEqual([...shadowed.cteAmbiguous], ['live'])
+  // And where a name two levels define is inlined and **not simple** at either level, a
+  // column read under it is refused: no plan says which definition a scan reads, so the
+  // doubt of one is the doubt of the name (`v_inlined_with_key` is the lab's case).
+  assert.deepEqual(
+    [
+      ...readViewTree(
+        '({QUERY :cteList' +
+          ' ({COMMONTABLEEXPR :ctename live :ctecolnames ("a")' +
+          ' :ctematerialized 0 :cterefcount 1 :cterecursive false' +
+          ' :ctequery {QUERY :hasAggs true :cteList <> :targetList <>}}' +
+          ' {COMMONTABLEEXPR :ctename live :ctecolnames ("b")' +
+          ' :ctematerialized 0 :cterefcount 1 :cterecursive false' +
+          ' :ctequery {QUERY :hasAggs false :cteList <> :targetList <>}})' +
+          ' :targetList ({TARGETENTRY :expr {VAR :varno 1 :varattno 1 :varlevelsup 0}' +
+          ' :resorigtbl 0 :resorigcol 0})' +
+          ' :rtable ({RANGETBLENTRY :alias <> :rtekind 6 :ctename live})})'
+      ).inlinedWithColumns
+    ],
+    [0]
+  )
   // A constant array (`:constvalue […]`) is read, not treated as a format break.
   assert.equal(
     readViewTree(

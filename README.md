@@ -66,7 +66,10 @@ any number of `NULL`s), so declaring a nullable key is sound where declaring it
 non-null would not be. A key an outer join can null is no row identity for either tag
 — the padded rows carry the same `NULL`, which tells none of them apart — so the same
 guard a `@primaryKey` is taken under yields neither, and the plan's own set is named
-in the view's notes. Of the keys it **derives**, a view gets the `@primaryKey` or the
+in the view's notes. A key holding a column whose plan reading was refused — one read
+from a `WITH` query a plan may spell either way — yields neither either: whether that
+column is never `NULL` is what the plan cannot say. Of the keys it **derives**, a view
+gets the `@primaryKey` or the
 `@unique` and never both: a key whose every column is never `NULL` is the `@primaryKey`
 of "Row identity", and only where no such key exists does the `@unique` stand. This is
 the derived pair alone. A hand-written `@primaryKey` the derivation does not match is
@@ -183,11 +186,15 @@ every `WITH` query's columns in order (`:ctename`, `:ctecolnames`), so a `cte.co
 read at that column's position in the subplan the plan computes it by. Where the view's
 own query reads a column from a `WITH` query it **inlines** that is not simple — one that
 groups, aggregates, de-duplicates, limits or windows, or that reads one of those — the
-column is refused: pulling such a query up into the query above means merging that work
-into it, which PostgreSQL does only where it chooses to, and the plan then prints the
-column flattened (where it resolves to a base column) or behind a subquery of the kept
-query, which this reader does not pin. A simple inlined query — a bare projection — is
-pulled up wherever it stands, and its columns are read as usual. The stored tree
+column is refused its non-nullness and its key: pulling such a query up into the query above
+means merging that work into it, which PostgreSQL does only where it chooses to, and the plan
+then prints the column flattened (where it resolves to a base column) or behind a subquery of
+the kept query, which this reader does not pin. The relation is not refused with it: that
+comes from the tree (`resorigtbl`), which no plan writes, so a `@foreignKey` on such a column
+stands. A simple inlined query — a bare projection — is pulled up wherever it stands, and its
+columns are read as usual. Which fields say a query is not simple is listed in
+`view-tree.ts`, and the list is one the reader has been checked against on PostgreSQL 15
+through 18: a field the dump no longer carries is read as the work being done. The stored tree
 is read only on a PostgreSQL major whose format this reader has been checked against
 (15 through 18): on any other major it is left unread — the plan's own refusals stand
 where its facts would have, and each view's notes say why — so a format that moved

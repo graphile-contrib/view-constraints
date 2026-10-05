@@ -1016,7 +1016,7 @@
           "notNull": true
         },
         "cur_code": {
-          "typeId": 153358519,
+          "typeId": 153384076,
           "typeMod": -1,
           "notNull": true
         }
@@ -1556,7 +1556,7 @@
           "notNull": false
         },
         "mystery_id": {
-          "typeId": 153359405,
+          "typeId": 153384966,
           "typeMod": -1,
           "notNull": false
         }
@@ -3328,6 +3328,25 @@
     },
     {
       "schema": "lab",
+      "relation": "v_inlined_with_key",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "bank_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "k": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_intersect",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -4962,7 +4981,7 @@
   "coercions": {
     "binary": ["1043>25", "25>1043"],
     "domainBase": {
-      "153358519": 25
+      "153384076": 25
     }
   },
   "strictEquality": true,
@@ -5780,6 +5799,12 @@
       "schema": "lab",
       "name": "v_inlined_with",
       "columns": ["bank_id", "n", "doubled", "title"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_inlined_with_key",
+      "columns": ["bank_id", "k"],
       "sources": []
     },
     {
@@ -7678,7 +7703,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 153359405,
+          "typeId": 153384966,
           "typeMod": -1
         }
       ],
@@ -14373,6 +14398,82 @@
             "Schema": "pg_catalog",
             "Alias": "piece",
             "Parent Relationship": "Inner"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_inlined_with_key",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "k",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "totals": ["bank_id", "n"]
+      },
+      "cteOrigins": {
+        "totals": [
+          {
+            "schema": "lab",
+            "relation": "tx",
+            "column": "bank_id"
+          },
+          null
+        ]
+      },
+      "cteAmbiguous": [],
+      "cteMaterialized": {
+        "totals": false
+      },
+      "cteRefCount": {
+        "totals": 1
+      },
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "tx",
+          "column": "bank_id",
+          "relkind": "r"
+        }
+      },
+      "inlinedWithColumns": [0],
+      "viewAliases": {
+        "tx": "tx"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["tx.bank_id", "count(*)"],
+        "Group Key": ["tx.bank_id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx.bank_id", "NULL::bigint"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["tx.bank_id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
           }
         ]
       }
@@ -21040,7 +21141,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 153359405,
+          "typeId": 153384966,
           "typeMod": -1
         }
       ],
@@ -27735,6 +27836,82 @@
             "Schema": "pg_catalog",
             "Alias": "piece",
             "Parent Relationship": "Inner"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_inlined_with_key",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "k",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "totals": ["bank_id", "n"]
+      },
+      "cteOrigins": {
+        "totals": [
+          {
+            "schema": "lab",
+            "relation": "tx",
+            "column": "bank_id"
+          },
+          null
+        ]
+      },
+      "cteAmbiguous": [],
+      "cteMaterialized": {
+        "totals": false
+      },
+      "cteRefCount": {
+        "totals": 1
+      },
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "tx",
+          "column": "bank_id",
+          "relkind": "r"
+        }
+      },
+      "inlinedWithColumns": [0],
+      "viewAliases": {
+        "tx": "tx"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["tx.bank_id", "count(*)"],
+        "Group Key": ["tx.bank_id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx.bank_id", "NULL::bigint"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["tx.bank_id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
           }
         ]
       }
@@ -34587,7 +34764,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 153359405,
+          "typeId": 153384966,
           "typeMod": -1
         }
       ],
@@ -42035,6 +42212,89 @@
     },
     {
       "schema": "lab",
+      "view": "v_inlined_with_key",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "k",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "totals": ["bank_id", "n"]
+      },
+      "cteOrigins": {
+        "totals": [
+          {
+            "schema": "lab",
+            "relation": "tx",
+            "column": "bank_id"
+          },
+          null
+        ]
+      },
+      "cteAmbiguous": [],
+      "cteMaterialized": {
+        "totals": false
+      },
+      "cteRefCount": {
+        "totals": 1
+      },
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "tx",
+          "column": "bank_id",
+          "relkind": "r"
+        }
+      },
+      "inlinedWithColumns": [0],
+      "viewAliases": {
+        "tx": "tx"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["tx.bank_id", "count(*)"],
+        "Group Key": ["tx.bank_id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx.bank_id", "NULL::bigint"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["tx.bank_id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Gather",
+                "Output": ["tx.bank_id"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["tx.bank_id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "tx",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_intersect",
       "relkind": "v",
       "regime": "parallel-forced",
@@ -49313,7 +49573,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 153359405,
+          "typeId": 153384966,
           "typeMod": -1
         }
       ],
@@ -56126,6 +56386,89 @@
     },
     {
       "schema": "lab",
+      "view": "v_inlined_with_key",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "k",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "totals": ["bank_id", "n"]
+      },
+      "cteOrigins": {
+        "totals": [
+          {
+            "schema": "lab",
+            "relation": "tx",
+            "column": "bank_id"
+          },
+          null
+        ]
+      },
+      "cteAmbiguous": [],
+      "cteMaterialized": {
+        "totals": false
+      },
+      "cteRefCount": {
+        "totals": 1
+      },
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "tx",
+          "column": "bank_id",
+          "relkind": "r"
+        }
+      },
+      "inlinedWithColumns": [0],
+      "viewAliases": {
+        "tx": "tx"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["tx.bank_id", "count(*)"],
+        "Group Key": ["tx.bank_id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx.bank_id", "NULL::bigint"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["tx.bank_id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Output": ["tx.bank_id"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["tx.bank_id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "tx",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_intersect",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -62838,7 +63181,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 153359405,
+          "typeId": 153384966,
           "typeMod": -1
         }
       ],
@@ -69384,6 +69727,82 @@
             "Schema": "pg_catalog",
             "Alias": "piece",
             "Parent Relationship": "Inner"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_inlined_with_key",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "k",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "totals": ["bank_id", "n"]
+      },
+      "cteOrigins": {
+        "totals": [
+          {
+            "schema": "lab",
+            "relation": "tx",
+            "column": "bank_id"
+          },
+          null
+        ]
+      },
+      "cteAmbiguous": [],
+      "cteMaterialized": {
+        "totals": false
+      },
+      "cteRefCount": {
+        "totals": 1
+      },
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "tx",
+          "column": "bank_id",
+          "relkind": "r"
+        }
+      },
+      "inlinedWithColumns": [0],
+      "viewAliases": {
+        "tx": "tx"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["tx.bank_id", "count(*)"],
+        "Group Key": ["tx.bank_id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx.bank_id", "NULL::bigint"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["tx.bank_id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
           }
         ]
       }
@@ -76054,7 +76473,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 153359405,
+          "typeId": 153384966,
           "typeMod": -1
         }
       ],
@@ -82827,6 +83246,82 @@
             "Schema": "pg_catalog",
             "Alias": "piece",
             "Parent Relationship": "Inner"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_inlined_with_key",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "k",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "totals": ["bank_id", "n"]
+      },
+      "cteOrigins": {
+        "totals": [
+          {
+            "schema": "lab",
+            "relation": "tx",
+            "column": "bank_id"
+          },
+          null
+        ]
+      },
+      "cteAmbiguous": [],
+      "cteMaterialized": {
+        "totals": false
+      },
+      "cteRefCount": {
+        "totals": 1
+      },
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "tx",
+          "column": "bank_id",
+          "relkind": "r"
+        }
+      },
+      "inlinedWithColumns": [0],
+      "viewAliases": {
+        "tx": "tx"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["tx.bank_id", "count(*)"],
+        "Group Key": ["tx.bank_id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx.bank_id", "NULL::bigint"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["tx.bank_id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
           }
         ]
       }
@@ -89677,7 +90172,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 153359405,
+          "typeId": 153384966,
           "typeMod": -1
         }
       ],
@@ -96062,6 +96557,82 @@
             "Parent Relationship": "Inner",
             "Index Name": "bank_pkey",
             "Index Cond": "(bank.id = tx.bank_id)"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_inlined_with_key",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "k",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "totals": ["bank_id", "n"]
+      },
+      "cteOrigins": {
+        "totals": [
+          {
+            "schema": "lab",
+            "relation": "tx",
+            "column": "bank_id"
+          },
+          null
+        ]
+      },
+      "cteAmbiguous": [],
+      "cteMaterialized": {
+        "totals": false
+      },
+      "cteRefCount": {
+        "totals": 1
+      },
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "tx",
+          "column": "bank_id",
+          "relkind": "r"
+        }
+      },
+      "inlinedWithColumns": [0],
+      "viewAliases": {
+        "tx": "tx"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["tx.bank_id", "count(*)"],
+        "Group Key": ["tx.bank_id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx.bank_id", "NULL::bigint"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["tx.bank_id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
           }
         ]
       }
@@ -102600,7 +103171,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 153359405,
+          "typeId": 153384966,
           "typeMod": -1
         }
       ],
@@ -109277,6 +109848,82 @@
     },
     {
       "schema": "lab",
+      "view": "v_inlined_with_key",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "k",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "totals": ["bank_id", "n"]
+      },
+      "cteOrigins": {
+        "totals": [
+          {
+            "schema": "lab",
+            "relation": "tx",
+            "column": "bank_id"
+          },
+          null
+        ]
+      },
+      "cteAmbiguous": [],
+      "cteMaterialized": {
+        "totals": false
+      },
+      "cteRefCount": {
+        "totals": 1
+      },
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "tx",
+          "column": "bank_id",
+          "relkind": "r"
+        }
+      },
+      "inlinedWithColumns": [0],
+      "viewAliases": {
+        "tx": "tx"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["tx.bank_id", "count(*)"],
+        "Group Key": ["tx.bank_id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx.bank_id", "NULL::bigint"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["tx.bank_id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_intersect",
       "relkind": "v",
       "regime": "genetic-join-order",
@@ -115934,7 +116581,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 153359405,
+          "typeId": 153384966,
           "typeMod": -1
         }
       ],
@@ -122432,6 +123079,82 @@
     },
     {
       "schema": "lab",
+      "view": "v_inlined_with_key",
+      "relkind": "v",
+      "regime": "production/default",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "k",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "totals": ["bank_id", "n"]
+      },
+      "cteOrigins": {
+        "totals": [
+          {
+            "schema": "lab",
+            "relation": "tx",
+            "column": "bank_id"
+          },
+          null
+        ]
+      },
+      "cteAmbiguous": [],
+      "cteMaterialized": {
+        "totals": false
+      },
+      "cteRefCount": {
+        "totals": 1
+      },
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "tx",
+          "column": "bank_id",
+          "relkind": "r"
+        }
+      },
+      "inlinedWithColumns": [0],
+      "viewAliases": {
+        "tx": "tx"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["tx.bank_id", "count(*)"],
+        "Group Key": ["tx.bank_id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx.bank_id", "NULL::bigint"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["tx.bank_id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_intersect",
       "relkind": "v",
       "regime": "production/default",
@@ -128849,7 +129572,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 153359405,
+          "typeId": 153384966,
           "typeMod": -1
         }
       ],
@@ -135257,6 +135980,82 @@
             "Relation Name": "bank",
             "Alias": "bank",
             "Parent Relationship": "Inner"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_inlined_with_key",
+      "relkind": "v",
+      "regime": "production/nestloop-only",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "k",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {
+        "totals": ["bank_id", "n"]
+      },
+      "cteOrigins": {
+        "totals": [
+          {
+            "schema": "lab",
+            "relation": "tx",
+            "column": "bank_id"
+          },
+          null
+        ]
+      },
+      "cteAmbiguous": [],
+      "cteMaterialized": {
+        "totals": false
+      },
+      "cteRefCount": {
+        "totals": 1
+      },
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "tx",
+          "column": "bank_id",
+          "relkind": "r"
+        }
+      },
+      "inlinedWithColumns": [0],
+      "viewAliases": {
+        "tx": "tx"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["tx.bank_id", "count(*)"],
+        "Group Key": ["tx.bank_id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["tx.bank_id", "NULL::bigint"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["tx.bank_id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["tx.id", "tx.cur_code", "tx.bank_id", "tx.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "tx",
+                "Parent Relationship": "Outer"
+              }
+            ]
           }
         ]
       }

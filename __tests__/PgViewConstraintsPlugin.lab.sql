@@ -75,11 +75,12 @@ create view v_cte_aggregate as
   with totals as materialized (select cur_code, count(*) as n from tx group by cur_code)
   select cur_code, n from totals;
 -- NEGATIVE: a column read from a `WITH` query this view inlines that is not simple —
--- it groups, or reads one that does — is refused whole, whatever the plan prints for
--- it. PostgreSQL pulls such a query up into the query above it only where it chooses to
--- merge its grouping, and where it does not the columns are printed behind a subquery
--- of its own, which this reader does not pin. `doubled` reads `scaled`, which reads the
--- grouped `totals`; `title` is read from a base relation and is derived.
+-- it groups, or reads one that does — is refused its non-nullness and its key, whatever
+-- the plan prints for it; its relation is taken from the tree and stands. PostgreSQL pulls
+-- such a query up into the query above it only where it chooses to merge its grouping,
+-- and where it does not the columns are printed behind a subquery of its own, which this
+-- reader does not pin. `doubled` reads `scaled`, which reads the grouped `totals`;
+-- `title` is read from a base relation and is derived.
 create view v_inlined_with as
   with totals as (select bank_id, count(*) as n from tx group by bank_id),
        scaled as (select bank_id, n * 2 as doubled from totals)
@@ -87,6 +88,12 @@ create view v_inlined_with as
   from scaled
        cross join lateral unnest(array[scaled.doubled]) piece(n)
        join bank on bank.id = scaled.bank_id;
+-- NEGATIVE: the same refusal where the plan's own key names the column. The group key
+-- above an uncertain `WITH` query is a row identity of the plan, and neither `@primaryKey`
+-- nor `@unique` may stand on a column whose never-NULLness this plan cannot answer.
+create view v_inlined_with_key as
+  with totals as (select bank_id, count(*) as n from tx group by bank_id)
+  select totals.bank_id, count(*) as k from totals group by totals.bank_id;
 create view v_unique_key as select code from asset;
 create materialized view m_tx as select id, cur_code, amount from tx;
 

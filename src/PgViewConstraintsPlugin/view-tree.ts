@@ -366,47 +366,25 @@ export function readViewTree(action: string): ViewTree {
   // The whole tree, so a `WITH` query nested in another query's body is reached: a name
   // two of them share is dropped, because the plan spells both by that name and cannot
   // say which a `CTE Scan` reads.
-  const simpleCte = new Map<string, boolean>()
-  const cteReads = new Map<string, Set<string>>()
+  const cteDefinitions = new Map<
+    string,
+    { simple: boolean; inlined: boolean; reads: Set<string> }[]
+  >()
   walkDumped(root, (node) => {
     for (const cte of nodesOf(node.fields.get('cteList'))) {
       if (cte.kind !== 'node') continue
       const name = textOf(cte.fields.get('ctename'))
       const names = stringsOf(cte.fields.get('ctecolnames'))
       if (name === null || names.length === 0) continue
-      if (tree.cteColumns.has(name)) {
-        tree.cteAmbiguous.add(name)
-        continue
-      }
-      tree.cteColumns.set(name, names)
-      // Each of the query's own columns' origin, from its target list: a `Var` records
-      // the base relation and attribute (`resorigtbl`/`resorigcol`), anything else
-      // records none. A plan subplan named after the query is proved against these
-      // before a `CTE Scan` is read off it.
       const query = cte.fields.get('ctequery')
       const cteQuery = query?.kind === 'node' ? query : undefined
-      const targets = cteQuery === undefined ? [] : nodesOf(cteQuery.fields.get('targetList'))
-      tree.cteOrigins.set(
-        name,
-        targets.map((entry) => {
-          if (entry.kind !== 'node') return null
-          const tableId = numberOf(entry.fields.get('resorigtbl'))
-          const attnum = numberOf(entry.fields.get('resorigcol'))
-          if (tableId === null || tableId === 0 || attnum === null || attnum === 0) return null
-          return { tableId, attnum }
-        })
-      )
       // Whether PostgreSQL materializes this query, from its own declaration: the
       // `:ctematerialized` keyword (`1` `MATERIALIZED`, `2` `NOT MATERIALIZED`, `0`
       // default), the number of references, and recursion.
       const keyword = numberOf(cte.fields.get('ctematerialized'))
       const refCount = numberOf(cte.fields.get('cterefcount')) ?? 0
       const recursive = textOf(cte.fields.get('cterecursive')) === 'true'
-      tree.cteRefCount.set(name, refCount)
-      tree.cteMaterialized.set(
-        name,
-        keyword === 1 || (keyword === 0 && (refCount > 1 || recursive))
-      )
+      const inlined = !(keyword === 1 || (keyword === 0 && (refCount > 1 || recursive)))
       // Whether PostgreSQL pulls the query up into the query above it in every plan. The
       // pull-up is a rule for a projection: it happens wherever the query stands. It is
       // not for a query that groups, aggregates, de-duplicates, limits, windows or
@@ -426,7 +404,6 @@ export function readViewTree(action: string): ViewTree {
         saysSomething(cteQuery, 'limitCount') ||
         saysSomething(cteQuery, 'limitOffset') ||
         saysSomething(cteQuery, 'setOperations')
-      simpleCte.set(name, !works)
       // The `WITH` queries this one's own query reads: a `WITH` query is named at an
       // outer level (`:ctelevelsup` counts up from the reading query), so any range-table
       // entry of that kind inside this query's body is a read of one, and the doubt it
@@ -440,7 +417,34 @@ export function readViewTree(action: string): ViewTree {
           if (referenced !== null) reads.add(referenced)
         })
       }
-      cteReads.set(name, reads)
+      // Every definition of the name, the ones the plan cannot tell apart included: the
+      // same name at two query levels is one spelling for two queries, and no plan says
+      // which a scan reads, so the doubt of either definition is the doubt of the name.
+      const definitions = cteDefinitions.get(name) ?? []
+      definitions.push({ simple: !works, inlined, reads })
+      cteDefinitions.set(name, definitions)
+      if (tree.cteColumns.has(name)) {
+        tree.cteAmbiguous.add(name)
+        continue
+      }
+      tree.cteColumns.set(name, names)
+      // Each of the query's own columns' origin, from its target list: a `Var` records
+      // the base relation and attribute (`resorigtbl`/`resorigcol`), anything else
+      // records none. A plan subplan named after the query is proved against these
+      // before a `CTE Scan` is read off it.
+      const targets = cteQuery === undefined ? [] : nodesOf(cteQuery.fields.get('targetList'))
+      tree.cteOrigins.set(
+        name,
+        targets.map((entry) => {
+          if (entry.kind !== 'node') return null
+          const tableId = numberOf(entry.fields.get('resorigtbl'))
+          const attnum = numberOf(entry.fields.get('resorigcol'))
+          if (tableId === null || tableId === 0 || attnum === null || attnum === 0) return null
+          return { tableId, attnum }
+        })
+      )
+      tree.cteRefCount.set(name, refCount)
+      tree.cteMaterialized.set(name, !inlined)
     }
   })
   for (const name of tree.cteAmbiguous) {
@@ -454,12 +458,15 @@ export function readViewTree(action: string): ViewTree {
   // that is not simple, or that reads another such query. Resolved to a fixpoint, since a
   // query reads only queries declared before it but the walk meets them in no order.
   const uncertain = new Set<string>()
-  for (let pass = 0; pass < simpleCte.size + 1; pass++) {
-    for (const [name, simple] of simpleCte) {
-      if (tree.cteMaterialized.get(name) !== false) continue
+  for (let pass = 0; pass < cteDefinitions.size + 1; pass++) {
+    for (const [name, definitions] of cteDefinitions) {
       if (uncertain.has(name)) continue
-      const reads = cteReads.get(name) ?? new Set<string>()
-      if (!simple || [...reads].some((read) => uncertain.has(read))) uncertain.add(name)
+      const spellsEitherWay = definitions.some(
+        (definition) =>
+          definition.inlined &&
+          (!definition.simple || [...definition.reads].some((read) => uncertain.has(read)))
+      )
+      if (spellsEitherWay) uncertain.add(name)
     }
   }
 
@@ -476,28 +483,47 @@ export function readViewTree(action: string): ViewTree {
   // them flattened into the query above — where they resolve to base columns — or behind
   // a subquery it kept, which is a `Subquery Scan` this reader does not pin. Which entry
   // of the view's own range table each column's expression stands on is what says it: a
-  // `Var` at this level whose `varno` is such a query.
+  // `Var` at this level whose `varno` is such a query. A column the view groups by stands
+  // on the query's `GROUP` range-table entry instead (`:rtekind 9`), whose `:groupexprs`
+  // hold the expression the column was written as — followed there, and no further than a
+  // `SUBLINK`, which stands over a query of its own level and names its own table.
   const cteByIndex = new Map<number, string>()
+  const groupExprs = new Map<number, Dumped[]>()
   nodesOf(top.fields.get('rtable')).forEach((entry, index) => {
     if (entry.kind !== 'node') return
-    if (textOf(entry.fields.get('rtekind')) !== '6') return
-    const name = textOf(entry.fields.get('ctename'))
-    if (name !== null) cteByIndex.set(index + 1, name)
+    if (textOf(entry.fields.get('rtekind')) === '6') {
+      const name = textOf(entry.fields.get('ctename'))
+      if (name !== null) cteByIndex.set(index + 1, name)
+    }
+    if (textOf(entry.fields.get('rtekind')) === '9') {
+      groupExprs.set(index + 1, nodesOf(entry.fields.get('groupexprs')))
+    }
   })
+  const readsUncertainWith = (value: Dumped, depth = 0): boolean => {
+    if (depth > 8) return false
+    if (value.kind === 'list') {
+      return value.items.some((item) => readsUncertainWith(item, depth))
+    }
+    if (value.kind !== 'node') return false
+    if (value.type === 'SUBLINK') return false
+    if (value.type === 'VAR') {
+      if (numberOf(value.fields.get('varlevelsup')) !== 0) return false
+      const varno = numberOf(value.fields.get('varno'))
+      if (varno === null) return false
+      const name = cteByIndex.get(varno)
+      if (name !== undefined && uncertain.has(name)) return true
+      const grouped = groupExprs.get(varno)
+      if (grouped === undefined) return false
+      const attno = numberOf(value.fields.get('varattno'))
+      const expr = attno === null ? undefined : grouped[attno - 1]
+      return expr === undefined ? false : readsUncertainWith(expr, depth + 1)
+    }
+    return [...value.fields.values()].some((field) => readsUncertainWith(field, depth))
+  }
   for (const [position, entry] of nodesOf(top.fields.get('targetList')).entries()) {
     if (entry.kind !== 'node') continue
     const expr = entry.fields.get('expr')
-    if (expr === undefined) continue
-    let fromInlinedWith = false
-    walkDumped(expr, (node) => {
-      if (fromInlinedWith || node.type !== 'VAR') return
-      if (numberOf(node.fields.get('varlevelsup')) !== 0) return
-      const varno = numberOf(node.fields.get('varno'))
-      if (varno === null) return
-      const name = cteByIndex.get(varno)
-      if (name !== undefined && uncertain.has(name)) fromInlinedWith = true
-    })
-    if (fromInlinedWith) tree.inlinedWithColumns.add(position)
+    if (expr !== undefined && readsUncertainWith(expr)) tree.inlinedWithColumns.add(position)
   }
 
   const ambiguousAliases = new Set<string>()

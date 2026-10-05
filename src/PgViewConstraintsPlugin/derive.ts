@@ -484,13 +484,15 @@ export function deriveViewConstraints(
   })
 
   // A column this view reads from a `WITH` query whose columns a plan may spell either
-  // way is refused whole — no non-nullness, no key and no relation — whatever this plan
+  // way is refused its plan reading — no non-nullness and no key — whatever this plan
   // happens to print for it. A `WITH` query this view inlines that groups, aggregates,
   // de-duplicates, limits or windows is pulled up into the query above only where the
   // planner chooses to merge that work, and where it does not the columns are printed
   // behind a `Subquery Scan` this reader does not pin: the same view of the same query,
-  // read differently by two plans. An answer taken from either alone would move with the
-  // planner's choice, so the column has no answer that holds.
+  // read differently by two plans, so an answer taken from either alone would move with
+  // the planner's choice. Its relation is not refused with it: that comes from the view's
+  // stored tree (`resorigtbl`), which no plan writes, so the foreign keys the tree
+  // carries stand below as they do for any column the plan left without a source.
   for (const index of inlinedWithColumns) {
     if (index < 0 || index >= columns.length) continue
     origins[index] = null
@@ -701,12 +703,13 @@ export function deriveViewConstraints(
   // keys. Only the columns the plan left without a source are read this way, and only
   // for a relation: the tree says nothing of non-nullness, and a column whose value the
   // plan did read is judged by the plan. A column the plan and the tree disagreed on is
-  // left out: it was refused whole above, and the tree is the side that may be wrong.
+  // left out: it was refused whole above, and the tree is the side that may be wrong. A
+  // column refused for a `WITH` query a plan may spell either way is read here: that
+  // refusal is of the plan's reading, and the tree's relation is no plan's answer.
   for (let index = 0; index < columns.length; index++) {
     const viewColumn = columns[index]
     if (viewColumn === undefined || origins[index] !== null) continue
     if (disagreed.has(index)) continue
-    if (inlinedWithColumns.has(index)) continue
     const tree = treeColumns.get(index)
     if (!tree) continue
     const origin: ColumnOrigin = {
@@ -750,9 +753,13 @@ export function deriveViewConstraints(
   // discriminator no discriminator: a NULL cannot tell a row it pads. That guard holds
   // for a `@unique` as much as for a `@primaryKey` — a sequence of NULLs is as
   // indistinguishable as a sequence of values — so both tags are taken from the same
-  // keys, and the never-NULL question is the only one that separates them.
+  // keys, and the never-NULL question is the only one that separates them. A key holding
+  // a column whose plan reading was refused is no row identity either: whether the column
+  // is never NULL is exactly what this plan cannot say, so neither tag may stand on it.
   const rowIdentities = plan.rowIdentities.filter((key) =>
-    key.columns.every((index) => plan.entryNullExtended[index] !== true)
+    key.columns.every(
+      (index) => plan.entryNullExtended[index] !== true && !inlinedWithColumns.has(index)
+    )
   )
   const candidates = rowIdentities.filter((key) =>
     key.columns.every((index) => key.discriminators.includes(index) || neverNull[index])
