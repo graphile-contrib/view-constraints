@@ -271,6 +271,13 @@ export interface ViewTree {
   ok: boolean
   /** CTE name → its column names in select-list order. */
   cteColumns: Map<string, string[]>
+  /**
+   * CTE name → the origin of each of its columns in select-list order: the base relation
+   * and attribute number the column's target-list entry is a `Var` of, or `null` where
+   * the entry is an expression. This is what a plan's `CTE <name>` subplan is proved
+   * against before it is read (`plan-origins.ts`).
+   */
+  cteOrigins: Map<string, (TreeOrigin | null)[]>
   /** CTE names the tree defines at more than one query level, so the plan cannot tell them apart. */
   cteAmbiguous: Set<string>
   /** View column position → the base relation oid and attribute number it came from. */
@@ -287,6 +294,7 @@ export function readViewTree(action: string): ViewTree {
   const tree: ViewTree = {
     ok: false,
     cteColumns: new Map(),
+    cteOrigins: new Map(),
     cteAmbiguous: new Set(),
     treeOrigins: new Map(),
     relationAliases: new Map()
@@ -319,9 +327,28 @@ export function readViewTree(action: string): ViewTree {
         continue
       }
       tree.cteColumns.set(name, names)
+      // Each of the query's own columns' origin, from its target list: a `Var` records
+      // the base relation and attribute (`resorigtbl`/`resorigcol`), anything else
+      // records none. A plan subplan named after the query is proved against these
+      // before a `CTE Scan` is read off it.
+      const query = cte.fields.get('ctequery')
+      const targets = query?.kind === 'node' ? nodesOf(query.fields.get('targetList')) : []
+      tree.cteOrigins.set(
+        name,
+        targets.map((entry) => {
+          if (entry.kind !== 'node') return null
+          const tableId = numberOf(entry.fields.get('resorigtbl'))
+          const attnum = numberOf(entry.fields.get('resorigcol'))
+          if (tableId === null || tableId === 0 || attnum === null || attnum === 0) return null
+          return { tableId, attnum }
+        })
+      )
     }
   })
-  for (const name of tree.cteAmbiguous) tree.cteColumns.delete(name)
+  for (const name of tree.cteAmbiguous) {
+    tree.cteColumns.delete(name)
+    tree.cteOrigins.delete(name)
+  }
 
   for (const [position, entry] of nodesOf(top.fields.get('targetList')).entries()) {
     if (entry.kind !== 'node') continue

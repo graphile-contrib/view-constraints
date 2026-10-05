@@ -166,13 +166,19 @@ query's select list in order — with no map between the two in the plan. That m
 where each of the view's own columns was written from, is in the view's stored rewrite
 tree (`pg_rewrite.ev_action`), read field by field and not parsed as SQL: the tree names
 every `WITH` query's columns in order (`:ctename`, `:ctecolnames`), so a `cte.col` is
-read at that column's position in the subplan the plan computes it by. A name two `WITH`
-queries share — the same name at two query levels, or a name the analysed view and a
-view it is built on both define (the source's materialized so it leaves a subplan, the
-analysed view's inlined so its own tree shows no clash) — is dropped, so no column is
-read through it: the plan spells every `CTE Scan` by the name alone and never says which
-view's query it is, so reading one off the analysed view's map would put the wrong
-columns, a false `@notNull` or `@foreignKey`, behind the names. Where the plan could not
+read at that column's position in the subplan the plan computes it by. The name is not
+the plan's to trust: the same `WITH` name can stand in another query the view goes
+through — the same name at two query levels, a view outside the surface, or a SQL
+function the view inlines — and the plan prints one `CTE <name>` subplan whose owner
+nothing names. So a subplan is read only where it is **proved** to be this view's own
+query, by its columns' origins, position for position: the stored tree gives each of the
+query's own columns' origin (the base column a column is a `Var` of, or an expression),
+and the subplan must print the same number of columns and, at every position, the same
+origin the plan names there. Exactly one subplan must prove; several or none is a
+refusal on every column read through it. Where the origins line up the reading is the
+query's own whatever subplan the planner built, so a coinciding other query is read for
+what it is rather than refused, and where they do not, no column is read off a query
+that may not be the one. Where the plan could not
 read a column at all — a scan a constant qualifier removed, a `WITH` query whose tree is
 out of reach — the tree's own record of the base column the view column was written from
 (`:resorigtbl`, `:resorigcol`) is taken as a fallback source for a relation, and for

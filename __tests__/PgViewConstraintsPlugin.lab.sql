@@ -840,3 +840,62 @@ create view v_cte_cross_src_once as
 create view v_cte_cross_view_inlined as
   with live as (select id as y, nn as x from need)
   select o.y as oy, s.x as sx from live o join v_cte_cross_src_once s on s.k = o.y;
+
+-- ── A `WITH` name reached through a source the surface does not read ─────────────
+--
+-- A `WITH` name can stand in a view outside the surface, or in a SQL function the view
+-- inlines, where neither its tree nor its sources are read. Nothing then names the owner
+-- of the `CTE <name>` subplan the plan carries, so the subplan is read only where it is
+-- proved to be the analysed view's own query by its columns' origins, position for
+-- position (`provedSubplan`). The data is here so a wrong reading would emit a tag the
+-- rows contradict.
+
+create schema lab_other;
+set search_path = lab_other;
+-- A source view outside the surface (its tree is never read for the surface's views).
+create view src_os as
+  with live as materialized (select id as k, nn as y, nul as x from lab.need)
+  select a.k, a.x from live a join live b using (k);
+-- The same shape as the analysed view's own `live`: the origins line up, so the subplan
+-- is read correctly even though it is another query's.
+create view src_coinciding as
+  with live as materialized (select id as y, nn as x from lab.need)
+  select a.y, a.x from live a join live b using (y);
+-- The key variant's source.
+create view src_os_fk as
+  with live as materialized (select id as k, ref as y, plain as x from lab.child)
+  select a.k, a.x from live a join live b using (k);
+set search_path = lab;
+
+-- NEGATIVE: `sx` is `lab_other.src_os.x`, a nullable `need.nul`; the source's own `live`
+-- prints three columns where the analysed view's has two, so no subplan is proved.
+create view v_cte_foreign_view as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.x as sx from live o join lab_other.src_os s on s.k = o.y;
+-- NEGATIVE: and with a key: `sx` is `child.plain`, no key, where the foreign `live`'s
+-- matching position computes `child.ref`.
+create view v_cte_foreign_view_fk as
+  with live as (select id as y, ref as x from child)
+  select o.y as oy, s.x as sx from live o join lab_other.src_os_fk s on s.k = o.y;
+-- POSITIVE: the foreign subplan's origins line up position for position, so it is read
+-- and the column is the real `need.nn` — not NULL.
+create view v_cte_coinciding as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.x as sx from live o join lab_other.src_coinciding s on s.y = o.y;
+
+-- NEGATIVE: an inlined `STABLE` SQL function with its own `live`, its columns out of
+-- step with the analysed view's.
+create function f_live() returns table (x int, y int) language sql stable as $$
+  with live as materialized (select nn as x, nul as y from need) select x, y from live $$;
+create view v_cte_function_lateral as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.y as sy from live o cross join lateral f_live() s;
+create view v_cte_function as
+  with live as (select id as y, nn as x from need)
+  select o.y as oy, s.y as sy from live o, f_live() s;
+-- NEGATIVE: the same with a key in play.
+create function f_live_fk() returns table (x int, y int) language sql stable as $$
+  with live as materialized (select ref as x, plain as y from child) select x, y from live $$;
+create view v_cte_function_fk as
+  with live as (select id as y, ref as x from child)
+  select o.y as oy, s.x as sx from live o cross join lateral f_live_fk() s;

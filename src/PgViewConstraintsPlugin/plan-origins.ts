@@ -66,6 +66,13 @@ export interface PlanCatalog extends QualifierCatalog {
    * leaves a `CTE Scan` refused as before.
    */
   cteColumns: ReadonlyMap<string, string[]>
+  /**
+   * Each `WITH` query's own columns' origins, in order: the base column each column is
+   * a reference to, or `null` where it is an expression. A plan subplan named after a
+   * `WITH` query is read only where it is proved to be that query's materialization by
+   * matching these, position for position.
+   */
+  cteOrigins: ReadonlyMap<string, ({ schema: string; relation: string; column: string } | null)[]>
 }
 
 /** One plan node of `EXPLAIN (FORMAT JSON)`, as much of it as this reader uses. */
@@ -490,23 +497,22 @@ function aliasNodeTypes(root: ExplainPlanNode): Map<string, string> {
 const CTE_SUBPLAN_PREFIX = 'CTE '
 
 /**
- * The subplan computing each `WITH` query, by the query's name. A name two subplans
- * carry — the same `WITH` name at two query levels — is dropped rather than picked
- * between: the plan spells both by that name and does not say which a `CTE Scan` reads,
- * so crossing either would be a guess.
+ * Every subplan computing a `WITH` query of this name. A name can be shared by several —
+ * the same name at two query levels, or a `WITH` query of a view or a function the
+ * analysed view goes through — so all are kept and one is proved to be the analysed
+ * view's own query before it is read (`provedSubplan`).
  */
-function cteSubplansIn(root: ExplainPlanNode): Map<string, ExplainPlanNode> {
-  const subplans = new Map<string, ExplainPlanNode>()
-  const ambiguous = new Set<string>()
+function cteSubplansIn(root: ExplainPlanNode): Map<string, ExplainPlanNode[]> {
+  const subplans = new Map<string, ExplainPlanNode[]>()
   walk(root, (node) => {
     const name = node['Subplan Name']
     if (typeof name === 'string' && name.startsWith(CTE_SUBPLAN_PREFIX)) {
       const cte = name.slice(CTE_SUBPLAN_PREFIX.length)
-      if (subplans.has(cte)) ambiguous.add(cte)
-      else subplans.set(cte, node)
+      const found = subplans.get(cte)
+      if (found) found.push(node)
+      else subplans.set(cte, [node])
     }
   })
-  for (const cte of ambiguous) subplans.delete(cte)
   return subplans
 }
 
@@ -788,10 +794,12 @@ class OriginReader {
   private readonly nulledNodes: ReadonlySet<ExplainPlanNode>
   private readonly crossable: ReadonlyMap<string, CrossableSubquery>
   private readonly aliasKinds: ReadonlyMap<string, string>
-  /** The `WITH` query each `CTE Scan` alias reads, and the subplan computing each. */
+  /** The `WITH` query each `CTE Scan` alias reads, and every subplan named for a query. */
   private readonly cteOfAlias: ReadonlyMap<string, string>
-  private readonly cteSubplans: ReadonlyMap<string, ExplainPlanNode>
+  private readonly cteSubplans: ReadonlyMap<string, ExplainPlanNode[]>
   private readonly cteStack = new Set<string>()
+  /** A `WITH` query name's proved subplan, or `null` where none was proved. */
+  private readonly cteProven = new Map<string, ExplainPlanNode | null>()
   private readonly catalog: PlanCatalog
   /** Every column of a set operation whose branches can be told apart, by entry text. */
   private readonly unionColumns: ReadonlyMap<string, UnionColumn>
@@ -921,16 +929,80 @@ class OriginReader {
   }
 
   /**
-   * Reads one column of a `WITH` query through the subplan that computes it: the stored
-   * tree says which position of the query's select list the column stands at, and the
-   * subplan prints that select list. The value is the entry's value unchanged — a
+   * The subplan proved to be this view's own `WITH` query `name`, or `null`.
+   *
+   * A `WITH` name is not unique to the view: the same name may stand in a view or a
+   * function the analysed view goes through, materialized there and printed as one more
+   * `CTE <name>` subplan, with nothing in the plan saying whose it is. So the subplan is
+   * not read on the name alone. The view's stored tree gives the query's own columns'
+   * origins, position for position — the base column a column is a `Var` of, or an
+   * expression — and a subplan is that query's materialization only where it prints the
+   * same number of columns and, at every position, the same origin the plan names there.
+   * Exactly one subplan must prove; several or none is a refusal. Where the origins line
+   * up the reading is the query's own whatever subplan the planner built, so a coinciding
+   * other query is read correctly rather than refused.
+   */
+  private provedSubplan(name: string): ExplainPlanNode | null {
+    if (this.cteProven.has(name)) return this.cteProven.get(name) ?? null
+    const own = this.catalog.cteOrigins.get(name)
+    const columns = this.catalog.cteColumns.get(name)
+    let proved: ExplainPlanNode | null = null
+    let count = 0
+    if (own && columns && own.length === columns.length) {
+      for (const candidate of this.cteSubplans.get(name) ?? []) {
+        const output = candidate.Output ?? []
+        if (output.length !== own.length) continue
+        const matches = own.every((origin, position) => {
+          const seen = this.subplanOrigin(output[position] ?? '')
+          if (origin === null) return seen === 'expression'
+          return (
+            seen !== 'expression' &&
+            seen !== 'unknown' &&
+            seen.schema === origin.schema &&
+            seen.relation === origin.relation &&
+            seen.column === origin.column
+          )
+        })
+        if (!matches) continue
+        count += 1
+        proved = candidate
+      }
+    }
+    const found = count === 1 ? proved : null
+    this.cteProven.set(name, found)
+    return found
+  }
+
+  /**
+   * What the plan names at one `Output` entry of a subplan: the base column a bare
+   * reference is to, `'expression'` where the entry is anything else (a call, a cast, a
+   * constant), or `'unknown'` where a reference names no relation this reader can place —
+   * which proves nothing and never matches.
+   */
+  private subplanOrigin(
+    entry: string
+  ): { schema: string; relation: string; column: string } | 'expression' | 'unknown' {
+    const reference = parseReference(entry)
+    if (!reference || reference.coerced) return 'expression'
+    const alias = reference.alias ?? this.soleRelation?.alias ?? null
+    if (alias === null) return 'unknown'
+    const relation = this.relations.get(alias)
+    if (!relation) return 'unknown'
+    return { schema: relation.schema, relation: relation.relation, column: reference.column }
+  }
+
+  /**
+   * Reads one column of a `WITH` query through the subplan proved to be its own: the
+   * stored tree says which position of the query's select list the column stands at, and
+   * that subplan prints the select list. The value is the entry's value unchanged — a
    * `WITH` query's column is its select list entry's type — so there is no waypoint to
-   * judge. A `WITH` query whose map or subplan is not in hand stays refused.
+   * judge. A `WITH` query whose map is not in hand, or whose subplan is not proved,
+   * stays refused.
    */
   private crossCte(alias: string, column: string, crossing: ReadonlySet<string>): Reading {
     const cte = this.cteOfAlias.get(alias)
     const columns = cte === undefined ? undefined : this.catalog.cteColumns.get(cte)
-    const subplan = cte === undefined ? undefined : this.cteSubplans.get(cte)
+    const subplan = cte === undefined ? null : this.provedSubplan(cte)
     if (cte === undefined || !columns || !subplan || this.cteStack.has(cte)) {
       return unknown('through-a-materialized-with')
     }
@@ -1106,7 +1178,7 @@ class OriginReader {
   ): ExpressionNullability {
     const cte = this.cteOfAlias.get(alias)
     const columns = cte === undefined ? undefined : this.catalog.cteColumns.get(cte)
-    const subplan = cte === undefined ? undefined : this.cteSubplans.get(cte)
+    const subplan = cte === undefined ? null : this.provedSubplan(cte)
     if (cte === undefined || !columns || !subplan || this.cteStack.has(cte)) return 'unknown'
     const position = columns.indexOf(column)
     if (position < 0) return 'unknown'

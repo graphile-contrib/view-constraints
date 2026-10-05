@@ -30,6 +30,7 @@ import {
   readViewTrees,
   readViews,
   readViewSources,
+  resolveCteOrigins,
   resolveTreeColumns
 } from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { RunQuery } from '../src/PgViewConstraintsPlugin/collect.ts'
@@ -179,6 +180,9 @@ for (const regime of REGIMES) {
       columns,
       treeOk: facts?.ok ?? false,
       cteColumns: Object.fromEntries(facts?.cteColumns ?? new Map()),
+      cteOrigins: Object.fromEntries(
+        resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map())
+      ),
       cteAmbiguous: [...(facts?.cteAmbiguous ?? [])].sort(),
       treeColumns: Object.fromEntries(
         resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map())

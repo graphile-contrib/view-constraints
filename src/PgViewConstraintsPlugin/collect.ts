@@ -502,7 +502,8 @@ export function planCatalogFrom(
   catalog: ReadonlyMap<string, CatalogRelation>,
   strictEquality: boolean,
   shadowedNames: ReadonlySet<string> = new Set(),
-  cteColumns: ReadonlyMap<string, string[]> = new Map()
+  cteColumns: ReadonlyMap<string, string[]> = new Map(),
+  cteOrigins: ReadonlyMap<string, (CteColumnOrigin | null)[]> = new Map()
 ): PlanCatalog {
   return {
     uniqueKeysOf: (schema, relation) => catalog.get(`${schema}.${relation}`)?.uniqueKeys ?? [],
@@ -514,8 +515,37 @@ export function planCatalogFrom(
     columnNotNull: (schema, relation, column) =>
       catalog.get(`${schema}.${relation}`)?.columns.get(column)?.notNull,
     shadowedNames,
-    cteColumns
+    cteColumns,
+    cteOrigins
   }
+}
+
+/** One base column a view's own `WITH` query column is a reference to; `null` for an expression. */
+export interface CteColumnOrigin {
+  schema: string
+  relation: string
+  column: string
+}
+
+/** Resolves a view's `WITH` query origins to the base columns they name, by query. */
+export function resolveCteOrigins(
+  index: RelationOidIndex,
+  origins: ReadonlyMap<string, (TreeOrigin | null)[]>
+): Map<string, (CteColumnOrigin | null)[]> {
+  const resolved = new Map<string, (CteColumnOrigin | null)[]>()
+  for (const [name, columns] of origins) {
+    resolved.set(
+      name,
+      columns.map((origin) => {
+        if (origin === null) return null
+        const relation = index.get(origin.tableId)
+        const column = relation?.columns.get(origin.attnum)
+        if (!relation || column === undefined) return null
+        return { schema: relation.schema, relation: relation.relation, column }
+      })
+    )
+  }
+  return resolved
 }
 
 /** One view of the database, with its select-list order and the views it is built on. */
@@ -549,6 +579,8 @@ export interface ViewTreeFacts {
   /** Whether the tree parsed; `false` means none of the rest is trusted. */
   ok: boolean
   cteColumns: Map<string, string[]>
+  /** CTE name → the origin of each of its columns (a `Var`'s base column, or `null`). */
+  cteOrigins: Map<string, (TreeOrigin | null)[]>
   /** CTE names the tree defines at more than one query level. */
   cteAmbiguous: Set<string>
   treeOrigins: Map<number, TreeOrigin>
@@ -655,58 +687,13 @@ export async function readViewTrees(
     trees.set(`${row.schema}.${row.view}`, {
       ok: tree.ok,
       cteColumns: tree.cteColumns,
+      cteOrigins: tree.cteOrigins,
       cteAmbiguous: tree.cteAmbiguous,
       treeOrigins: tree.treeOrigins,
       relationAliases: tree.relationAliases
     })
   }
   return trees
-}
-
-/**
- * A view's `WITH` column map, with every name dropped that any view the query goes
- * through also defines.
- *
- * The plan spells a `CTE Scan` with the `WITH` query's own name and never says which
- * view's query it is. A name the analysed view and one of its source views both define —
- * the source's `WITH` materialized, the analysed view's inlined, so its own tree shows
- * no clash — leaves the plan with one `CTE live` subplan whose owner nothing names, and
- * reading it off the analysed view's map would put the wrong columns behind every
- * `CTE Scan`. So the names are taken over the analysed view and its transitive sources
- * (from `pg_depend`), and a name more than one of them defines is dropped: the columns
- * read through it are refused rather than read off a query that may not be the one.
- *
- * A source referenced through several views is reached by the closure, and a `WITH`
- * query both views inlined leaves no subplan here but is still dropped: the analysed
- * view's tree names it, and a subplan of that name could come from the source.
- */
-export function cteColumnsWithoutSourceCollisions(
-  views: readonly ViewSourceRow[],
-  trees: ReadonlyMap<string, { cteColumns: ReadonlyMap<string, string[]> }>,
-  schema: string,
-  name: string
-): Map<string, string[]> {
-  const facts = trees.get(`${schema}.${name}`)
-  if (!facts) return new Map()
-  const byKey = new Map(views.map((view) => [`${view.schema}.${view.name}`, view]))
-  const reached = new Set<string>()
-  const queue = [...(byKey.get(`${schema}.${name}`)?.sources ?? [])]
-  while (queue.length > 0) {
-    const key = queue.pop()
-    if (key === undefined || reached.has(key)) continue
-    reached.add(key)
-    queue.push(...(byKey.get(key)?.sources ?? []))
-  }
-  const sourceNames = new Set<string>()
-  for (const key of reached) {
-    for (const sourceName of trees.get(key)?.cteColumns.keys() ?? []) sourceNames.add(sourceName)
-  }
-  const effective = new Map<string, string[]>()
-  for (const [cteName, columns] of facts.cteColumns) {
-    if (sourceNames.has(cteName)) continue
-    effective.set(cteName, columns)
-  }
-  return effective
 }
 
 /**
@@ -913,7 +900,8 @@ export async function collectViewConstraints(
           catalog,
           strictEquality,
           ruleSpellingsShadowedFor(viewSources, viewObjects, view.schema, view.view),
-          cteColumnsWithoutSourceCollisions(viewSources, viewTrees, view.schema, view.view)
+          facts?.cteColumns ?? new Map(),
+          resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map())
         )
       ),
       catalog,
