@@ -139,8 +139,17 @@ const strictEquality = await readStrictEquality(runQueryOn(lab))
 // stands down database-wide.
 const shadowedNames = [...(await readShadowedNames(runQueryOn(lab)))].sort()
 // Each view's stored rewrite tree: its CTE columns and the base column each of its own
-// columns came from.
-const viewTrees = await readViewTrees(runQueryOn(lab), ['lab'])
+// columns came from. Read only on a major the format is checked against — the fixture
+// is the lab for those majors, and one built without its trees would carry empty CTE
+// maps that look like a database with no `WITH` query at all.
+const treeRead = await readViewTrees(runQueryOn(lab), ['lab'])
+if (!treeRead.supported) {
+  throw new Error(
+    'the lab fixture is built on a PostgreSQL major outside the range the stored ' +
+      'rewrite tree is read against (15–18); build it on one of those'
+  )
+}
+const viewTrees = treeRead.trees
 const relationOids = await readRelationOids(runQueryOn(lab))
 const views = await readViews(runQueryOn(lab), ['lab'])
 // The tables of the lab, each a referencing half of a relation to a projection.

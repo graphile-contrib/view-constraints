@@ -63,7 +63,10 @@ key carried without a multiplying join, a group key, a `DISTINCT` — and a
 makes a `@primaryKey` column non-null and leaves a `@unique` column as it is, and
 PostgreSQL's own uniqueness admits a `NULL` beside anything (a `UNIQUE` index admits
 any number of `NULL`s), so declaring a nullable key is sound where declaring it
-non-null would not be. Of the keys it **derives**, a view gets the `@primaryKey` or the
+non-null would not be. A key an outer join can null is no row identity for either tag
+— the padded rows carry the same `NULL`, which tells none of them apart — so the same
+guard a `@primaryKey` is taken under yields neither, and the plan's own set is named
+in the view's notes. Of the keys it **derives**, a view gets the `@primaryKey` or the
 `@unique` and never both: a key whose every column is never `NULL` is the `@primaryKey`
 of "Row identity", and only where no such key exists does the `@unique` stand. This is
 the derived pair alone. A hand-written `@primaryKey` the derivation does not match is
@@ -95,7 +98,10 @@ A column is `@notNull` when it proxies a base column that is never `NULL` where 
 is read — `attnotnull`, or a qualifier of the plan rejects the `NULL`: a conjunct
 `column IS NOT NULL`, or `column = …` through a strict operator (read only while
 every `=` in the database is strict) — and no outer join, `NULL` union branch or
-`GROUPING SETS` row puts a `NULL` in. A qualifier counts only where it holds of
+`GROUPING SETS` row puts a `NULL` in. A materialized view is read by the same rule: its
+stored copy of an entry that was never `NULL` holds no `NULL` either, so the column its
+key is taken from carries `@notNull` beside the key rather than the key alone. A
+qualifier counts only where it holds of
 every row the column arrives in: not an outer or anti join's own condition, not a
 disjunction's arm, not a subplan. The predicate of a partial index a scan names is
 read as a qualifier of that scan, since the scan drops what the predicate implies
@@ -174,7 +180,11 @@ query's select list in order — with no map between the two in the plan. That m
 where each of the view's own columns was written from, is in the view's stored rewrite
 tree (`pg_rewrite.ev_action`), read field by field and not parsed as SQL: the tree names
 every `WITH` query's columns in order (`:ctename`, `:ctecolnames`), so a `cte.col` is
-read at that column's position in the subplan the plan computes it by. The name is not
+read at that column's position in the subplan the plan computes it by. The stored tree
+is read only on a PostgreSQL major whose format this reader has been checked against
+(15 through 18): on any other major it is left unread — the plan's own refusals stand
+where its facts would have, and each view's notes say why — so a format that moved
+between majors is a missed derivation and never a guessed one. The name is not
 the plan's to trust: the same `WITH` name can stand in another query the view goes
 through — the same name at two query levels, a view outside the surface, or a SQL
 function the view inlines — and the plan prints one `CTE <name>` subplan whose owner
@@ -250,4 +260,7 @@ an empty database and another against production. A consumer wires its services 
 `InvarianceTarget`s and a driver into `open`, and fails the build on a difference.
 
 `reportingPreset(preset, onReport)` and `ViewConstraintsReportRenderer` print what
-is derived beside what the views declare by hand.
+is derived beside what the views declare by hand. The report also names the built-in
+spellings a user object has taken over in the database, whose rules stand down for
+every view, so a surface that derives less than expected can be read against that list
+rather than mistaken for one with nothing to derive.

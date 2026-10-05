@@ -1016,7 +1016,7 @@
           "notNull": true
         },
         "cur_code": {
-          "typeId": 152760853,
+          "typeId": 152912361,
           "typeMod": -1,
           "notNull": true
         }
@@ -1556,7 +1556,7 @@
           "notNull": false
         },
         "mystery_id": {
-          "typeId": 152761730,
+          "typeId": 152913242,
           "typeMod": -1,
           "notNull": false
         }
@@ -3384,6 +3384,25 @@
     },
     {
       "schema": "lab",
+      "relation": "v_left_group_nulled",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "bank_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "n": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_left_join",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -4914,7 +4933,7 @@
   "coercions": {
     "binary": ["1043>25", "25>1043"],
     "domainBase": {
-      "152760853": 25
+      "152912361": 25
     }
   },
   "strictEquality": true,
@@ -5756,6 +5775,12 @@
       "schema": "lab",
       "name": "v_ledger_by_id",
       "columns": ["id"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_left_group_nulled",
+      "columns": ["bank_id", "n"],
       "sources": []
     },
     {
@@ -7593,7 +7618,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152761730,
+          "typeId": 152913242,
           "typeMod": -1
         }
       ],
@@ -14316,6 +14341,82 @@
         "Schema": "lab",
         "Relation Name": "ledger",
         "Alias": "ledger"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_left_group_nulled",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "bank",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "t": "tx",
+        "b": "bank"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["b.id", "count(*)"],
+        "Group Key": ["b.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["b.id"],
+            "Join Type": "Left",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(t.bank_id = b.id)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.cur_code", "t.bank_id", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["b.id"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id"],
+                    "Schema": "lab",
+                    "Relation Name": "bank",
+                    "Alias": "b",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -20553,7 +20654,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152761730,
+          "typeId": 152913242,
           "typeMod": -1
         }
       ],
@@ -27276,6 +27377,82 @@
         "Schema": "lab",
         "Relation Name": "ledger",
         "Alias": "ledger"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_left_group_nulled",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "bank",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "t": "tx",
+        "b": "bank"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["b.id", "count(*)"],
+        "Group Key": ["b.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["b.id"],
+            "Join Type": "Left",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(t.bank_id = b.id)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.cur_code", "t.bank_id", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["b.id"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id"],
+                    "Schema": "lab",
+                    "Relation Name": "bank",
+                    "Alias": "b",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       }
     },
     {
@@ -33698,7 +33875,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152761730,
+          "typeId": 152913242,
           "typeMod": -1
         }
       ],
@@ -41200,6 +41377,89 @@
     },
     {
       "schema": "lab",
+      "view": "v_left_group_nulled",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "bank",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "t": "tx",
+        "b": "bank"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["b.id", "count(*)"],
+        "Group Key": ["b.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Gather",
+            "Output": ["b.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Hash Join",
+                "Output": ["b.id"],
+                "Join Type": "Left",
+                "Parent Relationship": "Outer",
+                "Hash Cond": "(t.bank_id = b.id)",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["t.id", "t.cur_code", "t.bank_id", "t.amount"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "t",
+                    "Parent Relationship": "Outer"
+                  },
+                  {
+                    "Node Type": "Hash",
+                    "Output": ["b.id"],
+                    "Parent Relationship": "Inner",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["b.id"],
+                        "Schema": "lab",
+                        "Relation Name": "bank",
+                        "Alias": "b",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_left_join",
       "relkind": "v",
       "regime": "parallel-forced",
@@ -48001,7 +48261,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152761730,
+          "typeId": 152913242,
           "typeMod": -1
         }
       ],
@@ -54847,6 +55107,89 @@
     },
     {
       "schema": "lab",
+      "view": "v_left_group_nulled",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "bank",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "t": "tx",
+        "b": "bank"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["b.id", "count(*)"],
+        "Group Key": ["b.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Output": ["b.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Hash Join",
+                "Output": ["b.id"],
+                "Join Type": "Left",
+                "Parent Relationship": "Outer",
+                "Hash Cond": "(t.bank_id = b.id)",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["t.id", "t.cur_code", "t.bank_id", "t.amount"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "t",
+                    "Parent Relationship": "Outer"
+                  },
+                  {
+                    "Node Type": "Hash",
+                    "Output": ["b.id"],
+                    "Parent Relationship": "Inner",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["b.id"],
+                        "Schema": "lab",
+                        "Relation Name": "bank",
+                        "Alias": "b",
+                        "Parent Relationship": "Outer"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_left_join",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -61110,7 +61453,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152761730,
+          "typeId": 152913242,
           "typeMod": -1
         }
       ],
@@ -67688,6 +68031,82 @@
     },
     {
       "schema": "lab",
+      "view": "v_left_group_nulled",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "bank",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "t": "tx",
+        "b": "bank"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["b.id", "count(*)"],
+        "Group Key": ["b.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["b.id"],
+            "Join Type": "Left",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(t.bank_id = b.id)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.cur_code", "t.bank_id", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["b.id"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id"],
+                    "Schema": "lab",
+                    "Relation Name": "bank",
+                    "Alias": "b",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_left_join",
       "relkind": "v",
       "regime": "no-sort",
@@ -73924,7 +74343,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152761730,
+          "typeId": 152913242,
           "typeMod": -1
         }
       ],
@@ -80745,6 +81164,83 @@
     },
     {
       "schema": "lab",
+      "view": "v_left_group_nulled",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "bank",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "t": "tx",
+        "b": "bank"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["b.id", "count(*)"],
+        "Group Key": ["b.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["b.id"],
+            "Join Type": "Left",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(t.bank_id = b.id)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.cur_code", "t.bank_id", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["b.id"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Index Only Scan",
+                    "Output": ["b.id"],
+                    "Schema": "lab",
+                    "Relation Name": "bank",
+                    "Alias": "b",
+                    "Parent Relationship": "Outer",
+                    "Index Name": "bank_pkey"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_left_join",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -87143,7 +87639,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152761730,
+          "typeId": 152913242,
           "typeMod": -1
         }
       ],
@@ -93560,6 +94056,76 @@
     },
     {
       "schema": "lab",
+      "view": "v_left_group_nulled",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "bank",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "t": "tx",
+        "b": "bank"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["b.id", "count(*)"],
+        "Group Key": ["b.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Nested Loop",
+            "Output": ["b.id"],
+            "Join Type": "Left",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.cur_code", "t.bank_id", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["b.id"],
+                "Schema": "lab",
+                "Relation Name": "bank",
+                "Alias": "b",
+                "Parent Relationship": "Inner",
+                "Index Name": "bank_pkey",
+                "Index Cond": "(b.id = t.bank_id)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_left_join",
       "relkind": "v",
       "regime": "nestloop-only",
@@ -99676,7 +100242,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152761730,
+          "typeId": 152913242,
           "typeMod": -1
         }
       ],
@@ -106375,6 +106941,82 @@
         "Schema": "lab",
         "Relation Name": "ledger",
         "Alias": "ledger"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_left_group_nulled",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "bank_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "bank",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "t": "tx",
+        "b": "bank"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["b.id", "count(*)"],
+        "Group Key": ["b.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["b.id"],
+            "Join Type": "Left",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(t.bank_id = b.id)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["t.id", "t.cur_code", "t.bank_id", "t.amount"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "t",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["b.id"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id"],
+                    "Schema": "lab",
+                    "Relation Name": "bank",
+                    "Alias": "b",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
       }
     },
     {

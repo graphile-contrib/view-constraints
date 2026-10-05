@@ -97,6 +97,12 @@ export interface ViewConstraintsReport {
   failures: { schema: string; view: string; relkind: 'v' | 'm'; error: string }[]
   /** Views this plugin did not ask the database to plan, with the reason it did not. */
   skipped: { schema: string; view: string; relkind: 'v' | 'm'; reason: string }[]
+  /**
+   * The built-in spellings a user object has taken over in the database. The rules those
+   * spellings carry stand down for every view, so this list separates "derived nothing
+   * because another object bears the name" from "had nothing to derive".
+   */
+  shadowedNames: string[]
 }
 
 export interface ViewConstraintsOptions {
@@ -396,7 +402,8 @@ export function PgViewConstraintsPlugin(
             tables,
             unexamined,
             failures: collected.failures,
-            skipped: collected.skipped
+            skipped: collected.skipped,
+            shadowedNames: collected.shadowedNames
           })
         }
       }

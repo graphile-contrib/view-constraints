@@ -58,6 +58,14 @@ function renderService(
 ): NotNullTally {
   const tally: NotNullTally = { confirmed: 0, derivedOnly: 0, handOnly: [] }
   line(`\n════ ${title} (schemas: ${report.schemas.length})`)
+  // The rules a user object has taken a spelling from stand down for every view, so a
+  // surface that derives less than expected is read against this line rather than taken
+  // for a surface with nothing to derive.
+  line(
+    report.shadowedNames.length === 0
+      ? '  ~~ built-in spellings a user object has taken over: none'
+      : `  ~~ built-in spellings a user object has taken over: ${report.shadowedNames.join(', ')} — the rules they carry stand down for every view`
+  )
   for (const failure of report.failures) {
     line(
       `  !! ${failure.schema}.${failure.view} (relkind ${failure.relkind}): EXPLAIN refused: ${failure.error}`

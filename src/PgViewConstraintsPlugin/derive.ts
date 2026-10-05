@@ -519,12 +519,13 @@ export function deriveViewConstraints(
   // Non-nullness, column by column: the base column is NOT NULL where it is read and
   // every cast over it may only answer that value or NULL it cannot; or the entry is
   // no reference at all and the expression it spells proves the value never NULL. A
-  // materialized view is left out — its stored row outlives the row it was copied
-  // from, and the copy is the only thing this reader ever sees of it. A `GROUPING
-  // SETS` superaggregate row is all-NULL grouping columns; the expression rules
-  // already read every column reference under one as nullable, so a shape they still
-  // answer never-NULL for — a literal, a `count` — holds in every row, superaggregate
-  // rows included, and is kept.
+  // materialized view is read by the same rule: its stored copy of an entry that was
+  // never NULL holds no NULL either, which is the same reading its key is taken by
+  // (below), so the two answers about one column cannot disagree. A `GROUPING SETS`
+  // superaggregate row is all-NULL grouping columns; the expression rules already read
+  // every column reference under one as nullable, so a shape they still answer
+  // never-NULL for — a literal, a `count` — holds in every row, superaggregate rows
+  // included, and is kept.
   //
   // The origin path reads the raw sources, not the origins a value-preserving cast
   // leaves: a cast that refuses the proxy (a truncation) is still read for
@@ -536,7 +537,6 @@ export function deriveViewConstraints(
   for (let index = 0; index < columns.length; index++) {
     const viewColumn = columns[index]
     if (viewColumn === undefined) continue
-    if (relkind !== 'v') continue
     if (disagreed.has(index)) continue
     const sources = plan.columns[index]
     if (sources && sources.length > 0) {
@@ -729,14 +729,16 @@ export function deriveViewConstraints(
       plan.nullIntroduced[index] === false &&
       sources.every((origin) => neverNullOrigin(origin))
   )
-  const candidates = plan.rowIdentities.filter((key) =>
-    // A key column the plan can null from an outer join is no row identity, its
-    // discriminator no discriminator: a NULL cannot tell a row it pads.
-    key.columns.every(
-      (index) =>
-        plan.entryNullExtended[index] !== true &&
-        (key.discriminators.includes(index) || neverNull[index])
-    )
+  // A key column the plan can null from an outer join is no row identity, its
+  // discriminator no discriminator: a NULL cannot tell a row it pads. That guard holds
+  // for a `@unique` as much as for a `@primaryKey` — a sequence of NULLs is as
+  // indistinguishable as a sequence of values — so both tags are taken from the same
+  // keys, and the never-NULL question is the only one that separates them.
+  const rowIdentities = plan.rowIdentities.filter((key) =>
+    key.columns.every((index) => plan.entryNullExtended[index] !== true)
+  )
+  const candidates = rowIdentities.filter((key) =>
+    key.columns.every((index) => key.discriminators.includes(index) || neverNull[index])
   )
   // A key that is one base relation's own comes first — it is the one a relation to a
   // projection can point at — the primary key before a unique index, then by relation
@@ -774,8 +776,10 @@ export function deriveViewConstraints(
     // de-duplication over one. PostgreSQL's uniqueness admits that: no two rows share
     // the tuple, and a NULL is distinct from every other value, so the key is sound
     // and `PgFakeConstraintsPlugin` declares it without making its columns non-null.
+    // It is taken from `rowIdentities` and not from every key the plan proves: a key
+    // an outer join nulls is no row identity for a `@unique` either.
     if (deriveUnique) {
-      const [best] = [...plan.rowIdentities].sort((left, right) => {
+      const [best] = [...rowIdentities].sort((left, right) => {
         const [a, b] = [rank(left), rank(right)]
         return a < b ? -1 : a > b ? 1 : 0
       })
@@ -793,7 +797,10 @@ export function deriveViewConstraints(
           tag: tagOf(best)
         }
       }
-    } else {
+    }
+    // Nothing stood: either `@unique` is turned off or every key the plan proves is
+    // one an outer join can null, and the columns it may null are named here.
+    if (!unique) {
       const nullable = [
         ...new Set(
           plan.rowIdentities.flatMap((key) =>

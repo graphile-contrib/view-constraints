@@ -40,7 +40,9 @@ import {
   collectViewConstraints,
   NO_PRIVILEGED_CONNECTION_REASON,
   readShadowedNames,
+  readViewTrees,
   subqueryViewCandidates,
+  TREE_FORMAT_UNCHECKED_REASON,
   planCatalogFrom
 } from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { ViewSourceRow } from '../src/PgViewConstraintsPlugin/collect.ts'
@@ -274,6 +276,19 @@ const CASES: Case[] = [
     primaryKey: 'id'
   },
   {
+    view: 'v_left_group_nulled',
+    about:
+      'a group key taken from the nulled side of an outer join is no row identity for a ' +
+      '`@unique` either: the guard a `@primaryKey` is taken under holds for both, so no ' +
+      'key is derived and the plan’s own set is named in the notes',
+    origins: ['bank_id=bank.id', 'n=—'],
+    // The group key is NULL in every padded row — that is why it is no identity — while
+    // `count` answers 0 over the rows it counted.
+    notNull: ['n'],
+    foreignKeys: ['(bank_id) references lab.bank (id)'],
+    primaryKey: null
+  },
+  {
     view: 'v_group',
     about: 'a grouping key proxies; the aggregate beside it does not',
     origins: ['cur_code=tx.cur_code', 'n=—'],
@@ -357,9 +372,13 @@ const CASES: Case[] = [
     view: 'm_tx',
     about:
       'a materialized view is read through its defining query, whose single range ' +
-      'table entry EXPLAIN prints unqualified',
+      'table entry EXPLAIN prints unqualified, and by the same non-nullness rule a ' +
+      'plain view is: its stored copy of a never-`NULL` column holds no NULL either',
     origins: ['id=tx.id', 'cur_code=tx.cur_code', 'amount=tx.amount'],
-    notNull: [],
+    // The same columns `v_bare` derives non-null over the same base table: a
+    // materialized view carries no exception, and its key's columns are read as
+    // never `NULL` here as they are there.
+    notNull: ['id', 'cur_code', 'amount'],
     foreignKeys: ['(cur_code) references lab.currency (code)', '(id) references lab.tx (id)'],
     primaryKey: 'id'
   },
@@ -2771,6 +2790,48 @@ test('with no privileged connection the materialized view is named, not passed o
       reason: NO_PRIVILEGED_CONNECTION_REASON
     }
   ])
+})
+
+test('the report names the built-in spellings a user object has taken over', async () => {
+  // The rules a shadowed spelling carries stand down for every view, so the set is
+  // carried on the result: a surface that derives less than expected is read against it
+  // rather than taken for one with nothing to derive.
+  const issued: string[] = []
+  const surface = runnerRecording(issued, 'surface', {
+    'FROM pg_class class': TWO_VIEWS,
+    EXPLAIN: ONE_COLUMN_PLAN,
+    'FROM pg_proc': [{ name: 'count' }, { name: 'integer' }]
+  })
+  const collected = await collectViewConstraints(surface, ['lab'], null)
+  assert.deepEqual(collected.shadowedNames, ['count', 'integer'])
+  // The fake connection answers no version, so the stored tree is left unread and the
+  // view says so rather than looking like one with no `WITH` query at all.
+  assert.deepEqual(
+    collected.derivations[0]?.notes.filter((note) => note.includes('stored rewrite tree')),
+    [TREE_FORMAT_UNCHECKED_REASON]
+  )
+})
+
+test('the stored rewrite tree is read only on a major the format is checked against', async () => {
+  const asked = (version: number) => {
+    const issued: string[] = []
+    const query: RunQuery = async <Row>(text: string) => {
+      issued.push(text)
+      if (text.includes('server_version_num')) return [{ version }] as Row[]
+      return [{ schema: 'lab', view: 'v', action: '({QUERY :targetList <> :cteList <>})' }] as Row[]
+    }
+    return { issued, read: readViewTrees(query, ['lab']) }
+  }
+  const checked = asked(180000)
+  assert.equal((await checked.read).supported, true)
+  assert.ok(checked.issued.some((text) => text.includes('ev_action')))
+  // A major outside the range is not read at all: the stored action is never queried,
+  // so the plan's own refusals stand where the tree's facts would have and the format is
+  // a missed derivation rather than a guessed one.
+  const unchecked = asked(190000)
+  assert.equal((await unchecked.read).supported, false)
+  assert.deepEqual((await unchecked.read).trees.size, 0)
+  assert.ok(!unchecked.issued.some((text) => text.includes('ev_action')))
 })
 
 // ── The refusals are a closed list, and every one of them has a case ─────────────

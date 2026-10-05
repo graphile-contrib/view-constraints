@@ -604,11 +604,28 @@ export function resolveTreeColumns(
   return resolved
 }
 
+// The `pg_node_tree` a view's rewrite rule stores is PostgreSQL-internal and its
+// format carries no cross-version promise. The lab reads it against every major this
+// reader has been checked on, and a major outside that set is left unread — the plan's
+// own refusals stand where the tree's facts would have — because a format nobody has
+// read against is a guess, and a guess here is a wrong tag rather than a missed one.
+const SUPPORTED_TREE_MAJORS = [15, 16, 17, 18]
+/** The same range, said in prose: one place, so a message cannot name a major that moved. */
+const TREE_MAJOR_RANGE = `${SUPPORTED_TREE_MAJORS[0]}–${SUPPORTED_TREE_MAJORS.at(-1)}`
+const SERVER_VERSION_QUERY = `SELECT current_setting('server_version_num')::int AS version`
+
+/** What reading the views' stored trees gave: the facts, and whether they were read. */
+export interface ViewTreeRead {
+  /** Whether this server's major is one the stored format is read against. */
+  supported: boolean
+  trees: Map<string, ViewTreeFacts>
+}
+
 /** Each view's CTE column map and column origins, by `schema.view`. */
-export async function readViewTrees(
-  query: RunQuery,
-  schemas: string[]
-): Promise<Map<string, ViewTreeFacts>> {
+export async function readViewTrees(query: RunQuery, schemas: string[]): Promise<ViewTreeRead> {
+  const [version] = await query<{ version: number }>(SERVER_VERSION_QUERY)
+  const major = Math.floor((version?.version ?? 0) / 10000)
+  if (!SUPPORTED_TREE_MAJORS.includes(major)) return { supported: false, trees: new Map() }
   const rows = await query<{ schema: string; view: string; action: string | null }>(
     VIEW_ACTION_QUERY,
     [schemas]
@@ -628,7 +645,7 @@ export async function readViewTrees(
       cteRefCount: tree.cteRefCount
     })
   }
-  return trees
+  return { supported: true, trees }
 }
 
 /**
@@ -751,6 +768,19 @@ export const NO_PRIVILEGED_CONNECTION_REASON =
   'materialized view: its defining query is planned, and this service configures ' +
   'no privileged connection to plan it with (pgService superuserConnectionString)'
 
+/**
+ * Why the views' stored rewrite trees were left unread: the `pg_node_tree` format is
+ * PostgreSQL-internal, and a major the reader has not been checked against is not read
+ * at all. Said out loud because the tree is what a `WITH` query's columns and a column's
+ * stored origin come from, and "no `WITH` query was crossed" must be distinguishable
+ * from "there was no `WITH` query".
+ */
+export const TREE_FORMAT_UNCHECKED_REASON =
+  'stored rewrite tree (pg_rewrite.ev_action) not read: this PostgreSQL major is ' +
+  `outside the range the reader is checked against (${TREE_MAJOR_RANGE}), so its stored ` +
+  'format is not read, and no `WITH` query of this view is crossed and no column origin ' +
+  'is taken from it'
+
 export interface CollectResult {
   derivations: ViewDerivation[]
   /** Every table of the schemas this role may read, with what its foreign keys led to. */
@@ -759,6 +789,13 @@ export interface CollectResult {
   failures: { schema: string; view: string; relkind: 'v' | 'm'; error: string }[]
   /** Views this reader deliberately did not plan, with the reason it did not. */
   skipped: { schema: string; view: string; relkind: 'v' | 'm'; reason: string }[]
+  /**
+   * The built-in spellings a user object has taken over somewhere in the database. The
+   * rules those spellings carry stand down for every view, so a surface that derives
+   * less than expected can be read against this list rather than mistaken for a surface
+   * that had nothing to derive.
+   */
+  shadowedNames: string[]
 }
 
 /**
@@ -781,7 +818,7 @@ export async function collectViewConstraints(
   const coercions = await readTypeCoercions(query)
   const viewSources = await readViewSources(query)
   const shadowedNames = await readShadowedNames(query)
-  const viewTrees = await readViewTrees(query, schemas)
+  const { supported: treeSupported, trees: viewTrees } = await readViewTrees(query, schemas)
   const relationOids = await readRelationOids(query)
   const views = await readViews(query, schemas)
   const derivations: ViewDerivation[] = []
@@ -849,7 +886,9 @@ export async function collectViewConstraints(
     // A tree the walk could not place is said out loud: its CTE map is empty, so a
     // `WITH` query reads as refused, and the reason the map is empty is named here
     // rather than left to look like a query that has no `WITH` at all.
-    if (facts && !facts.ok) {
+    if (!treeSupported) {
+      derivation.notes.push(TREE_FORMAT_UNCHECKED_REASON)
+    } else if (facts && !facts.ok) {
       derivation.notes.push(
         'stored rewrite tree (pg_rewrite.ev_action) not read: its format was not ' +
           'recognised, so no `WITH` query of this view is crossed and no column origin ' +
@@ -875,5 +914,5 @@ export async function collectViewConstraints(
     declaredRowIdentity,
     tables
   )
-  return { derivations, tables, failures, skipped }
+  return { derivations, tables, failures, skipped, shadowedNames: [...shadowedNames].sort() }
 }

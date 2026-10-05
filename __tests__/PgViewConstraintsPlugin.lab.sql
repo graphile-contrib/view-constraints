@@ -42,6 +42,13 @@ create unique index slot_tag_key on slot (tag);
 create view v_bare as select id, cur_code from tx;
 create view v_left_join as
   select t.id, b.id as bank_id, t.cur_code from tx t left join bank b on b.id = t.bank_id;
+-- NEGATIVE: a group key taken from the nulled side of an outer join is no row identity
+-- for a `@unique` either, under the same guard a `@primaryKey` is taken under. Every
+-- padded row carries the same NULL there, so the key cannot tell those rows apart.
+create view v_left_group_nulled as
+  select b.id as bank_id, count(*) as n
+  from tx t left join bank b on b.id = t.bank_id
+  group by b.id;
 create view v_group as select cur_code, count(*) as n from tx group by cur_code;
 create view v_window as
   select id, cur_code, row_number() over (partition by cur_code order by id) as rn from tx;
