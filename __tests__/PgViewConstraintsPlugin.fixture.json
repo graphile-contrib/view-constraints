@@ -890,7 +890,7 @@
           "notNull": true
         },
         "cur_code": {
-          "typeId": 151513666,
+          "typeId": 151515640,
           "typeMod": -1,
           "notNull": true
         }
@@ -1430,7 +1430,7 @@
           "notNull": false
         },
         "mystery_id": {
-          "typeId": 151514539,
+          "typeId": 151516513,
           "typeMod": -1,
           "notNull": false
         }
@@ -3039,6 +3039,25 @@
     },
     {
       "schema": "lab",
+      "relation": "v_over_user_count",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "c": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_over_view",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -3884,6 +3903,63 @@
     },
     {
       "schema": "lab",
+      "relation": "v_user_count",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "c": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_user_operator",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "plus": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_user_type",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "ii": {
+          "typeId": 151516545,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_values_scan",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -3981,11 +4057,17 @@
   "coercions": {
     "binary": ["1043>25", "25>1043"],
     "domainBase": {
-      "151513666": 25
+      "151515640": 25,
+      "151516545": 20
     }
   },
   "strictEquality": true,
-  "shadowedNames": [],
+  "viewObjects": {
+    "lab.v_cast_user_defined": ["to_mystery"],
+    "lab.v_user_count": ["count"],
+    "lab.v_user_operator": ["+"],
+    "lab.v_user_type": ["integer"]
+  },
   "tables": [
     {
       "schema": "lab",
@@ -4745,6 +4827,12 @@
     },
     {
       "schema": "lab",
+      "name": "v_over_user_count",
+      "columns": ["id", "c"],
+      "sources": ["lab.v_user_count"]
+    },
+    {
+      "schema": "lab",
       "name": "v_over_view",
       "columns": ["id", "cur_code"],
       "sources": ["lab.v_distinct_src"]
@@ -5011,6 +5099,24 @@
       "schema": "lab",
       "name": "v_unique_key",
       "columns": ["code"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_user_count",
+      "columns": ["id", "c"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_user_operator",
+      "columns": ["id", "plus"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_user_type",
+      "columns": ["id", "ii"],
       "sources": []
     },
     {
@@ -5881,7 +5987,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151514539,
+          "typeId": 151516513,
           "typeMod": -1
         }
       ],
@@ -9028,6 +9134,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_user_count",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "default",
@@ -11125,6 +11256,81 @@
         "Schema": "lab",
         "Relation Name": "asset",
         "Alias": "asset"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_count",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_operator",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "plus",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.id OPERATOR(lab.+) '1'::bigint)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_type",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ii",
+          "typeId": 151516545,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(COALESCE(tx.amount, '0'::numeric))::\"integer\""],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
       }
     },
     {
@@ -12064,7 +12270,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151514539,
+          "typeId": 151516513,
           "typeMod": -1
         }
       ],
@@ -15211,6 +15417,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_user_count",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "serial",
@@ -17308,6 +17539,81 @@
         "Schema": "lab",
         "Relation Name": "asset",
         "Alias": "asset"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_count",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_operator",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "plus",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.id OPERATOR(lab.+) '1'::bigint)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_type",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ii",
+          "typeId": 151516545,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(COALESCE(tx.amount, '0'::numeric))::\"integer\""],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
       }
     },
     {
@@ -18432,7 +18738,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151514539,
+          "typeId": 151516513,
           "typeMod": -1
         }
       ],
@@ -22216,6 +22522,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_user_count",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "parallel-forced",
@@ -24661,6 +24992,88 @@
     },
     {
       "schema": "lab",
+      "view": "v_user_count",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_operator",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "plus",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.id OPERATOR(lab.+) '1'::bigint)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_type",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ii",
+          "typeId": 151516545,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["tx.id", "((COALESCE(tx.amount, '0'::numeric))::\"integer\")"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["tx.id", "(COALESCE(tx.amount, '0'::numeric))::\"integer\""],
+            "Schema": "lab",
+            "Relation Name": "tx",
+            "Alias": "tx",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_values_scan",
       "relkind": "v",
       "regime": "parallel-forced",
@@ -25603,7 +26016,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151514539,
+          "typeId": 151516513,
           "typeMod": -1
         }
       ],
@@ -28862,6 +29275,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_user_count",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -30993,6 +31431,81 @@
     },
     {
       "schema": "lab",
+      "view": "v_user_count",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_operator",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "plus",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.id OPERATOR(lab.+) '1'::bigint)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_type",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ii",
+          "typeId": 151516545,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(COALESCE(tx.amount, '0'::numeric))::\"integer\""],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_values_scan",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -31928,7 +32441,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151514539,
+          "typeId": 151516513,
           "typeMod": -1
         }
       ],
@@ -35060,6 +35573,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_user_count",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "no-sort",
@@ -37149,6 +37687,81 @@
     },
     {
       "schema": "lab",
+      "view": "v_user_count",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_operator",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "plus",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.id OPERATOR(lab.+) '1'::bigint)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_type",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ii",
+          "typeId": 151516545,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(COALESCE(tx.amount, '0'::numeric))::\"integer\""],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_values_scan",
       "relkind": "v",
       "regime": "no-sort",
@@ -38100,7 +38713,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151514539,
+          "typeId": 151516513,
           "typeMod": -1
         }
       ],
@@ -41348,6 +41961,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_user_count",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -43577,6 +44215,88 @@
     },
     {
       "schema": "lab",
+      "view": "v_user_count",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_operator",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "plus",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Bitmap Heap Scan",
+        "Output": ["tx.id", "(tx.id OPERATOR(lab.+) '1'::bigint)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx",
+        "Plans": [
+          {
+            "Node Type": "Bitmap Index Scan",
+            "Parent Relationship": "Outer",
+            "Index Name": "tx_pkey"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_type",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ii",
+          "typeId": 151516545,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(COALESCE(tx.amount, '0'::numeric))::\"integer\""],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_values_scan",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -44500,7 +45220,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151514539,
+          "typeId": 151516513,
           "typeMod": -1
         }
       ],
@@ -47532,6 +48252,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_user_count",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "nestloop-only",
@@ -49569,6 +50314,81 @@
     },
     {
       "schema": "lab",
+      "view": "v_user_count",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_operator",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "plus",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.id OPERATOR(lab.+) '1'::bigint)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_type",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ii",
+          "typeId": 151516545,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(COALESCE(tx.amount, '0'::numeric))::\"integer\""],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_values_scan",
       "relkind": "v",
       "regime": "nestloop-only",
@@ -50504,7 +51324,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 151514539,
+          "typeId": 151516513,
           "typeMod": -1
         }
       ],
@@ -53651,6 +54471,31 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_user_count",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "genetic-join-order",
@@ -55748,6 +56593,81 @@
         "Schema": "lab",
         "Relation Name": "asset",
         "Alias": "asset"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_count",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "count((tx.amount)::integer)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_operator",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "plus",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(tx.id OPERATOR(lab.+) '1'::bigint)"],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_user_type",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "ii",
+          "typeId": 151516545,
+          "typeMod": -1
+        }
+      ],
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["tx.id", "(COALESCE(tx.amount, '0'::numeric))::\"integer\""],
+        "Schema": "lab",
+        "Relation Name": "tx",
+        "Alias": "tx"
       }
     },
     {

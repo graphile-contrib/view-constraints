@@ -22,10 +22,10 @@ import pg from 'pg'
 import {
   explainStatement,
   readCatalogRelations,
-  readShadowedNames,
   readStrictEquality,
   readTables,
   readTypeCoercions,
+  readViewObjectNames,
   readViews,
   readViewSources
 } from '../src/PgViewConstraintsPlugin/collect.ts'
@@ -129,7 +129,8 @@ await lab.query(readFileSync(LAB_SQL, 'utf8'))
 const catalog = await readCatalogRelations(runQueryOn(lab))
 const coercions = await readTypeCoercions(runQueryOn(lab))
 const strictEquality = await readStrictEquality(runQueryOn(lab))
-const shadowedNames = await readShadowedNames(runQueryOn(lab))
+// The user objects each lab view names, per view: which rule spellings it shadows.
+const viewObjects = await readViewObjectNames(runQueryOn(lab))
 const views = await readViews(runQueryOn(lab), ['lab'])
 // The tables of the lab, each a referencing half of a relation to a projection.
 const tables = await readTables(runQueryOn(lab), ['lab'])
@@ -211,7 +212,12 @@ writeFileSync(
         )
       },
       strictEquality,
-      shadowedNames: [...shadowedNames].sort(),
+      viewObjects: Object.fromEntries(
+        [...viewObjects]
+          .filter(([key]) => key.startsWith('lab.'))
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, names]) => [key, [...names].sort()])
+      ),
       tables,
       viewSources,
       views: planned

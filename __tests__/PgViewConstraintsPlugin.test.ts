@@ -39,6 +39,7 @@ import type {
 import {
   collectViewConstraints,
   NO_PRIVILEGED_CONNECTION_REASON,
+  ruleSpellingsShadowedFor,
   subqueryViewCandidates,
   planCatalogFrom
 } from '../src/PgViewConstraintsPlugin/collect.ts'
@@ -70,8 +71,8 @@ interface Fixture {
   coercions: { binary: string[]; domainBase: Record<string, number> }
   /** Every `=` operator of the lab database is strict. */
   strictEquality: boolean
-  /** Built-in spellings a user-defined function or operator of the lab took over. */
-  shadowedNames: string[]
+  /** The user objects each lab view names directly: `schema.view` → object names. */
+  viewObjects: Record<string, string[]>
   /** Every lab table, each a referencing half of a relation to a projection. */
   tables: { schema: string; table: string }[]
   /** Every lab view's select-list order and the views it is built on. */
@@ -98,11 +99,14 @@ const catalog = new Map<string, CatalogRelation>(
   ])
 )
 
-const planCatalog = planCatalogFrom(
-  catalog,
-  fixture.strictEquality,
-  new Set(fixture.shadowedNames ?? [])
+const planCatalog = planCatalogFrom(catalog, fixture.strictEquality)
+
+/** The rule spellings each lab view shadows, off the objects it lists and its sources. */
+const viewObjects = new Map<string, Set<string>>(
+  Object.entries(fixture.viewObjects ?? {}).map(([key, names]) => [key, new Set(names)])
 )
+const shadowedFor = (schema: string, view: string): Set<string> =>
+  ruleSpellingsShadowedFor(fixture.viewSources as ViewSourceRow[], viewObjects, schema, view)
 
 const coercions: TypeCoercions = {
   binary: new Set(fixture.coercions.binary),
@@ -154,7 +158,7 @@ function derive(
       view.plan,
       view.columns.length,
       subqueryViewCandidates(fixture.viewSources, view.schema, view.view),
-      planCatalog
+      planCatalogFrom(catalog, fixture.strictEquality, shadowedFor(view.schema, view.view))
     ),
     catalog,
     coercions
@@ -496,6 +500,45 @@ const CASES: Case[] = [
     notNull: ['n'],
     foreignKeys: ['(id) references lab.tx (id)'],
     primaryKey: null
+  },
+  {
+    view: 'v_user_count',
+    about:
+      'a user function taking the name `count` is printed like the built-in, so the ' +
+      'count rule stands down for the view that names it — the column is not claimed',
+    origins: ['id=tx.id', 'c=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_over_user_count',
+    about:
+      'and for a view built on the one that names it, whose plan prints the same ' + 'function',
+    origins: ['id=tx.id', 'c=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_user_operator',
+    about:
+      'a user `+` whose function may answer NULL stands the whitelisted operator rule ' +
+      'down for the view that uses it',
+    origins: ['id=tx.id', 'plus=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_user_type',
+    about:
+      'a user type spelled `integer` is no longer the built-in family’s promise, so ' +
+      'the cast that would have been trusted stands down',
+    origins: ['id=tx.id', 'ii=—'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
   },
   {
     view: 'v_not_null_predicate',
@@ -1729,6 +1772,20 @@ test('uniqueness derivation can be turned off, and the refusal of a key is named
     off.notes.some((note) => note.startsWith('no key:')),
     'with uniqueness off the key is named as a refusal again'
   )
+})
+
+test('a user object shadows a rule spelling for its view and the views built on it, and no other', () => {
+  const shadowedOf = (view: string): string[] => [...shadowedFor('lab', view)].sort()
+  assert.deepEqual(shadowedOf('v_user_count'), ['count'])
+  // The closure over the view's sources: `v_over_user_count` names no user object
+  // itself, but the view it is built on does, and PostgreSQL flattens it in.
+  assert.deepEqual(shadowedOf('v_over_user_count'), ['count'])
+  assert.deepEqual(shadowedOf('v_user_operator'), ['+'])
+  assert.deepEqual(shadowedOf('v_user_type'), ['integer'])
+  // The many views that call the built-in spellings keep every rule in force: the
+  // user objects of other views are not theirs.
+  assert.deepEqual(shadowedOf('v_expr_group_count'), [])
+  assert.deepEqual(shadowedOf('v_expr_operators'), [])
 })
 
 test('a reference parses; anything with structure does not', () => {

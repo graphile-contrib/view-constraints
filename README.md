@@ -120,6 +120,19 @@ defines to answer a value for every input of the other — the exact numbers, th
 types. `jsonb` to `integer` and a user `CREATE CAST` are not, and may answer `NULL`,
 and neither is a cast to a type a user has named after one of those, whose name is
 then no promise at all.
+Whether a spelling is shadowed is a question about **this** view and not about the
+database as a whole. The plan prints a name, not an oid, so the plugin asks the
+catalog which user-defined objects the view's defining query names: the rewrite rule
+records a dependency on every non-built-in function, operator and type it uses
+(`pg_depend`; a built-in is pinned and leaves no such row), and the answer is taken
+over those objects and those of every view the view is built on, since a view is
+flattened into the query above it and the plan prints the inner view's objects too.
+A rule stands down for the view that names a user object with its spelling, and for no
+other: a user `count`, `+` or type `integer` elsewhere in the database — in another
+schema, or another view — leaves the built-in's rule in force. The resolution is at
+the object, not the individual call: the plan prints a name, and a view that names a
+user `count` anywhere stands the `count` rule down wherever that name is printed in
+its plan, which is the conservative reading.
 An entry that does not parse is `unknown` too — the reader never
 guesses. The same answer holds across a union's branches (a column is never `NULL`
 only where every branch proves it), across a crossed view boundary, and below an
