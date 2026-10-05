@@ -41,7 +41,7 @@
 // other; what the plan's qualifiers reject — `IS NOT NULL`, a strict equality — is
 // read by `plan-qualifiers.ts` and recorded on the origin.
 
-import { readPlanKeys } from './plan-keys.ts'
+import { readPlanKeys, unwrap } from './plan-keys.ts'
 import type { PlanKey, UniqueKeysOf } from './plan-keys.ts'
 import { qualifiedReference, readQualifiedNonNull } from './plan-qualifiers.ts'
 import type { QualifierCatalog } from './plan-qualifiers.ts'
@@ -1272,6 +1272,54 @@ class OriginReader {
     }
     return unknown ? 'unknown' : 'never-null'
   }
+
+  /**
+   * Whether the value one `Output` entry spells can be NULL because an outer join
+   * between `node` and where the value is read nulls the side it comes from.
+   *
+   * A column reference carries this on its origin (`nullExtended`), but a computed
+   * value — a literal, a `CAST`, a `CASE`, a `COALESCE`, a `count` — is printed by the
+   * join itself, whose `Output` is its inputs' concatenated, and the node is not under
+   * the nulled side. The entry is followed down the plan: at a join that nulls an input,
+   * an entry printing from a nulled input's output is nulled there; an entry from a
+   * preserved input is chased into that input, and an entry from no input was computed
+   * at the join, above the nulling, and is not nulled by it. Where the same entry prints
+   * from both a nulled and a preserved input the answer is the nulled one — the reader
+   * does not guess which side a value came from.
+   */
+  entryNullExtended(entry: string, node: ExplainPlanNode): boolean {
+    if (this.nulledNodes.has(node)) return true
+    const joinType = node['Join Type']
+    const nulled =
+      joinType === undefined ? null : (JOIN_TYPE_NULLED_SIDES.get(joinType) ?? BOTH_JOIN_SIDES)
+    const target = unwrap(entry)
+    let nulledHere = false
+    for (const child of inputChildren(node)) {
+      if (!this.emits(target, child)) continue
+      const relationship = child['Parent Relationship'] ?? 'Outer'
+      if (nulled !== null && nulled.has(relationship)) {
+        nulledHere = true
+        continue
+      }
+      if (this.entryNullExtended(entry, child)) return true
+    }
+    return nulledHere
+  }
+
+  /**
+   * Whether `node` or anything under it prints `target` in its select list. A node that
+   * projects prints the entry; a tuple-unioning node (`Append`, `Merge Append`) prints
+   * none of its own and hands its branches', so its branches are asked. The comparison
+   * is on the expression with its outer parentheses stripped, which `EXPLAIN` adds where
+   * it resolves an expression through a node (`('x'::text)` at a join over the
+   * `'x'::text` the scan under it prints).
+   */
+  private emits(target: string, node: ExplainPlanNode): boolean {
+    const output = node.Output ?? []
+    if (output.some((entry) => unwrap(entry) === target)) return true
+    if (output.length > 0) return false
+    return inputChildren(node).some((child) => this.emits(target, child))
+  }
 }
 
 /**
@@ -1339,6 +1387,13 @@ export interface PlanOrigins {
    * NULL where the expression does not, which `groupingSets` below says apart.
    */
   expressionNotNull: boolean[]
+  /**
+   * One entry per requested column: the value the select list spells — a base column or a
+   * computed one — can be NULL because an outer join nulls the side it comes from. A
+   * computed value is read by the same rule as a base one here, so a literal, a `CASE`,
+   * a `COALESCE` or a `count` from a nulled side is `true` just as a base column is.
+   */
+  entryNullExtended: boolean[]
   /** The plan computes `GROUPING SETS` / `ROLLUP` / `CUBE`, whose superaggregate row is all-NULL grouping columns. */
   groupingSets: boolean
   /**
@@ -1386,6 +1441,7 @@ export function readPlanOrigins(
 
   const readings: Reading[] = []
   const nullabilities: ExpressionNullability[] = []
+  const nullExtended: boolean[] = []
   if (SET_OPERATION_NODE_TYPES.has(selectListNode['Node Type'])) {
     const branches = inputChildren(selectListNode).map((child) => selectListNodeOf(child))
     if (branches.length === 0) return 'output-not-positional'
@@ -1406,6 +1462,9 @@ export function readPlanOrigins(
           )
         )
       )
+      nullExtended.push(
+        branches.some((branch) => reader.entryNullExtended(branch.Output?.[index] ?? '', branch))
+      )
     }
   } else {
     const output = selectListNode.Output
@@ -1413,6 +1472,7 @@ export function readPlanOrigins(
     for (const entry of output) {
       readings.push(reader.read(entry))
       nullabilities.push(reader.evaluateEntry(entry, selectListNode))
+      nullExtended.push(reader.entryNullExtended(entry, selectListNode))
     }
   }
 
@@ -1457,6 +1517,7 @@ export function readPlanOrigins(
         reading.origins.some((origin) => origin.nullExtended)
     ),
     expressionNotNull: nullabilities.map((state) => state === 'never-null'),
+    entryNullExtended: nullExtended,
     groupingSets,
     rowIdentities: readPlanKeys(root, selectListNode, context)
   }

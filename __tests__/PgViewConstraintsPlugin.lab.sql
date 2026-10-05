@@ -981,3 +981,37 @@ create view v_cte_recursive as
     select n.id, n.nul from need n join walk w on w.id = n.id
   )
   select id, nul from walk;
+
+-- ── A computed value from the nulled side of an outer join ──────────────────────
+--
+-- A relation with no base column — a literal, a `CAST`, a `CASE`, a `COALESCE`, an
+-- `IS` test — is printed by the join that nulls its input, and the join nulls it in
+-- every padded row. The expression rules must not claim it never NULL there, and a
+-- `UNION ALL` discriminator read from a nulled side is no discriminator.
+
+create view v_oj_expr_src as
+  select id, 'x'::text as c, '5'::int as n, (id is null) as f, (id is distinct from 0) as g,
+         case when id > 0 then 'y' else 'z' end as cs, coalesce(id, 7) as co, greatest(id, 1) as gr
+  from need;
+-- NEGATIVE: every computed column of the nulled side is NULL wherever the join pads.
+create view v_oj_expr as
+  select a.id as aid, s.c, s.n, s.f, s.g, s.cs, s.co, s.gr
+  from need a left join v_oj_expr_src s on s.id = a.id;
+-- NEGATIVE: a FULL join leaves both sides nullable.
+create view v_oj_full as
+  select a.id as aid, s.c, s.n from need a full join v_oj_expr_src s on s.id = a.id;
+-- POSITIVE: a literal computed above the join is not nulled by it.
+create view v_oj_above as
+  select a.id as aid, 'z'::text as lit from need a left join v_oj_expr_src s on s.id = a.id;
+-- POSITIVE: an expression over the preserved side is not nulled.
+create view v_oj_preserved as
+  select a.id as aid, coalesce(a.id, 0) as preserved from need a left join v_oj_expr_src s on s.id = a.id;
+
+-- NEGATIVE: a `UNION ALL` discriminator on the nulled side is no discriminator, and its
+-- column is NULL wherever the join pads.
+create view v_oj_union_src as
+  select 'a'::text as src, id, nn from need
+  union all
+  select 'b'::text, id, nn from need;
+create view v_oj_union as
+  select a.id as aid, u.src from need a left join v_oj_union_src u on u.id = a.id;

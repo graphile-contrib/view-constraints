@@ -1016,7 +1016,7 @@
           "notNull": true
         },
         "cur_code": {
-          "typeId": 152678199,
+          "typeId": 152745482,
           "typeMod": -1,
           "notNull": true
         }
@@ -1556,7 +1556,7 @@
           "notNull": false
         },
         "mystery_id": {
-          "typeId": 152679076,
+          "typeId": 152746359,
           "typeMod": -1,
           "notNull": false
         }
@@ -3598,6 +3598,209 @@
     },
     {
       "schema": "lab",
+      "relation": "v_oj_above",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "aid": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "lit": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_expr",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "aid": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "c": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "n": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "f": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "g": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "cs": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "co": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "gr": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_expr_src",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "id": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "c": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "n": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "f": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "g": {
+          "typeId": 16,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "cs": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "co": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "gr": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_full",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "aid": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "c": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "n": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_preserved",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "aid": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "preserved": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_union",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "aid": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "src": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_oj_union_src",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "columns": {
+        "src": {
+          "typeId": 25,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "id": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "nn": {
+          "typeId": 23,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_over_barrier",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -4682,7 +4885,7 @@
           "notNull": false
         },
         "ii": {
-          "typeId": 152679109,
+          "typeId": 152746391,
           "typeMod": -1,
           "notNull": false
         }
@@ -4787,8 +4990,8 @@
   "coercions": {
     "binary": ["1043>25", "25>1043"],
     "domainBase": {
-      "152678199": 25,
-      "152679109": 20
+      "152745482": 25,
+      "152746391": 20
     }
   },
   "strictEquality": true,
@@ -5704,6 +5907,48 @@
       "schema": "lab",
       "name": "v_nullable_unique",
       "columns": ["tag"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_above",
+      "columns": ["aid", "lit"],
+      "sources": ["lab.v_oj_expr_src"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_expr",
+      "columns": ["aid", "c", "n", "f", "g", "cs", "co", "gr"],
+      "sources": ["lab.v_oj_expr_src"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_expr_src",
+      "columns": ["id", "c", "n", "f", "g", "cs", "co", "gr"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_full",
+      "columns": ["aid", "c", "n"],
+      "sources": ["lab.v_oj_expr_src"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_preserved",
+      "columns": ["aid", "preserved"],
+      "sources": ["lab.v_oj_expr_src"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_union",
+      "columns": ["aid", "src"],
+      "sources": ["lab.v_oj_union_src"]
+    },
+    {
+      "schema": "lab",
+      "name": "v_oj_union_src",
+      "columns": ["src", "id", "nn"],
       "sources": []
     },
     {
@@ -7457,7 +7702,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152679076,
+          "typeId": 152746359,
           "typeMod": -1
         }
       ],
@@ -14903,6 +15148,555 @@
     },
     {
       "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        },
+        "3": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "f",
+          "relkind": "v"
+        },
+        "4": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "g",
+          "relkind": "v"
+        },
+        "5": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "cs",
+          "relkind": "v"
+        },
+        "6": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "co",
+          "relkind": "v"
+        },
+        "7": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "gr",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": [
+          "a.id",
+          "('x'::text)",
+          "(5)",
+          "((need.id IS NULL))",
+          "((need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(need.id, 7))",
+          "(GREATEST(need.id, 1))"
+        ],
+        "Join Type": "Right",
+        "Hash Cond": "(need.id = a.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": [
+              "need.id",
+              "'x'::text",
+              "5",
+              "(need.id IS NULL)",
+              "(need.id IS DISTINCT FROM 0)",
+              "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+              "COALESCE(need.id, 7)",
+              "GREATEST(need.id, 1)"
+            ],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["a.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "need.id",
+          "'x'::text",
+          "5",
+          "(need.id IS NULL)",
+          "(need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(need.id, 7)",
+          "GREATEST(need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(a.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["a.id", "a.nn", "a.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "COALESCE(a.id, 0)"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_union_src",
+          "column": "src",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "u": "v_oj_union_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('a'::text)"],
+        "Join Type": "Right",
+        "Hash Cond": "(need.id = a.id)",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'a'::text", "need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'b'::text", "need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "Member"
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["a.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "need.id", "need.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "need_1.id", "need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_barrier",
       "relkind": "v",
       "regime": "default",
@@ -18487,7 +19281,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152679109,
+          "typeId": 152746391,
           "typeMod": -1
         }
       ],
@@ -20042,7 +20836,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152679076,
+          "typeId": 152746359,
           "typeMod": -1
         }
       ],
@@ -27488,6 +28282,555 @@
     },
     {
       "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        },
+        "3": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "f",
+          "relkind": "v"
+        },
+        "4": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "g",
+          "relkind": "v"
+        },
+        "5": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "cs",
+          "relkind": "v"
+        },
+        "6": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "co",
+          "relkind": "v"
+        },
+        "7": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "gr",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": [
+          "a.id",
+          "('x'::text)",
+          "(5)",
+          "((need.id IS NULL))",
+          "((need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(need.id, 7))",
+          "(GREATEST(need.id, 1))"
+        ],
+        "Join Type": "Right",
+        "Hash Cond": "(need.id = a.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": [
+              "need.id",
+              "'x'::text",
+              "5",
+              "(need.id IS NULL)",
+              "(need.id IS DISTINCT FROM 0)",
+              "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+              "COALESCE(need.id, 7)",
+              "GREATEST(need.id, 1)"
+            ],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["a.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "need.id",
+          "'x'::text",
+          "5",
+          "(need.id IS NULL)",
+          "(need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(need.id, 7)",
+          "GREATEST(need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(a.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["a.id", "a.nn", "a.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "COALESCE(a.id, 0)"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_union_src",
+          "column": "src",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "u": "v_oj_union_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('a'::text)"],
+        "Join Type": "Right",
+        "Hash Cond": "(need.id = a.id)",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'a'::text", "need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'b'::text", "need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "Member"
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["a.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "need.id", "need.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "need_1.id", "need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_barrier",
       "relkind": "v",
       "regime": "serial",
@@ -31072,7 +32415,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152679109,
+          "typeId": 152746391,
           "typeMod": -1
         }
       ],
@@ -32812,7 +34155,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152679076,
+          "typeId": 152746359,
           "typeMod": -1
         }
       ],
@@ -41101,6 +42444,631 @@
     },
     {
       "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["a.id", "'z'::text"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["a.id", "'z'::text"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        },
+        "3": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "f",
+          "relkind": "v"
+        },
+        "4": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "g",
+          "relkind": "v"
+        },
+        "5": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "cs",
+          "relkind": "v"
+        },
+        "6": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "co",
+          "relkind": "v"
+        },
+        "7": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "gr",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Gather",
+        "Output": [
+          "a.id",
+          "('x'::text)",
+          "(5)",
+          "((need.id IS NULL))",
+          "((need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(need.id, 7))",
+          "(GREATEST(need.id, 1))"
+        ],
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": [
+              "a.id",
+              "('x'::text)",
+              "(5)",
+              "((need.id IS NULL))",
+              "((need.id IS DISTINCT FROM 0))",
+              "(CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+              "(COALESCE(need.id, 7))",
+              "(GREATEST(need.id, 1))"
+            ],
+            "Join Type": "Left",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(a.id = need.id)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.nn", "a.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": [
+                  "need.id",
+                  "('x'::text)",
+                  "(5)",
+                  "((need.id IS NULL))",
+                  "((need.id IS DISTINCT FROM 0))",
+                  "(CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+                  "(COALESCE(need.id, 7))",
+                  "(GREATEST(need.id, 1))"
+                ],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": [
+                      "need.id",
+                      "'x'::text",
+                      "5",
+                      "(need.id IS NULL)",
+                      "(need.id IS DISTINCT FROM 0)",
+                      "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+                      "COALESCE(need.id, 7)",
+                      "GREATEST(need.id, 1)"
+                    ],
+                    "Schema": "lab",
+                    "Relation Name": "need",
+                    "Alias": "need",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Gather",
+        "Output": [
+          "need.id",
+          "'x'::text",
+          "5",
+          "((need.id IS NULL))",
+          "((need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(need.id, 7))",
+          "(GREATEST(need.id, 1))"
+        ],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": [
+              "need.id",
+              "'x'::text",
+              "5",
+              "(need.id IS NULL)",
+              "(need.id IS DISTINCT FROM 0)",
+              "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+              "COALESCE(need.id, 7)",
+              "GREATEST(need.id, 1)"
+            ],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["a.id", "('x'::text)", "(5)"],
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["a.id", "('x'::text)", "(5)"],
+            "Join Type": "Full",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(a.id = need.id)",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.nn", "a.nul"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["need.id", "('x'::text)", "(5)"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["need.id", "'x'::text", "5"],
+                    "Schema": "lab",
+                    "Relation Name": "need",
+                    "Alias": "need",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["a.id", "(COALESCE(a.id, 0))"],
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["a.id", "COALESCE(a.id, 0)"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_union_src",
+          "column": "src",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "u": "v_oj_union_src"
+      },
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["a.id", "('a'::text)"],
+        "Plans": [
+          {
+            "Node Type": "Hash Join",
+            "Output": ["a.id", "('a'::text)"],
+            "Join Type": "Right",
+            "Parent Relationship": "Outer",
+            "Hash Cond": "(need.id = a.id)",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["'a'::text", "need.id"],
+                    "Schema": "lab",
+                    "Relation Name": "need",
+                    "Alias": "need",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["'b'::text", "need_1.id"],
+                    "Schema": "lab",
+                    "Relation Name": "need",
+                    "Alias": "need_1",
+                    "Parent Relationship": "Member"
+                  }
+                ]
+              },
+              {
+                "Node Type": "Hash",
+                "Output": ["a.id"],
+                "Parent Relationship": "Inner",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "need",
+                    "Alias": "a",
+                    "Parent Relationship": "Outer"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Gather",
+        "Output": ["('a'::text)", "need.id", "need.nn"],
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'a'::text", "need.id", "need.nn"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'b'::text", "need_1.id", "need_1.nn"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_barrier",
       "relkind": "v",
       "regime": "parallel-forced",
@@ -45102,7 +47070,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152679109,
+          "typeId": 152746391,
           "typeMod": -1
         }
       ],
@@ -46671,7 +48639,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152679076,
+          "typeId": 152746359,
           "typeMod": -1
         }
       ],
@@ -54236,6 +56204,555 @@
     },
     {
       "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        },
+        "3": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "f",
+          "relkind": "v"
+        },
+        "4": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "g",
+          "relkind": "v"
+        },
+        "5": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "cs",
+          "relkind": "v"
+        },
+        "6": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "co",
+          "relkind": "v"
+        },
+        "7": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "gr",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": [
+          "a.id",
+          "('x'::text)",
+          "(5)",
+          "((need.id IS NULL))",
+          "((need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(need.id, 7))",
+          "(GREATEST(need.id, 1))"
+        ],
+        "Join Type": "Right",
+        "Hash Cond": "(need.id = a.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": [
+              "need.id",
+              "'x'::text",
+              "5",
+              "(need.id IS NULL)",
+              "(need.id IS DISTINCT FROM 0)",
+              "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+              "COALESCE(need.id, 7)",
+              "GREATEST(need.id, 1)"
+            ],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["a.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "need.id",
+          "'x'::text",
+          "5",
+          "(need.id IS NULL)",
+          "(need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(need.id, 7)",
+          "GREATEST(need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(a.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["a.id", "a.nn", "a.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "COALESCE(a.id, 0)"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_union_src",
+          "column": "src",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "u": "v_oj_union_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('a'::text)"],
+        "Join Type": "Right",
+        "Hash Cond": "(need.id = a.id)",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'a'::text", "need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'b'::text", "need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "Member"
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["a.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "need.id", "need.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "need_1.id", "need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_barrier",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -57850,7 +60367,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152679109,
+          "typeId": 152746391,
           "typeMod": -1
         }
       ],
@@ -59405,7 +61922,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152679076,
+          "typeId": 152746359,
           "typeMod": -1
         }
       ],
@@ -66701,6 +69218,555 @@
     },
     {
       "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        },
+        "3": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "f",
+          "relkind": "v"
+        },
+        "4": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "g",
+          "relkind": "v"
+        },
+        "5": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "cs",
+          "relkind": "v"
+        },
+        "6": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "co",
+          "relkind": "v"
+        },
+        "7": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "gr",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": [
+          "a.id",
+          "('x'::text)",
+          "(5)",
+          "((need.id IS NULL))",
+          "((need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(need.id, 7))",
+          "(GREATEST(need.id, 1))"
+        ],
+        "Join Type": "Right",
+        "Hash Cond": "(need.id = a.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": [
+              "need.id",
+              "'x'::text",
+              "5",
+              "(need.id IS NULL)",
+              "(need.id IS DISTINCT FROM 0)",
+              "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+              "COALESCE(need.id, 7)",
+              "GREATEST(need.id, 1)"
+            ],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["a.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "need.id",
+          "'x'::text",
+          "5",
+          "(need.id IS NULL)",
+          "(need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(need.id, 7)",
+          "GREATEST(need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(a.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["a.id", "a.nn", "a.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "COALESCE(a.id, 0)"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_union_src",
+          "column": "src",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "u": "v_oj_union_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('a'::text)"],
+        "Join Type": "Right",
+        "Hash Cond": "(need.id = a.id)",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'a'::text", "need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'b'::text", "need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "Member"
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["a.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "need.id", "need.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "need_1.id", "need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_barrier",
       "relkind": "v",
       "regime": "no-sort",
@@ -70273,7 +73339,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152679109,
+          "typeId": 152746391,
           "typeMod": -1
         }
       ],
@@ -71844,7 +74910,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152679076,
+          "typeId": 152746359,
           "typeMod": -1
         }
       ],
@@ -79404,6 +82470,569 @@
     },
     {
       "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Bitmap Heap Scan",
+        "Output": ["a.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a",
+        "Plans": [
+          {
+            "Node Type": "Bitmap Index Scan",
+            "Parent Relationship": "Outer",
+            "Index Name": "need_pkey"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        },
+        "3": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "f",
+          "relkind": "v"
+        },
+        "4": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "g",
+          "relkind": "v"
+        },
+        "5": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "cs",
+          "relkind": "v"
+        },
+        "6": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "co",
+          "relkind": "v"
+        },
+        "7": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "gr",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": [
+          "a.id",
+          "('x'::text)",
+          "(5)",
+          "((need.id IS NULL))",
+          "((need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(need.id, 7))",
+          "(GREATEST(need.id, 1))"
+        ],
+        "Join Type": "Left",
+        "Merge Cond": "(a.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Index Only Scan",
+            "Output": ["a.id"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer",
+            "Index Name": "need_pkey"
+          },
+          {
+            "Node Type": "Index Only Scan",
+            "Output": [
+              "need.id",
+              "'x'::text",
+              "5",
+              "(need.id IS NULL)",
+              "(need.id IS DISTINCT FROM 0)",
+              "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+              "COALESCE(need.id, 7)",
+              "GREATEST(need.id, 1)"
+            ],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Inner",
+            "Index Name": "need_pkey"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Bitmap Heap Scan",
+        "Output": [
+          "need.id",
+          "'x'::text",
+          "5",
+          "(need.id IS NULL)",
+          "(need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(need.id, 7)",
+          "GREATEST(need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need",
+        "Plans": [
+          {
+            "Node Type": "Bitmap Index Scan",
+            "Parent Relationship": "Outer",
+            "Index Name": "need_pkey"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Merge Join",
+        "Output": ["a.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Merge Cond": "(a.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Index Only Scan",
+            "Output": ["a.id"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer",
+            "Index Name": "need_pkey"
+          },
+          {
+            "Node Type": "Index Only Scan",
+            "Output": ["need.id", "'x'::text", "5"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Inner",
+            "Index Name": "need_pkey"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Bitmap Heap Scan",
+        "Output": ["a.id", "COALESCE(a.id, 0)"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a",
+        "Plans": [
+          {
+            "Node Type": "Bitmap Index Scan",
+            "Parent Relationship": "Outer",
+            "Index Name": "need_pkey"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_union_src",
+          "column": "src",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "u": "v_oj_union_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('a'::text)"],
+        "Join Type": "Right",
+        "Hash Cond": "(need.id = a.id)",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'a'::text", "need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Member",
+                "Index Name": "need_pkey"
+              },
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'b'::text", "need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "Member",
+                "Index Name": "need_pkey"
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["a.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["a.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer",
+                "Index Name": "need_pkey"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "need.id", "need.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "need_1.id", "need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_barrier",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -83138,7 +86767,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152679109,
+          "typeId": 152746391,
           "typeMod": -1
         }
       ],
@@ -84681,7 +88310,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152679076,
+          "typeId": 152746359,
           "typeMod": -1
         }
       ],
@@ -91780,6 +95409,545 @@
     },
     {
       "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        },
+        "3": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "f",
+          "relkind": "v"
+        },
+        "4": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "g",
+          "relkind": "v"
+        },
+        "5": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "cs",
+          "relkind": "v"
+        },
+        "6": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "co",
+          "relkind": "v"
+        },
+        "7": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "gr",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": [
+          "a.id",
+          "('x'::text)",
+          "(5)",
+          "((need.id IS NULL))",
+          "((need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(need.id, 7))",
+          "(GREATEST(need.id, 1))"
+        ],
+        "Join Type": "Left",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["a.id", "a.nn", "a.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Index Only Scan",
+            "Output": [
+              "need.id",
+              "'x'::text",
+              "5",
+              "(need.id IS NULL)",
+              "(need.id IS DISTINCT FROM 0)",
+              "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+              "COALESCE(need.id, 7)",
+              "GREATEST(need.id, 1)"
+            ],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Inner",
+            "Index Name": "need_pkey",
+            "Index Cond": "(need.id = a.id)"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "need.id",
+          "'x'::text",
+          "5",
+          "(need.id IS NULL)",
+          "(need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(need.id, 7)",
+          "GREATEST(need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(a.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["a.id", "a.nn", "a.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "COALESCE(a.id, 0)"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_union_src",
+          "column": "src",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "u": "v_oj_union_src"
+      },
+      "plan": {
+        "Node Type": "Nested Loop",
+        "Output": ["a.id", "('a'::text)"],
+        "Join Type": "Left",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["a.id", "a.nn", "a.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'a'::text", "need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Member",
+                "Index Name": "need_pkey",
+                "Index Cond": "(need.id = a.id)"
+              },
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["'b'::text", "need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "Member",
+                "Index Name": "need_pkey",
+                "Index Cond": "(need_1.id = a.id)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "need.id", "need.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "need_1.id", "need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_barrier",
       "relkind": "v",
       "regime": "nestloop-only",
@@ -95294,7 +99462,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152679109,
+          "typeId": 152746391,
           "typeMod": -1
         }
       ],
@@ -96849,7 +101017,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 152679076,
+          "typeId": 152746359,
           "typeMod": -1
         }
       ],
@@ -104271,6 +108439,555 @@
     },
     {
       "schema": "lab",
+      "view": "v_oj_above",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "lit",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "'z'::text"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        },
+        "3": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "f",
+          "relkind": "v"
+        },
+        "4": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "g",
+          "relkind": "v"
+        },
+        "5": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "cs",
+          "relkind": "v"
+        },
+        "6": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "co",
+          "relkind": "v"
+        },
+        "7": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "gr",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": [
+          "a.id",
+          "('x'::text)",
+          "(5)",
+          "((need.id IS NULL))",
+          "((need.id IS DISTINCT FROM 0))",
+          "(CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END)",
+          "(COALESCE(need.id, 7))",
+          "(GREATEST(need.id, 1))"
+        ],
+        "Join Type": "Right",
+        "Hash Cond": "(need.id = a.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": [
+              "need.id",
+              "'x'::text",
+              "5",
+              "(need.id IS NULL)",
+              "(need.id IS DISTINCT FROM 0)",
+              "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+              "COALESCE(need.id, 7)",
+              "GREATEST(need.id, 1)"
+            ],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["a.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_expr_src",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "f",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "g",
+          "typeId": 16,
+          "typeMod": -1
+        },
+        {
+          "name": "cs",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "co",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "gr",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": [
+          "need.id",
+          "'x'::text",
+          "5",
+          "(need.id IS NULL)",
+          "(need.id IS DISTINCT FROM 0)",
+          "CASE WHEN (need.id > 0) THEN 'y'::text ELSE 'z'::text END",
+          "COALESCE(need.id, 7)",
+          "GREATEST(need.id, 1)"
+        ],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "need"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_full",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "c",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "c",
+          "relkind": "v"
+        },
+        "2": {
+          "schema": "lab",
+          "relation": "v_oj_expr_src",
+          "column": "n",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('x'::text)", "(5)"],
+        "Join Type": "Full",
+        "Hash Cond": "(a.id = need.id)",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["a.id", "a.nn", "a.nul"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "a",
+            "Parent Relationship": "Outer"
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["need.id", "('x'::text)", "(5)"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["need.id", "'x'::text", "5"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_preserved",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "preserved",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "s": "v_oj_expr_src"
+      },
+      "plan": {
+        "Node Type": "Seq Scan",
+        "Output": ["a.id", "COALESCE(a.id, 0)"],
+        "Schema": "lab",
+        "Relation Name": "need",
+        "Alias": "a"
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "aid",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "need",
+          "column": "id",
+          "relkind": "r"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_oj_union_src",
+          "column": "src",
+          "relkind": "v"
+        }
+      },
+      "viewAliases": {
+        "a": "need",
+        "u": "v_oj_union_src"
+      },
+      "plan": {
+        "Node Type": "Hash Join",
+        "Output": ["a.id", "('a'::text)"],
+        "Join Type": "Right",
+        "Hash Cond": "(need.id = a.id)",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'a'::text", "need.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["'b'::text", "need_1.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "need_1",
+                "Parent Relationship": "Member"
+              }
+            ]
+          },
+          {
+            "Node Type": "Hash",
+            "Output": ["a.id"],
+            "Parent Relationship": "Inner",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id"],
+                "Schema": "lab",
+                "Relation Name": "need",
+                "Alias": "a",
+                "Parent Relationship": "Outer"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_oj_union_src",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "src",
+          "typeId": 25,
+          "typeMod": -1
+        },
+        {
+          "name": "id",
+          "typeId": 23,
+          "typeMod": -1
+        },
+        {
+          "name": "nn",
+          "typeId": 23,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "viewAliases": {
+        "need": "need"
+      },
+      "plan": {
+        "Node Type": "Append",
+        "Plans": [
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'a'::text", "need.id", "need.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need",
+            "Parent Relationship": "Member"
+          },
+          {
+            "Node Type": "Seq Scan",
+            "Output": ["'b'::text", "need_1.id", "need_1.nn"],
+            "Schema": "lab",
+            "Relation Name": "need",
+            "Alias": "need_1",
+            "Parent Relationship": "Member"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_barrier",
       "relkind": "v",
       "regime": "genetic-join-order",
@@ -107855,7 +112572,7 @@
         },
         {
           "name": "ii",
-          "typeId": 152679109,
+          "typeId": 152746391,
           "typeMod": -1
         }
       ],
