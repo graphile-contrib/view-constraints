@@ -23,10 +23,10 @@ import {
   explainStatement,
   readCatalogRelations,
   readRelationOids,
+  readShadowedNames,
   readStrictEquality,
   readTables,
   readTypeCoercions,
-  readViewObjectNames,
   readViewTrees,
   readViews,
   readViewSources,
@@ -135,8 +135,9 @@ await lab.query(readFileSync(LAB_SQL, 'utf8'))
 const catalog = await readCatalogRelations(runQueryOn(lab))
 const coercions = await readTypeCoercions(runQueryOn(lab))
 const strictEquality = await readStrictEquality(runQueryOn(lab))
-// The user objects each lab view names, per view: which rule spellings it shadows.
-const viewObjects = await readViewObjectNames(runQueryOn(lab))
+// The rule spellings a user object has taken over in the lab: the names whose rule
+// stands down database-wide.
+const shadowedNames = [...(await readShadowedNames(runQueryOn(lab)))].sort()
 // Each view's stored rewrite tree: its CTE columns and the base column each of its own
 // columns came from.
 const viewTrees = await readViewTrees(runQueryOn(lab), ['lab'])
@@ -243,12 +244,7 @@ writeFileSync(
         )
       },
       strictEquality,
-      viewObjects: Object.fromEntries(
-        [...viewObjects]
-          .filter(([key]) => key.startsWith('lab.'))
-          .sort(([left], [right]) => left.localeCompare(right))
-          .map(([key, names]) => [key, [...names].sort()])
-      ),
+      shadowedNames,
       tables,
       viewSources,
       views: planned

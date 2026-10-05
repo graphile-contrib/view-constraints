@@ -242,56 +242,23 @@ const RULE_SPELLINGS = [
   'character varying'
 ]
 
-// The user-defined (non-built-in) functions, operators and types each view's defining
-// query names, read from the dependency edges PostgreSQL records on the view's rewrite
-// rule. A built-in object is pinned — it sits below the first normal object id — and
-// leaves no such row, so what is here is exactly the objects a user created: the ones
-// that can take a built-in's spelling and be printed by it in the plan. The rule a
-// spelling carries stands down for a view that (or whose defining views) depend on a
-// user object with that spelling, and for no other view — a user `count` in another
-// schema, or another view, leaves the built-in `count` alone.
-const VIEW_OBJECTS_QUERY = `
-  SELECT namespace.nspname AS schema,
-         class.relname     AS view,
-         procedure.proname AS name
-  FROM pg_depend dependency
-           JOIN pg_rewrite rule ON rule.oid = dependency.objid
-           JOIN pg_class class ON class.oid = rule.ev_class
-           JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
-           JOIN pg_proc procedure ON procedure.oid = dependency.refobjid
-  WHERE dependency.classid = 'pg_rewrite'::regclass
-    AND dependency.refclassid = 'pg_proc'::regclass
-    AND procedure.oid >= 16384
-    AND class.relkind IN ('v', 'm')
-    AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+// The user-defined (non-built-in) functions, operators and types the database holds
+// under a spelling the rules lean on, read from the whole catalog. A built-in object
+// is pinned — it sits below the first normal object id — so every row here is an
+// object a user created: one that can take a built-in's spelling and be printed by it
+// in a plan. A plan prints a name, not an oid, so a user `count`, or a user type
+// spelled `integer`, printed where the built-in's name would be looks exactly like the
+// built-in, and the rule it does not obey has to stand down. The stand-down is taken
+// over the whole database and not over one view's dependencies: a user object a view
+// reaches only through an inlined function's body leaves no dependency edge on the
+// view, so a per-view set would miss it and trust the built-in's name for someone
+// else's object.
+const SHADOWED_NAMES_QUERY = `
+  SELECT proname AS name FROM pg_proc WHERE oid >= 16384 AND proname = ANY ($1)
   UNION
-  SELECT namespace.nspname AS schema,
-         class.relname     AS view,
-         operator.oprname  AS name
-  FROM pg_depend dependency
-           JOIN pg_rewrite rule ON rule.oid = dependency.objid
-           JOIN pg_class class ON class.oid = rule.ev_class
-           JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
-           JOIN pg_operator operator ON operator.oid = dependency.refobjid
-  WHERE dependency.classid = 'pg_rewrite'::regclass
-    AND dependency.refclassid = 'pg_operator'::regclass
-    AND operator.oid >= 16384
-    AND class.relkind IN ('v', 'm')
-    AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')
+  SELECT oprname FROM pg_operator WHERE oid >= 16384 AND oprname = ANY ($1)
   UNION
-  SELECT namespace.nspname AS schema,
-         class.relname     AS view,
-         type.typname      AS name
-  FROM pg_depend dependency
-           JOIN pg_rewrite rule ON rule.oid = dependency.objid
-           JOIN pg_class class ON class.oid = rule.ev_class
-           JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
-           JOIN pg_type type ON type.oid = dependency.refobjid
-  WHERE dependency.classid = 'pg_rewrite'::regclass
-    AND dependency.refclassid = 'pg_type'::regclass
-    AND type.oid >= 16384
-    AND class.relkind IN ('v', 'm')
-    AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')`
+  SELECT typname FROM pg_type WHERE oid >= 16384 AND typname = ANY ($1)`
 
 // The stored analysed body of each view (`pg_node_tree`), read for the facts the plan
 // cannot state: the column names of every `WITH` query, and the base relation and
@@ -462,39 +429,10 @@ export async function readStrictEquality(query: RunQuery): Promise<boolean> {
   return row?.strict === true
 }
 
-/**
- * The rule spellings a user object has taken over in a view and the views it is built
- * on: what the view's defining query names, transitively, intersected with the
- * spellings the rules lean on.
- *
- * `objects` are the user objects each view names directly (`readViewObjectNames`),
- * `views` the views each is built on (`readViewSources`). The closure is taken over
- * the view's own sources because PostgreSQL flattens a view into the query above it,
- * so a plan for the outer view prints the inner view's functions and types — and a
- * user object of an inner view shadows the spelling for the outer one too.
- */
-export function ruleSpellingsShadowedFor(
-  views: readonly ViewSourceRow[],
-  objects: ReadonlyMap<string, ReadonlySet<string>>,
-  schema: string,
-  name: string
-): Set<string> {
-  const byKey = new Map(views.map((view) => [`${view.schema}.${view.name}`, view]))
-  const reached = new Set<string>()
-  const queue = [`${schema}.${name}`]
-  while (queue.length > 0) {
-    const key = queue.pop()
-    if (key === undefined || reached.has(key)) continue
-    reached.add(key)
-    queue.push(...(byKey.get(key)?.sources ?? []))
-  }
-  const shadowed = new Set<string>()
-  for (const key of reached) {
-    for (const object of objects.get(key) ?? []) {
-      if (RULE_SPELLINGS.includes(object)) shadowed.add(object)
-    }
-  }
-  return shadowed
+/** The rule spellings a user object has taken over somewhere in the database. */
+export async function readShadowedNames(query: RunQuery): Promise<Set<string>> {
+  const rows = await query<{ name: string }>(SHADOWED_NAMES_QUERY, [RULE_SPELLINGS])
+  return new Set(rows.map((row) => row.name))
 }
 
 /** What a plan reader asks of the catalog, out of what `readCatalogRelations` read. */
@@ -563,19 +501,6 @@ export interface ViewSourceRow {
 
 export async function readViewSources(query: RunQuery): Promise<readonly ViewSourceRow[]> {
   return query<ViewSourceRow>(VIEW_SOURCE_QUERY)
-}
-
-/** The user objects each view's defining query names, by `schema.view`. */
-export async function readViewObjectNames(query: RunQuery): Promise<Map<string, Set<string>>> {
-  const rows = await query<{ schema: string; view: string; name: string }>(VIEW_OBJECTS_QUERY)
-  const objects = new Map<string, Set<string>>()
-  for (const row of rows) {
-    const key = `${row.schema}.${row.view}`
-    const names = objects.get(key)
-    if (names) names.add(row.name)
-    else objects.set(key, new Set([row.name]))
-  }
-  return objects
 }
 
 /** What a view's stored rewrite tree says: its CTE columns and its columns' origins. */
@@ -855,7 +780,7 @@ export async function collectViewConstraints(
   const strictEquality = await readStrictEquality(query)
   const coercions = await readTypeCoercions(query)
   const viewSources = await readViewSources(query)
-  const viewObjects = await readViewObjectNames(query)
+  const shadowedNames = await readShadowedNames(query)
   const viewTrees = await readViewTrees(query, schemas)
   const relationOids = await readRelationOids(query)
   const views = await readViews(query, schemas)
@@ -909,7 +834,7 @@ export async function collectViewConstraints(
         planCatalogFrom(
           catalog,
           strictEquality,
-          ruleSpellingsShadowedFor(viewSources, viewObjects, view.schema, view.view),
+          shadowedNames,
           facts?.cteColumns ?? new Map(),
           resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map()),
           facts?.cteMaterialized ?? new Map(),

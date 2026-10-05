@@ -46,6 +46,13 @@ is only used to show the join does not multiply rows: whether the planner keeps 
 read across a cast. Only a key that is one base relation's own can be the target
 of a relation to a projection.
 
+The reader keeps at most 64 keys per node and assembles a key from at most 4 relations
+(`KEYS_PER_NODE`, `RELATIONS_PER_KEY` in `plan-keys.ts`). Both are caps on how much work
+one plan may be asked for, not on what is true: a key beyond them is missed, never
+claimed. A view whose rows are told apart only by a wider key, or by more relations
+together, is left without a derived `@primaryKey` or `@unique`, and the plan proves
+nothing false.
+
 ## Uniqueness
 
 Where the plan proves a set of the view's columns no two rows share but that set is
@@ -123,23 +130,24 @@ defines to answer a value for every input of the other — the exact numbers, th
 types. `jsonb` to `integer` and a user `CREATE CAST` are not, and may answer `NULL`,
 and neither is a cast to a type a user has named after one of those, whose name is
 then no promise at all.
-Whether a spelling is shadowed is a question about **this** view and not about the
-database as a whole. The plan prints a name, not an oid, so the plugin asks the
-catalog which user-defined objects the view's defining query names: the rewrite rule
-records a dependency on every non-built-in function, operator and type it uses
-(`pg_depend`; a built-in is pinned and leaves no such row), and the answer is taken
-over those objects and those of every view the view is built on, since a view is
-flattened into the query above it and the plan prints the inner view's objects too.
-A rule stands down for the view that names a user object with its spelling, and for no
-other: a user `count`, `+` or type `integer` elsewhere in the database — in another
-schema, or another view — leaves the built-in's rule in force. The resolution is at
-the object, not the individual call: the plan prints a name, and a view that names a
-user `count` anywhere stands the `count` rule down wherever that name is printed in
-its plan, which is the conservative reading. Where the deparser had to qualify a
-call because a same-named function shadows the built-in in the search path, it prints
-the built-in as `pg_catalog.count(…)`; that qualified spelling **is** the built-in, so
-its rule holds there whatever the view's own objects say, while a call under any other
-schema is that schema's function and claims nothing.
+Whether a spelling is shadowed is a question about the **whole database**, not about
+one view. The plan prints a name, not an oid, so a user object can take a built-in's
+spelling and be printed exactly like it; and a view can reach such an object without
+naming it — a user function PostgreSQL inlines carries its own body's objects into the
+view's plan, while the view's rewrite rule records the function alone (`pg_depend`
+records the objects a view names directly; an inlined function's body leaves no such
+row). So the plugin asks the catalog which non-built-in functions, operators and types
+the database holds under a spelling the rules lean on, and any object under such a
+spelling stands its rule down. A user `count`, `+` or type `integer` anywhere in the
+database stands the rule down for every view — an under-count on purpose, so that no
+view is left trusting the built-in's name for someone else's object. The resolution is
+at the object, not the individual call: the plan prints a name, and a name a user
+object has taken stands the rule down wherever it is printed. Where the deparser had
+to qualify a call because a same-named function shadows the built-in in the search
+path, it prints the built-in as `pg_catalog.count(…)`; that qualified spelling **is**
+the built-in — the object is named, not spelled — so its rule holds there whatever
+user objects exist, while a call under any other schema is that schema's function and
+claims nothing.
 An entry that does not parse is `unknown` too — the reader never
 guesses. The same answer holds across a union's branches (a column is never `NULL`
 only where every branch proves it), across a crossed view boundary, and below an
@@ -194,7 +202,11 @@ judged by the plan. Where both name a base column for the same view column and t
 not the same, the column is refused (`plan-and-tree-disagree`) rather than either
 trusted; the tree names a view where the column came through one, and is left out of the
 comparison then, since that boundary is exactly the step the plan crosses and the tree
-does not. The tree also names every range-table alias of the view's relations (`:alias`,
+does not. The tree is the current definition — `CREATE OR REPLACE VIEW` rewrites
+`pg_rewrite.ev_action`, so it is read afresh on every schema build and never from a stale
+copy — and where it disagrees with the plan the column is refused whole: no non-nullness,
+no key and no relation, since nothing says which of the two is the outdated one. The tree
+also names every range-table alias of the view's relations (`:alias`,
 `:relid`), so a source view the query referred to by an explicit alias
 (`FROM deposit.v bank_range`) is a boundary the reader crosses too — PostgreSQL spells
 such a subquery's node with the alias, not the view's name, and the tree is what turns

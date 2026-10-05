@@ -488,6 +488,10 @@ export function deriveViewConstraints(
   // two are never mixed. The tree names a view rather than a base table where the column
   // came through one, and is left out of the comparison then: a view boundary is exactly
   // the step the plan crosses to the base column and the tree does not.
+  // A column the plan and the tree name differently is refused whole below — no
+  // non-nullness, no key and no relation — so the tree, which may be the side in the
+  // wrong, is not read for it in any of those passes.
+  const disagreed = new Set<number>()
   for (let index = 0; index < columns.length; index++) {
     const sources = origins[index]
     const tree = treeColumns.get(index)
@@ -502,6 +506,7 @@ export function deriveViewConstraints(
     ) {
       origins[index] = null
       columnRefusals[index] = 'plan-and-tree-disagree'
+      disagreed.add(index)
     }
   }
 
@@ -532,6 +537,7 @@ export function deriveViewConstraints(
     const viewColumn = columns[index]
     if (viewColumn === undefined) continue
     if (relkind !== 'v') continue
+    if (disagreed.has(index)) continue
     const sources = plan.columns[index]
     if (sources && sources.length > 0) {
       if (plan.nullIntroduced[index] !== false) continue
@@ -678,10 +684,12 @@ export function deriveViewConstraints(
   // `WITH` queries alike — and a bare reference to a base column carries its foreign
   // keys. Only the columns the plan left without a source are read this way, and only
   // for a relation: the tree says nothing of non-nullness, and a column whose value the
-  // plan did read is judged by the plan.
+  // plan did read is judged by the plan. A column the plan and the tree disagreed on is
+  // left out: it was refused whole above, and the tree is the side that may be wrong.
   for (let index = 0; index < columns.length; index++) {
     const viewColumn = columns[index]
     if (viewColumn === undefined || origins[index] !== null) continue
+    if (disagreed.has(index)) continue
     const tree = treeColumns.get(index)
     if (!tree) continue
     const origin: ColumnOrigin = {

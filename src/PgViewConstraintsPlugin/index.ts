@@ -20,10 +20,11 @@
 // constraint the rest of PostGraphile understands — does the rest.
 //
 // `@notNull` on a column is the same derivation over one column instead of a key: the
-// base column is NOT NULL in `pg_attribute` and no shape of the plan — an outer join,
-// a `UNION` branch of NULLs, a `GROUPING SETS` superaggregate row — puts a NULL over
-// it. That is the whole rule; no expression is read, so everything a parser would
-// recover stays nullable. That is why this
+// base column is NOT NULL in `pg_attribute` and no shape of the plan — an outer join, a
+// `UNION` branch of NULLs, a `GROUPING SETS` superaggregate row — puts a NULL over it;
+// or the column is a computed one, no base column to ask, and the select-list expression
+// itself proves the value never NULL (`plan-expressions.ts`), by shapes whose SQL
+// definition is the claim and not by any function's name or strictness. That is why this
 // plugin runs `after: ['smart-tags']` and `before: ['PgFakeConstraintsPlugin']`, on the
 // same `pgIntrospection_introspection` hook: the tag has to exist by the time fake
 // constraints are built, and the view's own tags have to be readable to compare with.

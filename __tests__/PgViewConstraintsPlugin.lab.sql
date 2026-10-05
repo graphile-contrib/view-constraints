@@ -719,32 +719,6 @@ create view v_group_count_rollup as
   select id, count(*) as n, count(bank_id) as some_n from tx group by rollup (id);
 create view v_group_count_cube as select id, count(*) as n from tx group by cube (id);
 
--- ── A user object taking a built-in spelling ────────────────────────────────────
---
--- The non-nullness rules read a function's, an operator's or a type's name off the
--- plan, and a user object that takes a built-in spelling is printed by it. The rule
--- the spelling carries stands down for the view that names that object (and the views
--- built on it), and for no other: the many views above that call the built-in `count`,
--- `+` and `integer` keep their rules.
-
-create function lab.count(integer) returns integer
-  language plpgsql immutable as $$ begin if $1 < 0 then return null; end if; return $1; end $$;
-create function lab.plus(bigint, bigint) returns bigint
-  language plpgsql immutable as $$ begin if $1 < 0 then return null; end if; return $1 + $2; end $$;
-create operator lab.+ (leftarg = bigint, rightarg = bigint, function = lab.plus);
-create domain lab.integer as bigint;
-
--- NEGATIVE: a user `count` under a name the rules know: the column it fills is not
--- claimed non-null, and neither is the one a view built on this one fills.
-create view v_user_count as select id, lab.count(amount::integer) as c from tx;
-create view v_over_user_count as select id, c from v_user_count;
--- NEGATIVE: a user `+` whose function may answer NULL stands the whitelisted operator
--- rule down.
-create view v_user_operator as select id, (id operator(lab.+) 1) as plus from tx;
--- NEGATIVE: a user type spelled `integer` is no longer the built-in's promise: the
--- cast the family rule would have trusted stands down for the view that names it.
-create view v_user_type as select id, coalesce(amount, 0)::lab.integer as ii from tx;
-
 -- ── A `WITH` name at two query levels ───────────────────────────────────────────
 --
 -- The plan spells a `CTE Scan` with the `WITH` query's own name and never says which

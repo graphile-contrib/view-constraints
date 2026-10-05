@@ -39,7 +39,6 @@ import type {
 import {
   collectViewConstraints,
   NO_PRIVILEGED_CONNECTION_REASON,
-  ruleSpellingsShadowedFor,
   subqueryViewCandidates,
   planCatalogFrom
 } from '../src/PgViewConstraintsPlugin/collect.ts'
@@ -72,8 +71,8 @@ interface Fixture {
   coercions: { binary: string[]; domainBase: Record<string, number> }
   /** Every `=` operator of the lab database is strict. */
   strictEquality: boolean
-  /** The user objects each lab view names directly: `schema.view` → object names. */
-  viewObjects: Record<string, string[]>
+  /** The rule spellings a user object has taken over somewhere in the lab database. */
+  shadowedNames: string[]
   /** Every lab table, each a referencing half of a relation to a projection. */
   tables: { schema: string; table: string }[]
   /** Every lab view's select-list order and the views it is built on. */
@@ -119,14 +118,11 @@ const catalog = new Map<string, CatalogRelation>(
   ])
 )
 
-const planCatalog = planCatalogFrom(catalog, fixture.strictEquality)
+// The rule spellings a user object has taken over across the lab database: the same
+// set for every view, since a plan prints a name and not the object it stands for.
+const shadowedNames = new Set(fixture.shadowedNames ?? [])
 
-/** The rule spellings each lab view shadows, off the objects it lists and its sources. */
-const viewObjects = new Map<string, Set<string>>(
-  Object.entries(fixture.viewObjects ?? {}).map(([key, names]) => [key, new Set(names)])
-)
-const shadowedFor = (schema: string, view: string): Set<string> =>
-  ruleSpellingsShadowedFor(fixture.viewSources as ViewSourceRow[], viewObjects, schema, view)
+const planCatalog = planCatalogFrom(catalog, fixture.strictEquality, shadowedNames)
 
 const coercions: TypeCoercions = {
   binary: new Set(fixture.coercions.binary),
@@ -154,7 +150,8 @@ const REGIMES = [...new Set(fixture.views.map((view) => view.regime))]
 /** What one lab view's derivation reduces to, in the shape the cases are written in. */
 function derive(
   name: string,
-  regime: string = DEFAULT_REGIME
+  regime: string = DEFAULT_REGIME,
+  shadowed: ReadonlySet<string> = shadowedNames
 ): {
   origins: string[] | null
   notNull: string[]
@@ -194,7 +191,7 @@ function derive(
       planCatalogFrom(
         catalog,
         fixture.strictEquality,
-        shadowedFor(view.schema, view.view),
+        shadowed,
         cteColumns,
         cteOrigins,
         cteMaterialized,
@@ -560,45 +557,6 @@ const CASES: Case[] = [
     notNull: ['n'],
     foreignKeys: ['(id) references lab.tx (id)'],
     primaryKey: null
-  },
-  {
-    view: 'v_user_count',
-    about:
-      'a user function taking the name `count` is printed like the built-in, so the ' +
-      'count rule stands down for the view that names it — the column is not claimed',
-    origins: ['id=tx.id', 'c=—'],
-    notNull: ['id'],
-    foreignKeys: ['(id) references lab.tx (id)'],
-    primaryKey: 'id'
-  },
-  {
-    view: 'v_over_user_count',
-    about:
-      'and for a view built on the one that names it, whose plan prints the same ' + 'function',
-    origins: ['id=tx.id', 'c=—'],
-    notNull: ['id'],
-    foreignKeys: ['(id) references lab.tx (id)'],
-    primaryKey: 'id'
-  },
-  {
-    view: 'v_user_operator',
-    about:
-      'a user `+` whose function may answer NULL stands the whitelisted operator rule ' +
-      'down for the view that uses it',
-    origins: ['id=tx.id', 'plus=—'],
-    notNull: ['id'],
-    foreignKeys: ['(id) references lab.tx (id)'],
-    primaryKey: 'id'
-  },
-  {
-    view: 'v_user_type',
-    about:
-      'a user type spelled `integer` is no longer the built-in family’s promise, so ' +
-      'the cast that would have been trusted stands down',
-    origins: ['id=tx.id', 'ii=—'],
-    notNull: ['id'],
-    foreignKeys: ['(id) references lab.tx (id)'],
-    primaryKey: 'id'
   },
   {
     view: 'v_not_null_predicate',
@@ -2229,22 +2187,63 @@ test('where the plan and the stored tree name different base columns, the column
   assert.equal(derived.columns[0], 'id')
   assert.equal(derived.origins?.[0], null)
   assert.equal(derived.columnRefusals[0], 'plan-and-tree-disagree')
+  // The column is refused whole: the tree side, which named `currency.code` for it, is
+  // not read for a foreign key either, and the column is not non-null.
+  assert.deepEqual(
+    derived.foreignKeys.map((foreignKey) => foreignKey.tag),
+    ['(cur_code) references lab.currency (code)']
+  )
+  assert.deepEqual(derived.notNullColumns, ['cur_code'])
   // A column with no tree entry is left exactly as the plan read it.
   assert.ok(derived.origins?.[1])
 })
 
-test('a user object shadows a rule spelling for its view and the views built on it, and no other', () => {
-  const shadowedOf = (view: string): string[] => [...shadowedFor('lab', view)].sort()
-  assert.deepEqual(shadowedOf('v_user_count'), ['count'])
-  // The closure over the view's sources: `v_over_user_count` names no user object
-  // itself, but the view it is built on does, and PostgreSQL flattens it in.
-  assert.deepEqual(shadowedOf('v_over_user_count'), ['count'])
-  assert.deepEqual(shadowedOf('v_user_operator'), ['+'])
-  assert.deepEqual(shadowedOf('v_user_type'), ['integer'])
-  // The many views that call the built-in spellings keep every rule in force: the
-  // user objects of other views are not theirs.
-  assert.deepEqual(shadowedOf('v_expr_group_count'), [])
-  assert.deepEqual(shadowedOf('v_expr_operators'), [])
+test('a user object anywhere in the database stands its rule spelling down for every view', () => {
+  // A plan prints a name, not the object the name stands for, so a user `count` is
+  // printed exactly like the built-in. The stand-down is taken over the whole database
+  // rather than over one view's dependencies: a user object a view reaches only through
+  // an inlined function's body leaves no dependency edge on the view, and a per-view set
+  // would miss it and trust the built-in's rule for someone else's object. So every
+  // view loses the rule the moment any user object takes the spelling.
+  assert.ok(derive('v_expr_group_count').notNull.includes('n'))
+  const shadowed = new Set(['count'])
+  assert.equal(derive('v_expr_group_count', DEFAULT_REGIME, shadowed).notNull.includes('n'), false)
+  // `count(bank_id)` and `count(distinct bank_id)` read the same spelling and stand down
+  // with it; nothing else in the view moves.
+  assert.deepEqual(derive('v_expr_group_count', DEFAULT_REGIME, shadowed).notNull, ['cur_code'])
+  // The lab itself holds no object under a spelling the rules lean on, so every view
+  // above keeps its rules in force.
+  assert.deepEqual([...shadowedNames], [])
+})
+
+test('a bare built-in spelling reached through an inlined function’s body is refused, not trusted', () => {
+  // The form a per-view set falls for: a view calls a user function that PostgreSQL
+  // inlines, whose body calls a user object under a built-in spelling. The plan for the
+  // view prints that name bare, and the view's own dependencies name only the function,
+  // so a per-view set is empty where the plan really prints a user object. The global
+  // stand-down closes it: the same spelling stands down for every view, table and schema,
+  // so no view is left trusting the built-in for the user's object.
+  // A qualified call names the object itself and keeps the rule: `pg_catalog.count` is
+  // the built-in wherever it is printed, whatever spelling a user object took.
+  const asker = (shadowed: (name: string) => boolean) => ({
+    column: () => 'never-null' as const,
+    hasGroupKey: false,
+    shadowed
+  })
+  assert.equal(
+    evaluateExpression(
+      parseExpression('count((x)::integer)'),
+      asker((name) => name === 'count')
+    ),
+    'unknown'
+  )
+  assert.equal(
+    evaluateExpression(
+      parseExpression('pg_catalog.count((x)::integer)'),
+      asker((name) => name === 'count')
+    ),
+    'never-null'
+  )
 })
 
 test('a view’s stored tree is read by field name, and a format it does not know yields nothing', () => {
