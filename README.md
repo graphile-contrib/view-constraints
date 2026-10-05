@@ -170,17 +170,22 @@ read at that column's position in the subplan the plan computes it by. The name 
 the plan's to trust: the same `WITH` name can stand in another query the view goes
 through — the same name at two query levels, a view outside the surface, or a SQL
 function the view inlines — and the plan prints one `CTE <name>` subplan whose owner
-nothing names. Two things must hold before a `CTE Scan` is read. Its alias must be a
-range-table entry of **this view's own** query reading that `WITH` query (`RTE_CTE` in the
-stored tree): a scan of another query's `WITH` query carries that query's alias, which
-this view never wrote, and its column names need not line up with this view's map — so
-the name-to-position step would be a guess, and the scan is refused. And the subplan must
-be **proved** to be this view's own query, by its columns' origins, position for position:
-the tree gives each of the query's own columns' origin (the base column a column is a
-`Var` of, or an expression), and exactly one subplan must print the same number of columns
-and, at every position, the same origin the plan names there; several or none refuses
-every column read through the scan. A foreign scan is refused however its origins happen
-to line up, because its own names are the ones that were never read. Where the plan could
+nothing names. Nor is the alias the scan carries, which the view and another query can
+share. What places the scan is PostgreSQL's own rule, read from the view's tree: a plan
+carries a `CTE <name>` subplan and a `CTE Scan` only for a `WITH` query PostgreSQL
+**materializes**, and the tree says whether this view's query of that name is one of those
+(`:ctematerialized`, `:cterefcount`, `:cterecursive`: `MATERIALIZED`, a recursive query,
+and a default one referenced more than once materialize; `NOT MATERIALIZED`, and a default
+one referenced once, are inlined). Where the view's own query is inlined it contributes no
+subplan, so any scan of that name is another query's and is refused however its origins
+line up. Where it materializes it contributes exactly one subplan, so the plan must carry
+exactly one — a second is another query's query of the same name, and the plan does not
+say which a scan reads — the plan must name no more scans of the name than the view's own
+query references it, and that one subplan must match the query's columns' origins,
+position for position (the base column a column is a `Var` of, or an expression). Any of
+these unproved refuses every column read through the scan. A query the tree reads as
+inlined but a volatile body materializes falls on the refusing side, so a wrong reading of
+the rule is a missed derivation and never a wrong tag. Where the plan could
 not read a column at all — a scan a constant qualifier removed, a `WITH` query whose tree
 is out of reach — the tree's own record of the base column the view column was written
 from (`:resorigtbl`, `:resorigcol`) is taken as a fallback source for a relation, and for

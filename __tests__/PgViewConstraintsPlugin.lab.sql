@@ -928,3 +928,56 @@ create view v_cte_swap_fk as
   with live as (select plain as p, ref as q from child)
   select o.p as op, s.q as sq, s.p as sp
   from live o join v_cte_swap_src_fk s on s.p = o.q;
+
+-- ── A `WITH` name shared with a query whose alias matches ───────────────────────
+--
+-- The alias a `CTE Scan` carries is only a name, and a source and the view can both
+-- write the same one: `live l` in both. What places the scan is that a plan carries a
+-- `CTE Scan` only for a `WITH` query PostgreSQL materializes, and the view's own
+-- `WITH` query of that name (its `:ctematerialized`, `:cterefcount`, `:cterecursive`)
+-- says whether it is one of those.
+
+-- NEGATIVE: the view's own `live` is referenced once, so the default inlines it and it
+-- has no scan; the source's `live` (referenced twice, materialized) is the only one, and
+-- its columns are `q, p` where the view's are `p, q`.
+create view v_cte_alias_src as
+  with live as materialized (select nul as q, nn as p from need)
+  select l.q, l.p from live l join live l2 on l.q is not distinct from l2.q;
+create view v_cte_alias as
+  with live as (select nul as p, nn as q from need)
+  select l.p as op, s.q as sq, s.p as sp
+  from live l join v_cte_alias_src s on s.p = l.q;
+
+-- NEGATIVE: both `live` queries are referenced twice, so both materialize and the plan
+-- carries two `CTE live` subplans; nothing says which a scan reads.
+create view v_cte_ab_src as
+  with live as materialized (select nul as q, nn as p from need)
+  select l.q, l.p from live l join live l2 on l.q is not distinct from l2.q;
+create view v_cte_ab as
+  with live as (select nul as p, nn as q from need)
+  select a.p as op, b.q as oq
+  from live a join live b on a.p = b.p
+  join v_cte_ab_src s on s.p = a.q;
+
+-- POSITIVE: a `WITH` query referenced once is inlined, so its columns come straight off
+-- the base relation and know nothing of a `CTE Scan`.
+create view v_cte_ref_once as
+  with live as (select id as p, nn as q from need)
+  select p, q from live;
+-- POSITIVE: `NOT MATERIALIZED` inlines even a repeated `WITH` query.
+create view v_cte_not_materialized as
+  with live as not materialized (select id as p, nn as q from need)
+  select a.p, a.q from live a join live b on a.p = b.p;
+-- NEGATIVE: a `WITH` query the tree reads as inlined, but a volatile body materializes:
+-- the plan carries a scan of it, and the reader refuses rather than trust the guess.
+create view v_cte_volatile as
+  with live as (select nul as p, nn as q, random() as r from need)
+  select p, q from live;
+-- NEGATIVE: a recursive `WITH` reads its own output as one tagged stream.
+create view v_cte_recursive as
+  with recursive walk as (
+    select id, nul from need where id = 1
+    union all
+    select n.id, n.nul from need n join walk w on w.id = n.id
+  )
+  select id, nul from walk;

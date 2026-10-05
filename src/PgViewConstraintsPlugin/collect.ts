@@ -504,7 +504,8 @@ export function planCatalogFrom(
   shadowedNames: ReadonlySet<string> = new Set(),
   cteColumns: ReadonlyMap<string, string[]> = new Map(),
   cteOrigins: ReadonlyMap<string, (CteColumnOrigin | null)[]> = new Map(),
-  cteRefAliases: ReadonlyMap<string, string> = new Map()
+  cteMaterialized: ReadonlyMap<string, boolean> = new Map(),
+  cteRefCount: ReadonlyMap<string, number> = new Map()
 ): PlanCatalog {
   return {
     uniqueKeysOf: (schema, relation) => catalog.get(`${schema}.${relation}`)?.uniqueKeys ?? [],
@@ -518,7 +519,8 @@ export function planCatalogFrom(
     shadowedNames,
     cteColumns,
     cteOrigins,
-    cteRefAliases
+    cteMaterialized,
+    cteRefCount
   }
 }
 
@@ -588,8 +590,10 @@ export interface ViewTreeFacts {
   treeOrigins: Map<number, TreeOrigin>
   /** The relation each range-table alias of the view names, by alias. */
   relationAliases: Map<string, number>
-  /** The `WITH` query each range-table alias of the view reads, by alias. */
-  cteRefAliases: Map<string, string>
+  /** Whether each `WITH` query of the view is materialized (see `view-tree.ts`). */
+  cteMaterialized: Map<string, boolean>
+  /** How many times each `WITH` query is referenced in the view's own query. */
+  cteRefCount: Map<string, number>
 }
 
 /** One base column a view column's stored tree traced it to. */
@@ -695,7 +699,8 @@ export async function readViewTrees(
       cteAmbiguous: tree.cteAmbiguous,
       treeOrigins: tree.treeOrigins,
       relationAliases: tree.relationAliases,
-      cteRefAliases: tree.cteRefAliases
+      cteMaterialized: tree.cteMaterialized,
+      cteRefCount: tree.cteRefCount
     })
   }
   return trees
@@ -907,7 +912,8 @@ export async function collectViewConstraints(
           ruleSpellingsShadowedFor(viewSources, viewObjects, view.schema, view.view),
           facts?.cteColumns ?? new Map(),
           resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map()),
-          facts?.cteRefAliases ?? new Map()
+          facts?.cteMaterialized ?? new Map(),
+          facts?.cteRefCount ?? new Map()
         )
       ),
       catalog,

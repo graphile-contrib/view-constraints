@@ -74,12 +74,14 @@ export interface PlanCatalog extends QualifierCatalog {
    */
   cteOrigins: ReadonlyMap<string, ({ schema: string; relation: string; column: string } | null)[]>
   /**
-   * The `WITH` query each range-table alias of this view's own query reads, by alias
-   * (`RTE_CTE`). A plan's `CTE Scan` carries its range-table alias, so an alias in here
-   * names this view's own query and one that is not is another query's — through which
-   * no column is read.
+   * Whether each of this view's own `WITH` queries is materialized by PostgreSQL (see
+   * `view-tree.ts`): a plan carries a `CTE <name>` subplan and a `CTE Scan` only for a
+   * materialized query, so a name this view inlines has no scan of its own and any scan
+   * of that name is another query's.
    */
-  cteRefAliases: ReadonlyMap<string, string>
+  cteMaterialized: ReadonlyMap<string, boolean>
+  /** How many times each `WITH` query is referenced in this view's own query. */
+  cteRefCount: ReadonlyMap<string, number>
 }
 
 /** One plan node of `EXPLAIN (FORMAT JSON)`, as much of it as this reader uses. */
@@ -523,6 +525,17 @@ function cteSubplansIn(root: ExplainPlanNode): Map<string, ExplainPlanNode[]> {
   return subplans
 }
 
+/** How many `CTE Scan`s the plan carries for each `WITH` query name. */
+function cteScanCountsIn(root: ExplainPlanNode): Map<string, number> {
+  const counts = new Map<string, number>()
+  walk(root, (node) => {
+    if (node['Node Type'] !== CTE_SCAN) return
+    const name = node['CTE Name']
+    if (typeof name === 'string') counts.set(name, (counts.get(name) ?? 0) + 1)
+  })
+  return counts
+}
+
 /** The `WITH` query each `CTE Scan` alias reads, by alias. */
 function cteAliasesIn(root: ExplainPlanNode): Map<string, string> {
   const aliases = new Map<string, string>()
@@ -804,6 +817,8 @@ class OriginReader {
   /** The `WITH` query each `CTE Scan` alias reads, and every subplan named for a query. */
   private readonly cteOfAlias: ReadonlyMap<string, string>
   private readonly cteSubplans: ReadonlyMap<string, ExplainPlanNode[]>
+  /** How many `CTE Scan`s the plan carries for each `WITH` query name. */
+  private readonly cteScanCounts: ReadonlyMap<string, number>
   private readonly cteStack = new Set<string>()
   /** A `WITH` query name's proved subplan, or `null` where none was proved. */
   private readonly cteProven = new Map<string, ExplainPlanNode | null>()
@@ -829,6 +844,7 @@ class OriginReader {
     this.aliasKinds = aliasNodeTypes(root)
     this.cteOfAlias = cteAliasesIn(root)
     this.cteSubplans = cteSubplansIn(root)
+    this.cteScanCounts = cteScanCountsIn(root)
     const unions = unionColumnsOf(root, this.crossable)
     this.unionColumns = unions.columns
     this.unionAliases = unions.aliases
@@ -936,18 +952,33 @@ class OriginReader {
   }
 
   /**
-   * The subplan proved to be this view's own `WITH` query `name`, or `null`.
+   * The subplan a `CTE Scan` of this view's `WITH` query `name` may be read by, or `null`.
    *
-   * A `WITH` name is not unique to the view: the same name may stand in a view or a
-   * function the analysed view goes through, materialized there and printed as one more
-   * `CTE <name>` subplan, with nothing in the plan saying whose it is. So the subplan is
-   * not read on the name alone. The view's stored tree gives the query's own columns'
-   * origins, position for position — the base column a column is a `Var` of, or an
-   * expression — and a subplan is that query's materialization only where it prints the
-   * same number of columns and, at every position, the same origin the plan names there.
-   * Exactly one subplan must prove; several or none is a refusal. Where the origins line
-   * up the reading is the query's own whatever subplan the planner built, so a coinciding
-   * other query is read correctly rather than refused.
+   * A `WITH` name is not unique to the view: the same name can stand in a view or a
+   * function the analysed view goes through, where the plan carries a `CTE <name>`
+   * subplan nothing says the owner of. Two facts place the view's own. A plan carries a
+   * subplan and a `CTE Scan` only for a query PostgreSQL **materializes**, and the tree
+   * says whether this view's own query of that name is one of those (`view-tree.ts`):
+   * where it is inlined — `NOT MATERIALIZED`, or the default referenced once — the view
+   * contributes no subplan at all, so any scan of that name is another query's and is
+   * refused. Where it materializes, the view contributes exactly one subplan, so the plan
+   * must carry exactly one: a second is another query's query of the same name, and
+   * nothing says which a scan reads. The plan must then name no more scans of the name
+   * than the view's own query references it, and the one subplan must match the query's
+   * columns' origins, position for position. Any of these unproved refuses every column
+   * read through the scan.
+   */
+  private usableSubplan(name: string): ExplainPlanNode | null {
+    if (this.catalog.cteMaterialized.get(name) !== true) return null
+    if ((this.cteSubplans.get(name) ?? []).length !== 1) return null
+    if ((this.cteScanCounts.get(name) ?? 0) > (this.catalog.cteRefCount.get(name) ?? 0)) return null
+    return this.provedSubplan(name)
+  }
+
+  /**
+   * The one subplan that matches this view's `WITH` query `name` by its columns' origins,
+   * position for position: the base column a column is a `Var` of, or an expression.
+   * `null` where none matches.
    */
   private provedSubplan(name: string): ExplainPlanNode | null {
     if (this.cteProven.has(name)) return this.cteProven.get(name) ?? null
@@ -1008,15 +1039,9 @@ class OriginReader {
    */
   private crossCte(alias: string, column: string, crossing: ReadonlySet<string>): Reading {
     const cte = this.cteOfAlias.get(alias)
-    const columns = cte === undefined ? undefined : this.catalog.cteColumns.get(cte)
-    const subplan = cte === undefined ? null : this.provedSubplan(cte)
-    // The scan must be this view's own: its alias is a range-table entry of this view's
-    // query reading the `WITH` query. A scan of another query's `WITH` query — a source
-    // view's or a function's, inlined here — carries that query's alias, which this view
-    // never wrote, and its column names need not line up with this view's map.
-    if (cte === undefined || this.catalog.cteRefAliases.get(alias) !== cte) {
-      return unknown('through-a-materialized-with')
-    }
+    if (cte === undefined) return unknown('through-a-materialized-with')
+    const columns = this.catalog.cteColumns.get(cte)
+    const subplan = this.usableSubplan(cte)
     if (!columns || !subplan || this.cteStack.has(cte)) {
       return unknown('through-a-materialized-with')
     }
@@ -1191,9 +1216,9 @@ class OriginReader {
     crossing: ReadonlySet<string>
   ): ExpressionNullability {
     const cte = this.cteOfAlias.get(alias)
-    const columns = cte === undefined ? undefined : this.catalog.cteColumns.get(cte)
-    const subplan = cte === undefined ? null : this.provedSubplan(cte)
-    if (cte === undefined || this.catalog.cteRefAliases.get(alias) !== cte) return 'unknown'
+    if (cte === undefined) return 'unknown'
+    const columns = this.catalog.cteColumns.get(cte)
+    const subplan = this.usableSubplan(cte)
     if (!columns || !subplan || this.cteStack.has(cte)) return 'unknown'
     const position = columns.indexOf(column)
     if (position < 0) return 'unknown'

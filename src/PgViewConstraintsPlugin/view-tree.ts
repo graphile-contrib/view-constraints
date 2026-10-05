@@ -285,12 +285,20 @@ export interface ViewTree {
   /** Range-table alias → the relation oid it names. */
   relationAliases: Map<string, number>
   /**
-   * The aliases this view's own query reads a `WITH` query by: `alias → ctename` from
-   * the range table's `RTE_CTE` entries. A plan's `CTE Scan` carries its range-table
-   * alias, so an alias in here is a scan of this view's own `WITH` query, and one that
-   * is not is some other query's.
+   * Whether each `WITH` query of this view is **materialized** by PostgreSQL, read from
+   * the query's own `:ctematerialized` (`MATERIALIZED`, `NOT MATERIALIZED`, default),
+   * `:cterefcount` and `:cterecursive`: a `MATERIALIZED` query, a recursive one, and a
+   * default one referenced more than once are materialized; a `NOT MATERIALIZED` one,
+   * and a default one referenced once, are inlined. A plan carries a `CTE <name>`
+   * subplan and a `CTE Scan` only for a materialized query, so a name this view inlines
+   * has no scan of its own and any scan of that name is some other query's. The default
+   * referenced once is inlined only while its body has no volatile function, which the
+   * tree does not say — so a `false` here is read as "no scan of this name may be read",
+   * which refuses a query a volatile function actually materialized rather than trust it.
    */
-  cteRefAliases: Map<string, string>
+  cteMaterialized: Map<string, boolean>
+  /** How many times each `WITH` query is referenced in this view's own query. */
+  cteRefCount: Map<string, number>
 }
 
 /**
@@ -305,7 +313,8 @@ export function readViewTree(action: string): ViewTree {
     cteAmbiguous: new Set(),
     treeOrigins: new Map(),
     relationAliases: new Map(),
-    cteRefAliases: new Map()
+    cteMaterialized: new Map(),
+    cteRefCount: new Map()
   }
   const parsed = new DumpReader(action).parse()
   if (!parsed.ok || parsed.value === null) return tree
@@ -351,11 +360,24 @@ export function readViewTree(action: string): ViewTree {
           return { tableId, attnum }
         })
       )
+      // Whether PostgreSQL materializes this query, from its own declaration: the
+      // `:ctematerialized` keyword (`1` `MATERIALIZED`, `2` `NOT MATERIALIZED`, `0`
+      // default), the number of references, and recursion.
+      const keyword = numberOf(cte.fields.get('ctematerialized'))
+      const refCount = numberOf(cte.fields.get('cterefcount')) ?? 0
+      const recursive = textOf(cte.fields.get('cterecursive')) === 'true'
+      tree.cteRefCount.set(name, refCount)
+      tree.cteMaterialized.set(
+        name,
+        keyword === 1 || (keyword === 0 && (refCount > 1 || recursive))
+      )
     }
   })
   for (const name of tree.cteAmbiguous) {
     tree.cteColumns.delete(name)
     tree.cteOrigins.delete(name)
+    tree.cteMaterialized.delete(name)
+    tree.cteRefCount.delete(name)
   }
 
   for (const [position, entry] of nodesOf(top.fields.get('targetList')).entries()) {
@@ -381,24 +403,6 @@ export function readViewTree(action: string): ViewTree {
     tree.relationAliases.set(alias, relid)
   })
   for (const alias of ambiguousAliases) tree.relationAliases.delete(alias)
-
-  // The `WITH` queries this view's own query reads, by the range-table alias it gave
-  // them (`RTE_CTE`), so a plan's `CTE Scan` can be told from one of another query's.
-  const ambiguousRefs = new Set<string>()
-  walkDumped(root, (node) => {
-    if (node.type !== 'RANGETBLENTRY') return
-    if (textOf(node.fields.get('rtekind')) !== '6') return
-    const ctename = textOf(node.fields.get('ctename'))
-    const alias = aliasOf(node)
-    if (ctename === null || alias === null) return
-    const seen = tree.cteRefAliases.get(alias)
-    if (seen !== undefined && seen !== ctename) {
-      ambiguousRefs.add(alias)
-      return
-    }
-    tree.cteRefAliases.set(alias, ctename)
-  })
-  for (const alias of ambiguousRefs) tree.cteRefAliases.delete(alias)
 
   return tree
 }

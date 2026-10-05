@@ -93,8 +93,10 @@ interface Fixture {
     cteOrigins: Record<string, ({ schema: string; relation: string; column: string } | null)[]>
     /** `WITH` names the tree defines at more than one query level. */
     cteAmbiguous: string[]
-    /** The `WITH` query each range-table alias of the view reads, by alias. */
-    cteRefAliases: Record<string, string>
+    /** Whether each `WITH` query of the view is materialized by PostgreSQL. */
+    cteMaterialized: Record<string, boolean>
+    /** How many times each `WITH` query is referenced in the view's own query. */
+    cteRefCount: Record<string, number>
     /** Each view column's traced base column, by position, from the stored tree. */
     treeColumns: Record<
       string,
@@ -169,7 +171,8 @@ function derive(
   assert.ok(view, `no fixture for lab.${name} under ${regime}`)
   const cteColumns = new Map(Object.entries(view.cteColumns ?? {}))
   const cteOrigins = new Map(Object.entries(view.cteOrigins ?? {}))
-  const cteRefAliases = new Map(Object.entries(view.cteRefAliases ?? {}))
+  const cteMaterialized = new Map(Object.entries(view.cteMaterialized ?? {}))
+  const cteRefCount = new Map(Object.entries(view.cteRefCount ?? {}))
   const treeColumns = new Map(
     Object.entries(view.treeColumns ?? {}).map(([position, column]) => [Number(position), column])
   )
@@ -194,7 +197,8 @@ function derive(
         shadowedFor(view.schema, view.view),
         cteColumns,
         cteOrigins,
-        cteRefAliases
+        cteMaterialized,
+        cteRefCount
       )
     ),
     catalog,
@@ -1963,6 +1967,79 @@ const CASES: Case[] = [
     notNull: ['oy'],
     foreignKeys: ['(oy) references lab.child (id)'],
     primaryKey: null
+  },
+  {
+    view: 'v_cte_alias_src',
+    about: 'the same-alias source: its own `live` is referenced twice and reads as usual',
+    origins: ['q=need.nul', 'p=need.nn'],
+    notNull: ['p'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_alias',
+    about:
+      'the view’s own `live` is referenced once, so the default inlines it and it has no ' +
+      'scan; the only `CTE live` is the source’s, whose columns are `q, p` where the ' +
+      'view’s are `p, q` — the alias matches but proves nothing, so `sq` and `sp` are refused',
+    origins: ['op=need.nul', 'sq=—', 'sp=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_ab_src',
+    about: 'the twice-referenced source `live` is materialized and reads as usual',
+    origins: ['q=need.nul', 'p=need.nn'],
+    notNull: ['p'],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_ab',
+    about:
+      'both `live` queries are referenced twice, so both materialize: the plan carries ' +
+      'two `CTE live` subplans, nothing says which a scan reads, and the columns are refused',
+    origins: ['op=—', 'oq=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_ref_once',
+    about:
+      'a `WITH` query referenced once is inlined, so its columns come off the base ' +
+      'relation directly and read as usual',
+    origins: ['p=need.id', 'q=need.nn'],
+    notNull: ['p', 'q'],
+    foreignKeys: ['(p) references lab.need (id)'],
+    primaryKey: 'p'
+  },
+  {
+    view: 'v_cte_not_materialized',
+    about: 'and `NOT MATERIALIZED` inlines even a repeated `WITH` query',
+    origins: ['p=need.id', 'q=need.nn'],
+    notNull: ['p', 'q'],
+    foreignKeys: ['(p) references lab.need (id)'],
+    primaryKey: 'p'
+  },
+  {
+    view: 'v_cte_volatile',
+    about:
+      'a `WITH` query the tree reads as inlined, but a volatile body materializes: the ' +
+      'reader refuses rather than trust the prediction',
+    origins: ['p=—', 'q=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
+  },
+  {
+    view: 'v_cte_recursive',
+    about: 'a recursive `WITH` reads its own output as one tagged stream',
+    origins: null,
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null
   }
 ]
 
@@ -2763,8 +2840,8 @@ test('a CTE Scan is read only where the stored tree names the query’s columns 
   const without = readPlanOrigins(plan, 1, new Map(), planCatalog)
   assert.ok(typeof without !== 'string')
   assert.deepEqual(without.refusals, ['through-a-materialized-with'])
-  // The query's own columns are `lab.tx.id` and `lab.tx.cur_code`, the scan is this
-  // view's own range-table entry, and the subplan prints those origins position for
+  // The query's own columns are `lab.tx.id` and `lab.tx.cur_code`, it is materialized so
+  // its own scan is expected, and the one subplan prints those origins position for
   // position: it is proved and read.
   const withMap = planCatalogFrom(
     catalog,
@@ -2780,7 +2857,8 @@ test('a CTE Scan is read only where the stored tree names the query’s columns 
         ]
       ]
     ]),
-    new Map([['live', 'live']])
+    new Map([['live', true]]),
+    new Map([['live', 1]])
   )
   const origins = readPlanOrigins(plan, 1, new Map(), withMap)
   assert.ok(typeof origins !== 'string')
@@ -2798,15 +2876,15 @@ test('a CTE Scan is read only where the stored tree names the query’s columns 
     new Map([['live', ['id', 'cur_code']]]),
     // The query's second column is an expression where the subplan names a base column.
     new Map([['live', [{ schema: 'lab', relation: 'tx', column: 'id' }, null]]]),
-    new Map([['live', 'live']])
+    new Map([['live', true]]),
+    new Map([['live', 1]])
   )
   const refused = readPlanOrigins(plan, 1, new Map(), mismatched)
   assert.ok(typeof refused !== 'string')
   assert.deepEqual(refused.refusals, ['through-a-materialized-with'])
-  // And a scan whose alias is not this view's own range-table entry is refused even
-  // where the map and the origins both fit: the column names a foreign scan prints need
-  // not line up with this view's map, so the name-to-position step would be a guess.
-  const foreignScan = planCatalogFrom(
+  // And a `WITH` query this view inlines has no scan of its own, so a `CTE Scan` of the
+  // name is another query's and is refused even where the map and the origins both fit.
+  const inlined = planCatalogFrom(
     catalog,
     fixture.strictEquality,
     new Set(),
@@ -2820,11 +2898,12 @@ test('a CTE Scan is read only where the stored tree names the query’s columns 
         ]
       ]
     ]),
-    new Map()
+    new Map([['live', false]]),
+    new Map([['live', 1]])
   )
-  const foreignRefused = readPlanOrigins(plan, 1, new Map(), foreignScan)
-  assert.ok(typeof foreignRefused !== 'string')
-  assert.deepEqual(foreignRefused.refusals, ['through-a-materialized-with'])
+  const inlinedRefused = readPlanOrigins(plan, 1, new Map(), inlined)
+  assert.ok(typeof inlinedRefused !== 'string')
+  assert.deepEqual(inlinedRefused.refusals, ['through-a-materialized-with'])
 })
 
 // ── A relation led to a projection ──────────────────────────────────────────────
