@@ -51,6 +51,10 @@ import {
   readPlanOrigins
 } from '../src/PgViewConstraintsPlugin/plan-origins.ts'
 import { conditionEqualities } from '../src/PgViewConstraintsPlugin/plan-keys.ts'
+import {
+  evaluateExpression,
+  parseExpression
+} from '../src/PgViewConstraintsPlugin/plan-expressions.ts'
 import type {
   ColumnRefusal,
   ExplainPlanNode,
@@ -1796,6 +1800,32 @@ test('a truncating cast kills the value but not the non-nullness; a null-answeri
   // is a function cast none of the families authorises.
   assert.equal(castPreservesNonNull(jsonb, asInteger, coercions), false)
   assert.equal(castPreservesNonNull(text, asNumeric, coercions), false)
+})
+
+test('a cast to a shadowed type name answers NULL whatever the operand proves', () => {
+  // The cast rule reads the target type by the name the plan prints it under, and a
+  // user-defined type may take a built-in type's name and be printed with it. Then
+  // the name is no promise the cast keeps, and the column stays nullable.
+  const asker = (shadowed: (name: string) => boolean) => ({
+    column: () => 'never-null' as const,
+    hasGroupKey: true,
+    shadowed
+  })
+  const cast = parseExpression('(CASE WHEN (x) THEN 1 ELSE 2 END)::integer')
+  assert.equal(
+    evaluateExpression(
+      cast,
+      asker(() => false)
+    ),
+    'never-null'
+  )
+  assert.equal(
+    evaluateExpression(
+      cast,
+      asker((name) => name === 'integer')
+    ),
+    'nullable'
+  )
 })
 
 test('a join type this reader does not know nulls both of its sides', () => {

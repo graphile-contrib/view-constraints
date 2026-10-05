@@ -48,8 +48,9 @@ export interface ExpressionAsker {
    */
   hasGroupKey: boolean
   /**
-   * Whether a user-defined function or operator has taken a built-in spelling
-   * (`count`, `+`, …), so the rule that spelling carries does not hold here.
+   * Whether a user-defined object — a function, an operator, a type — has taken a
+   * built-in spelling (`count`, `+`, `integer`, …), so the rule that spelling
+   * carries does not hold here. The plan prints a name, not an oid.
    */
   shadowed(name: string): boolean
 }
@@ -793,6 +794,9 @@ function evaluate(node: ExpressionNode, ask: ExpressionAsker): ExpressionNullabi
       const operand = evaluate(node.operand, ask)
       // A cast adds nothing to a nullable operand's answer: it stays nullable.
       if (operand !== 'never-null') return operand
+      // A user-defined type may take a built-in type's name and be printed with
+      // it, and a `CREATE CAST` onto it need answer nothing the name promises.
+      if (ask.shadowed(node.target)) return 'nullable'
       const target = castTypeFamily(node.target)
       if (target !== null && target === operandTypeFamily(node.operand, ask)) return 'never-null'
       return 'nullable'

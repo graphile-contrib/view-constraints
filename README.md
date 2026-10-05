@@ -101,7 +101,9 @@ answer at all. A cast is another such shape: the plan names the type it casts to
 nothing about the operand's type, and a cast is free to answer `NULL` for a non-`NULL`
 input, so a cast stands the rule down unless both ends are one family PostgreSQL
 defines to answer a value for every input of the other — the exact numbers, the text
-types. `jsonb` to `integer` and a user `CREATE CAST` are not, and may answer `NULL`.
+types. `jsonb` to `integer` and a user `CREATE CAST` are not, and may answer `NULL`,
+and neither is a cast to a type a user has named after one of those, whose name is
+then no promise at all.
 An entry that does not parse is `unknown` too — the reader never
 guesses. The same answer holds across a union's branches (a column is never `NULL`
 only where every branch proves it), across a crossed view boundary, and below an
