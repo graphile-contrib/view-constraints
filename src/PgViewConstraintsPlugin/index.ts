@@ -120,8 +120,11 @@ export interface ViewConstraintsReport {
 
 export interface ViewConstraintsOptions {
   /**
-   * Write the derived relations onto the view as smart tags. Off unless asked for:
-   * a reporting run must leave the schema exactly as it found it.
+   * Write the derived relations onto the view as smart tags. On unless turned off.
+   * `declare: false` only inspects: the instance derives and reports and leaves the
+   * schema as it found it, and a schema in which something stands on a derived key —
+   * a relational `@interface` whose variant is a view, say — is not built without the
+   * tags that declare it.
    */
   declare?: boolean
   /**
@@ -343,6 +346,9 @@ export function PgViewConstraintsPlugin(
             )
             if (!pgClass) continue
             const tags = pgClass.getTagsAndDescription().tags
+            // What a human wrote is read here, before this instance declares anything on
+            // the view below: the report's hand-written side must not count a derived
+            // tag as a hand tag. Every `declared*` value is a copy, not the tag object.
             views.push({
               derived,
               declaredForeignKeys: asStringArray(tags['foreignKey']),
@@ -381,6 +387,7 @@ export function PgViewConstraintsPlugin(
             const pgClass = classOf(derived.schema, derived.table)
             if (!pgClass) continue
             const tags = pgClass.getTagsAndDescription().tags
+            // Read before the declaring below, as a view's are.
             tables.push({ derived, declaredForeignKeys: asStringArray(tags['foreignKey']) })
             if (!declare) continue
             const alreadyDeclared = new Set(
