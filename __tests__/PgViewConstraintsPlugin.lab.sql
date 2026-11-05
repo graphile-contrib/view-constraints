@@ -1152,3 +1152,38 @@ create table idx_ref (
 create index idx_ref_target_id_idx on idx_ref (target_id);
 create view v_idx_ref_indexed as select target_id from idx_ref;
 create view v_idx_ref_unindexed as select unindexed_id from idx_ref;
+
+-- NEGATIVE: the DISTINCT ON key covers the sort key and the output, so the plan alone
+-- cannot tell it from a plain DISTINCT; the view's stored tree can.
+create view v_idx_distinct_on_covered as
+  select distinct on (id) id, later from idx_lab order by id, later;
+-- NEGATIVE: an index serves the DISTINCT ON ordering, so no Sort Key is printed; the
+-- stored tree still says DISTINCT ON.
+create view v_idx_distinct_on_indexed_order as
+  select distinct on (id) id, later from idx_lab order by id;
+-- NEGATIVE: a TABLESAMPLE is a Sample Scan on the path.
+create view v_idx_sample as select id from idx_lab tablesample system (10);
+
+-- NEGATIVE: the referencing columns of a composite key have two single-column indexes,
+-- not one index of both, so the backward relation stays closed even though each column
+-- is index-backed on its own.
+create table idx_composite_target (a bigint, b bigint, primary key (a, b));
+create table idx_composite_ref (
+  id bigint primary key,
+  a bigint not null,
+  b bigint not null,
+  foreign key (a, b) references idx_composite_target (a, b)
+);
+create index idx_composite_ref_a_idx on idx_composite_ref (a);
+create index idx_composite_ref_b_idx on idx_composite_ref (b);
+create view v_idx_composite_two_single as select a, b from idx_composite_ref;
+-- POSITIVE: one composite index covers both referencing columns.
+create table idx_pair_target (a bigint, b bigint, primary key (a, b));
+create table idx_pair_ref (
+  id bigint primary key,
+  a bigint not null,
+  b bigint not null,
+  foreign key (a, b) references idx_pair_target (a, b)
+);
+create index idx_pair_ref_ab_idx on idx_pair_ref (a, b);
+create view v_idx_pair_composite as select a, b from idx_pair_ref;

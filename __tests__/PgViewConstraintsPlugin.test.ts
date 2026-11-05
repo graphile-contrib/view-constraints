@@ -20,12 +20,18 @@
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import process from 'node:process'
 import { test } from 'node:test'
+import pg from 'pg'
+import { makeSchema } from 'postgraphile'
+import { defaultPreset as graphileBuildPreset } from 'graphile-build'
+import { defaultPreset as graphileBuildPgPreset } from 'graphile-build-pg'
+import { makePgService } from '@dataplan/pg/adaptors/pg'
 import {
   castPreservesNonNull,
   deriveProjectionRelations,
   deriveViewConstraints,
-  foreignKeyIndexBacked,
+  relationIndexBacked,
   TARGET_REFUSALS,
   valuePreservingCast
 } from '../src/PgViewConstraintsPlugin/derive.ts'
@@ -56,6 +62,9 @@ import {
 } from '../src/PgViewConstraintsPlugin/plan-origins.ts'
 import { conditionEqualities } from '../src/PgViewConstraintsPlugin/plan-keys.ts'
 import { readViewTree } from '../src/PgViewConstraintsPlugin/view-tree.ts'
+import { PgViewConstraintsPlugin } from '../src/PgViewConstraintsPlugin/index.ts'
+import type { ViewConstraintsReport } from '../src/PgViewConstraintsPlugin/index.ts'
+import { ViewConstraintsReportRenderer } from '../src/PgViewConstraintsPlugin/report.ts'
 import {
   evaluateExpression,
   parseExpression
@@ -81,6 +90,8 @@ interface Fixture {
   tables: { schema: string; table: string }[]
   /** Every lab view's select-list order and the views it is built on. */
   viewSources: ViewSourceRow[]
+  /** `schema.view` of every lab view whose stored query uses `DISTINCT ON`. */
+  viewDistinctOn: string[]
   views: {
     schema: string
     view: string
@@ -127,6 +138,9 @@ const catalog = new Map<string, CatalogRelation>(
 // The rule spellings a user object has taken over across the lab database: the same
 // set for every view, since a plan prints a name and not the object it stands for.
 const shadowedNames = new Set(fixture.shadowedNames ?? [])
+// The views whose stored query de-duplicates on a leading subset (`DISTINCT ON`), read
+// from the tree rather than inferred from a plan whose `Unique` prints no key.
+const distinctOnViews = new Set(fixture.viewDistinctOn ?? [])
 
 const planCatalog = planCatalogFrom(catalog, fixture.strictEquality, shadowedNames)
 
@@ -212,7 +226,8 @@ function derive(
     treeColumns,
     new Set(view.optionallyFlattenedColumns ?? []),
     true,
-    true
+    true,
+    distinctOnViews
   )
   return {
     origins:
@@ -2238,7 +2253,7 @@ const CASES: Case[] = [
     notNull: [],
     foreignKeys: [],
     primaryKey: null,
-    indexBacked: { only_partial: 'only-partial-or-expression-index' }
+    indexBacked: { only_partial: 'only-partial-index' }
   },
   {
     view: 'v_idx_expression',
@@ -2247,7 +2262,7 @@ const CASES: Case[] = [
     notNull: [],
     foreignKeys: [],
     primaryKey: null,
-    indexBacked: { only_expression: 'only-partial-or-expression-index' }
+    indexBacked: { only_expression: 'no-index-on-base-column' }
   },
   {
     view: 'v_idx_include',
@@ -2363,13 +2378,12 @@ const CASES: Case[] = [
   {
     view: 'm_idx',
     about:
-      'the materialized view itself is read through its defining query, where its columns ' +
-      'proxy the base table’s indexed ones',
+      'a materialized view derives no index answer of its own: its own indexes are ' +
+      'PgIndexBehaviorsPlugin’s to read',
     origins: ['id=idx_lab.id', 'later=idx_lab.later'],
     notNull: ['id', 'later'],
     foreignKeys: ['(id) references lab.idx_lab (id)'],
-    primaryKey: 'id',
-    indexBacked: { id: true, later: true }
+    primaryKey: 'id'
   },
   {
     view: 'v_idx_ref_indexed',
@@ -2388,6 +2402,63 @@ const CASES: Case[] = [
     foreignKeys: ['(unindexed_id) references lab.idx_target (id)'],
     primaryKey: null,
     indexBacked: { unindexed_id: 'no-index-on-base-column' }
+  },
+  {
+    view: 'v_idx_distinct_on_covered',
+    about:
+      'a DISTINCT ON whose sort key covers its whole output is shaped exactly like a ' +
+      'plain DISTINCT in the plan; the stored tree still closes the column',
+    origins: ['id=idx_lab.id', 'later=idx_lab.later'],
+    notNull: ['id', 'later'],
+    foreignKeys: ['(id) references lab.idx_lab (id)'],
+    primaryKey: 'id',
+    indexBacked: {
+      id: 'condition-stops-above-the-scan',
+      later: 'condition-stops-above-the-scan'
+    }
+  },
+  {
+    view: 'v_idx_distinct_on_indexed_order',
+    about:
+      'an index serves the DISTINCT ON ordering, so the plan prints no Sort Key; the ' +
+      'stored tree still closes the column',
+    origins: ['id=idx_lab.id', 'later=idx_lab.later'],
+    notNull: ['id', 'later'],
+    foreignKeys: ['(id) references lab.idx_lab (id)'],
+    primaryKey: 'id',
+    indexBacked: {
+      id: 'condition-stops-above-the-scan',
+      later: 'condition-stops-above-the-scan'
+    }
+  },
+  {
+    view: 'v_idx_sample',
+    about: 'a TABLESAMPLE is a Sample Scan on the path',
+    origins: ['id=idx_lab.id'],
+    notNull: ['id'],
+    foreignKeys: ['(id) references lab.idx_lab (id)'],
+    primaryKey: 'id',
+    indexBacked: { id: 'condition-stops-above-the-scan' }
+  },
+  {
+    view: 'v_idx_composite_two_single',
+    about:
+      'each referencing column has its own index, but no one index covers both, so the ' +
+      'relation mark is false while each column is index-backed',
+    origins: ['a=idx_composite_ref.a', 'b=idx_composite_ref.b'],
+    notNull: ['a', 'b'],
+    foreignKeys: ['(a,b) references lab.idx_composite_target (a,b)'],
+    primaryKey: null,
+    indexBacked: { a: true, b: true }
+  },
+  {
+    view: 'v_idx_pair_composite',
+    about: 'one composite index covers both referencing columns',
+    origins: ['a=idx_pair_ref.a', 'b=idx_pair_ref.b'],
+    notNull: ['a', 'b'],
+    foreignKeys: ['(a,b) references lab.idx_pair_target (a,b)'],
+    primaryKey: null,
+    indexBacked: { a: true, b: true }
   }
 ]
 
@@ -3316,6 +3387,86 @@ test('the index catalog is read only for the opt-in derivation', async () => {
   assert.notEqual(withIndexes.derivations[0]?.indexBacked, null)
 })
 
+test('a built schema withholds filter and order on an unbacked view column', async (t) => {
+  // The parts meet only in a real schema build: the derivation's `indexBacked`, the
+  // codec extensions this plugin writes, `PgIndexBehaviorsPlugin`'s behavior callback and
+  // the relation mark. The CI `lab` job provides PostgreSQL; a run without a server skips
+  // this one rather than fail on the absence of one.
+  const host = process.env['PGHOST'] ?? '127.0.0.1'
+  const port = process.env['PGPORT'] ?? '5432'
+  const user = process.env['PGUSER'] ?? 'postgres'
+  const adminDatabase = process.env['PGDATABASE'] ?? 'postgres'
+  const database = 'view_constraints_hook'
+  const adminUrl = `postgres://${user}@${host}:${port}/${adminDatabase}`
+  const labUrl = `postgres://${user}@${host}:${port}/${database}`
+  const admin = new pg.Client({ connectionString: adminUrl })
+  try {
+    await admin.connect()
+  } catch {
+    await admin.end().catch(() => undefined)
+    t.skip('PostgreSQL is not available')
+    return
+  }
+  let service: ReturnType<typeof makePgService> | undefined
+  try {
+    await admin.query(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`)
+    await admin.query(`CREATE DATABASE ${database}`)
+    const lab = new pg.Client({ connectionString: labUrl })
+    await lab.connect()
+    try {
+      await lab.query(`
+        create schema hook_lab;
+        create table hook_lab.target (id bigint primary key, title text not null);
+        create table hook_lab.ref (
+          id bigint primary key,
+          target_id bigint not null references hook_lab.target(id),
+          unindexed_id bigint not null references hook_lab.target(id),
+          payload text not null
+        );
+        create index ref_target_id_idx on hook_lab.ref (target_id);
+        create view hook_lab.v_hook as
+          select target_id, unindexed_id, payload from hook_lab.ref;
+      `)
+    } finally {
+      await lab.end()
+    }
+    service = makePgService({ connectionString: labUrl, schemas: ['hook_lab'] })
+    const { schema } = await makeSchema({
+      extends: [graphileBuildPreset, graphileBuildPgPreset],
+      pgServices: [service],
+      plugins: [PgViewConstraintsPlugin({ indexes: true })]
+    })
+    const fields = (name: string): string[] => {
+      const type = schema.getType(name)
+      assert.ok(type, name)
+      return Object.keys((type as { getFields(): Record<string, unknown> }).getFields())
+    }
+    const values = (name: string): string[] => {
+      const type = schema.getType(name)
+      assert.ok(type, name)
+      const getValues = (type as { getValues?(): { name: string }[] }).getValues
+      return (getValues?.call(type) ?? []).map((value) => value.name)
+    }
+    // The indexed view column is filterable and sortable; the columns with no index are
+    // in neither input.
+    assert.ok(fields('VHookCondition').includes('targetId'))
+    assert.ok(!fields('VHookCondition').includes('unindexedId'))
+    assert.ok(!fields('VHookCondition').includes('payload'))
+    assert.ok(values('VHookOrderBy').includes('TARGET_ID_ASC'))
+    assert.ok(!values('VHookOrderBy').includes('UNINDEXED_ID_ASC'))
+    assert.ok(!values('VHookOrderBy').includes('PAYLOAD_ASC'))
+    // The backward relation through the indexed referencing column is present; the one
+    // through the unindexed column has lost its list and connection behaviors.
+    const targetFields = fields('Target')
+    assert.ok(targetFields.includes('vHooksByTargetId'))
+    assert.ok(!targetFields.includes('vHooksByUnindexedId'))
+  } finally {
+    await service?.release?.()
+    await admin.query(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`).catch(() => undefined)
+    await admin.end()
+  }
+})
+
 test('the stored rewrite tree is read only on a major the format is checked against', async () => {
   const asked = (version: number) => {
     const issued: string[] = []
@@ -3408,7 +3559,7 @@ test('every index-backing reason names a lab view, and no lab view names another
   // column that does not open says which of them it is.
   const reasons = [
     'no-index-on-base-column',
-    'only-partial-or-expression-index',
+    'only-partial-index',
     'condition-stops-above-the-scan'
   ]
   const named = new Set<string>([
@@ -3428,18 +3579,72 @@ test('every index-backing reason names a lab view, and no lab view names another
   for (const reason of reasons) assert.ok(seen.has(reason), `no lab view carries ${reason}`)
 })
 
-test('a relation mark follows the index-backed answer of its referencing view columns', () => {
+test('a relation mark is the table test over one indexed base relation', () => {
   const derivations = labDerivations()
-  const indexed = derivations.find((derived) => derived.view === 'v_idx_ref_indexed')
-  const unindexed = derivations.find((derived) => derived.view === 'v_idx_ref_unindexed')
-  assert.ok(indexed && unindexed)
-  assert.equal(foreignKeyIndexBacked(indexed, indexed.foreignKeys[0]!), true)
-  assert.equal(foreignKeyIndexBacked(unindexed, unindexed.foreignKeys[0]!), false)
-  // A view whose index answer was not derived has no mark either way.
+  const deriveOf = (view: string) => {
+    const derived = derivations.find((candidate) => candidate.view === view)
+    assert.ok(derived, view)
+    return derived
+  }
+  const mark = (view: string): boolean => {
+    const derived = deriveOf(view)
+    assert.equal(derived.foreignKeys.length, 1, view)
+    return relationIndexBacked(derived, derived.foreignKeys[0]!.viewColumns, catalog)
+  }
+  assert.equal(mark('v_idx_ref_indexed'), true)
+  assert.equal(mark('v_idx_ref_unindexed'), false)
+  // Two single-column indexes on the columns of one composite key are not one index of
+  // both: the relation is closed even though each column is index-backed on its own.
+  assert.equal(mark('v_idx_composite_two_single'), false)
+  // One composite index covers both referencing columns.
+  assert.equal(mark('v_idx_pair_composite'), true)
+  // A view whose index answer was not derived is closed, not unanswered.
+  const indexed = deriveOf('v_idx_ref_indexed')
   assert.equal(
-    foreignKeyIndexBacked({ ...indexed, indexBacked: null }, indexed.foreignKeys[0]!),
-    null
+    relationIndexBacked({ ...indexed, indexBacked: null }, ['target_id'], catalog),
+    false
   )
+})
+
+test('a materialized view derives no index answer of its own', () => {
+  assert.equal(derive('m_idx').indexBacked, null)
+})
+
+test('a report never goes silent about an index answer it could not derive', () => {
+  const derived = labDerivations().find((candidate) => candidate.view === 'm_idx')
+  assert.ok(derived)
+  const report: ViewConstraintsReport = {
+    serviceName: 'lab',
+    schemas: ['lab'],
+    views: [
+      {
+        derived,
+        declaredForeignKeys: [],
+        declaredPrimaryKey: null,
+        declaredUnique: [],
+        declaredNotNullColumns: []
+      }
+    ],
+    tables: [],
+    unexamined: [],
+    failures: [],
+    skipped: [],
+    shadowedNames: [],
+    indexes: true
+  }
+  const lines = new ViewConstraintsReportRenderer().service('lab', report)
+  assert.ok(
+    lines.some(
+      (line) => line.includes('idx no') && line.includes('not-derived (materialized view')
+    ),
+    lines.join('\n')
+  )
+  // With the derivation off, the report says nothing about indexes.
+  const without = new ViewConstraintsReportRenderer().service('lab', {
+    ...report,
+    indexes: false
+  })
+  assert.ok(!without.some((line) => line.trimStart().startsWith('idx ')), without.join('\n'))
 })
 
 test('an Output that does not line up with the view’s columns is refused whole', () => {
@@ -3623,7 +3828,8 @@ function labDerivations(regime: string = DEFAULT_REGIME): ViewDerivation[] {
         new Map(),
         new Set(),
         true,
-        true
+        true,
+        distinctOnViews
       )
     )
 }
@@ -3877,7 +4083,9 @@ test('leading a relation to a projection does not move with the plan', () => {
       const marks =
         derivation && 'indexBacked' in derivation
           ? derivation.foreignKeys
-              .map((key) => `${key.tag}=${foreignKeyIndexBacked(derivation, key)}`)
+              .map(
+                (key) => `${key.tag}=${relationIndexBacked(derivation, key.viewColumns, catalog)}`
+              )
               .join(' ')
           : ''
       return [

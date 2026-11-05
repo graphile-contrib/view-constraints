@@ -104,7 +104,6 @@ const PLAN_FIELDS = [
   'Grouping Sets',
   'Index Name',
   'Group Key',
-  'Sort Key',
   'Partial Mode',
   'CTE Name',
   'Subplan Name',
@@ -165,7 +164,7 @@ const shadowedNames = [...(await readShadowedNames(runQueryOn(lab)))].sort()
 // columns came from. Read only on a major the format is checked against — the fixture
 // is the lab for those majors, and one built without its trees would carry empty CTE
 // maps that look like a database with no `WITH` query at all.
-const treeRead = await readViewTrees(runQueryOn(lab), ['lab'])
+const treeRead = await readViewTrees(runQueryOn(lab), ['lab', 'lab_other'])
 if (!treeRead.supported) {
   throw new Error(
     'the lab fixture is built on a PostgreSQL major outside the range the stored ' +
@@ -173,6 +172,13 @@ if (!treeRead.supported) {
   )
 }
 const viewTrees = treeRead.trees
+// The views whose stored query de-duplicates on a leading subset of its output. The
+// plan prints a `Unique` but not its key, so this is the plan-independent answer; a
+// `DISTINCT ON` in a crossed source view must be read too.
+const viewDistinctOn = [...viewTrees]
+  .filter(([, facts]) => facts.ok && facts.distinctOn)
+  .map(([key]) => key)
+  .sort()
 const relationOids = await readRelationOids(runQueryOn(lab))
 const views = await readViews(runQueryOn(lab), ['lab'])
 // The tables of the lab, each a referencing half of a relation to a projection.
@@ -289,6 +295,7 @@ writeFileSync(
       shadowedNames,
       tables,
       viewSources,
+      viewDistinctOn,
       views: planned
     },
     null,

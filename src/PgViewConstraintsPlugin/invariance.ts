@@ -16,7 +16,7 @@
 
 import { collectViewConstraints } from './collect.ts'
 import type { RunQuery } from './collect.ts'
-import { foreignKeyIndexBacked } from './derive.ts'
+import { relationIndexBacked } from './derive.ts'
 
 /**
  * Opens a session on one connection string with the caller's driver; the plugin
@@ -104,7 +104,7 @@ interface Contract {
   planReadable: boolean
   foreignKeys: string[]
   /** Each derived relation, and whether its referencing view columns are all indexed. */
-  relations: { tag: string; indexBacked: boolean | null }[]
+  relations: { tag: string; indexBacked: boolean }[]
   primaryKey: string | null
   unique: string | null
   notNull: string[]
@@ -161,7 +161,10 @@ async function contractOf(
         planReadable: derived.origins !== null,
         foreignKeys: derived.foreignKeys.map((key) => key.tag).sort(),
         relations: derived.foreignKeys
-          .map((key) => ({ tag: key.tag, indexBacked: foreignKeyIndexBacked(derived, key) }))
+          .map((key) => ({
+            tag: key.tag,
+            indexBacked: relationIndexBacked(derived, key.viewColumns, collected.catalog)
+          }))
           .sort((left, right) => left.tag.localeCompare(right.tag)),
         primaryKey: derived.primaryKey?.tag ?? null,
         unique: derived.unique?.tag ?? null,
@@ -197,10 +200,7 @@ function indexed(contracts: TargetContract[]): Map<string, string> {
   for (const target of contracts) {
     for (const view of target.views) {
       const relations = view.relations
-        .map(
-          (relation) =>
-            `${relation.tag}=${relation.indexBacked === null ? '-' : relation.indexBacked}`
-        )
+        .map((relation) => `${relation.tag}=${relation.indexBacked}`)
         .join('; ')
       const indexBacked =
         view.indexBacked === null

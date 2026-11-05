@@ -187,8 +187,7 @@ const UNIQUE_KEY_QUERY = `
 // Every index of a relation, for the columns a condition can be pushed to. Only the
 // plain column keys among the first `indnkeyatts` positions count — an expression key is
 // not a column and an `INCLUDE` column is not a key — and an index serves a condition
-// only where it is valid, ready and not partial (`indpred` null). The expression text is
-// read for the one reason a column can carry when no usable key covers it.
+// only where it is valid, ready and not partial (`indpred` null).
 const INDEX_QUERY = `
   SELECT namespace.nspname      AS schema,
          class.relname          AS relation,
@@ -199,8 +198,7 @@ const INDEX_QUERY = `
           FROM unnest(index.indkey[0:index.indnkeyatts - 1]) WITH ORDINALITY AS key(attnum, ord)
                    JOIN pg_attribute attribute
                         ON attribute.attrelid = index.indrelid
-                            AND attribute.attnum = key.attnum) AS key_columns,
-         pg_get_expr(index.indexprs, index.indrelid) AS expressions
+                            AND attribute.attnum = key.attnum) AS key_columns
   FROM pg_index index
            JOIN pg_class class ON class.oid = index.indrelid
            JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
@@ -448,14 +446,12 @@ export async function readCatalogRelations(
       usable: boolean
       partial: boolean
       key_columns: string[] | null
-      expressions: string | null
     }>(INDEX_QUERY)) {
       relationOf(row.schema, row.relation).indexes.push({
         name: row.index_name,
         keyColumns: row.key_columns ?? [],
         usable: row.usable === true,
-        partial: row.partial === true,
-        expressions: row.expressions
+        partial: row.partial === true
       })
     }
   }
@@ -573,6 +569,8 @@ export interface ViewTreeFacts {
   cteMaterialized: Map<string, boolean>
   /** How many times each `WITH` query is referenced in the view's own query. */
   cteRefCount: Map<string, number>
+  /** Whether any query of the view's stored tree uses `DISTINCT ON` (`hasDistinctOn`). */
+  distinctOn: boolean
 }
 
 /** One base column a view column's stored tree traced it to. */
@@ -697,7 +695,8 @@ export async function readViewTrees(query: RunQuery, schemas: string[]): Promise
       optionallyFlattenedColumns: tree.optionallyFlattenedColumns,
       relationAliases: tree.relationAliases,
       cteMaterialized: tree.cteMaterialized,
-      cteRefCount: tree.cteRefCount
+      cteRefCount: tree.cteRefCount,
+      distinctOn: tree.distinctOn
     })
   }
   return { supported: true, trees }
@@ -851,6 +850,33 @@ export interface CollectResult {
    * that had nothing to derive.
    */
   shadowedNames: string[]
+  /** The catalog the derivation read, for the relation marks that stand on it. */
+  catalog: ReadonlyMap<string, CatalogRelation>
+}
+
+/**
+ * The schemas whose stored trees have to be read: the service's own, plus every schema a
+ * view of it reaches through a source view. A `DISTINCT ON` of a crossed view is a fact
+ * of that view's tree, and reading only the service's schemas would miss it.
+ */
+function treeSchemasOf(schemas: readonly string[], views: readonly ViewSourceRow[]): string[] {
+  const byKey = new Map(views.map((view) => [`${view.schema}.${view.name}`, view]))
+  const queue = views
+    .filter((view) => schemas.includes(view.schema))
+    .map((view) => ({ key: `${view.schema}.${view.name}`, schema: view.schema }))
+  const reached = new Set<string>()
+  const result = new Set(schemas)
+  while (queue.length > 0) {
+    const next = queue.pop()
+    if (!next || reached.has(next.key)) continue
+    reached.add(next.key)
+    result.add(next.schema)
+    for (const source of byKey.get(next.key)?.sources ?? []) {
+      const found = byKey.get(source)
+      if (found) queue.push({ key: source, schema: found.schema })
+    }
+  }
+  return [...result]
 }
 
 /**
@@ -874,7 +900,13 @@ export async function collectViewConstraints(
   const coercions = await readTypeCoercions(query)
   const viewSources = await readViewSources(query)
   const shadowedNames = await readShadowedNames(query)
-  const { supported: treeSupported, trees: viewTrees } = await readViewTrees(query, schemas)
+  const { supported: treeSupported, trees: viewTrees } = await readViewTrees(
+    query,
+    treeSchemasOf(schemas, viewSources)
+  )
+  const distinctOnViews = new Set(
+    [...viewTrees].filter(([, facts]) => facts.ok && facts.distinctOn).map(([key]) => key)
+  )
   const relationOids = await readRelationOids(query)
   const views = await readViews(query, schemas)
   const derivations: ViewDerivation[] = []
@@ -945,7 +977,8 @@ export async function collectViewConstraints(
       resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map()),
       facts?.optionallyFlattenedColumns ?? new Set(),
       treeRead,
-      deriveIndexes
+      deriveIndexes,
+      distinctOnViews
     )
     // A tree the walk could not place is said out loud: its CTE map is empty, so a
     // `WITH` query reads as refused, and the reason the map is empty is named here
@@ -983,5 +1016,12 @@ export async function collectViewConstraints(
     declaredRowIdentity,
     tables
   )
-  return { derivations, tables, failures, skipped, shadowedNames: [...shadowedNames].sort() }
+  return {
+    derivations,
+    tables,
+    failures,
+    skipped,
+    shadowedNames: [...shadowedNames].sort(),
+    catalog
+  }
 }

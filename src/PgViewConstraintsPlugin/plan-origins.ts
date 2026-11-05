@@ -100,8 +100,6 @@ export interface ExplainPlanNode {
   'Grouping Sets'?: unknown
   /** The grouping of an `Aggregate` or a `Group`, one expression per entry. */
   'Group Key'?: string[]
-  /** The ordering a `Sort`, `Merge Append` or the like applies, one expression per entry. */
-  'Sort Key'?: string[]
   /** `Simple`, or `Partial` / `Finalize` for an aggregate split across workers. */
   'Partial Mode'?: string
   /** On a `CTE Scan`: the `WITH` query it reads. */
@@ -1293,15 +1291,15 @@ class OriginReader {
   /**
    * Every `alias.column` reference whose path from the plan's output to its scan
    * crosses a node a condition on the column cannot be pushed through: a `WindowAgg`, a
-   * `Limit`, a `DISTINCT ON`'s `Unique`, a `ProjectSet`, or a grouping the column is
-   * not grouped by. The path is followed through the nodes that only carry the value —
-   * a join into the input the value comes from, a `Subquery Scan` through the view it is
-   * pinned to, a `CTE Scan` into the subplan proved to be its query — so a blocker in
-   * another branch of the plan does not count.
+   * `Limit`, a `ProjectSet`, a `Sample Scan`, or a grouping the column is not grouped
+   * by. The path is followed through the nodes that only carry the value — a join into
+   * the input the value comes from, a `Subquery Scan` through the view it is pinned to, a
+   * `CTE Scan` into the subplan proved to be its query — so a blocker in another branch
+   * of the plan does not count.
    *
-   * The `Unique` question is the plan's one blind spot: it prints a de-duplication but
-   * not its key, and the key is what tells a `DISTINCT ON` from a regular `DISTINCT`.
-   * See `distinctOnUnique`.
+   * A `DISTINCT ON` is not read here: the plan prints the `Unique` but not its key, so
+   * the view's stored tree is the plan-independent source (`view-tree.ts`, `distinctOn`),
+   * and `derive.ts` closes the columns that cross that view.
    */
   conditionBlocked(root: ExplainPlanNode, selectList: ExplainPlanNode): Set<string> {
     const blocked = new Set<string>()
@@ -1316,15 +1314,20 @@ class OriginReader {
     const pass = (node: ExplainPlanNode, entries: string[], branchLocal: boolean): void => {
       if (entries.length === 0) return
       const type = node['Node Type']
-      if (type === 'WindowAgg' || type === 'Limit' || type === 'ProjectSet') {
+      if (
+        type === 'WindowAgg' ||
+        type === 'Limit' ||
+        type === 'ProjectSet' ||
+        type === 'Sample Scan'
+      ) {
         for (const entry of entries) mark(entry, branchLocal)
         return
       }
       if (type === 'Unique') {
-        if (distinctOnUnique(node, this.soleRelation?.alias ?? null)) {
-          for (const entry of entries) mark(entry, branchLocal)
-          return
-        }
+        // A regular `DISTINCT` de-duplicates all of its output and a condition on a
+        // column passes it. A `DISTINCT ON` de-duplicates a leading subset, which the
+        // plan does not print; that is read from the view's stored tree and applied in
+        // `derive.ts`, where the columns that cross the view are known.
         for (const child of inputChildren(node)) pass(child, entries, branchLocal)
         return
       }
@@ -1541,41 +1544,6 @@ function computesCount(entry: string): boolean {
 function groupsItsInput(node: ExplainPlanNode): boolean {
   const keys = node['Group Key']
   return node['Grouping Sets'] === undefined && Array.isArray(keys) && keys.length > 0
-}
-
-/**
- * Whether a `Unique` de-duplicates a leading subset of its output — a `DISTINCT ON`.
- *
- * The plan prints the de-duplication but not the key it de-duplicates on, and the key is
- * what tells the two apart. A regular `DISTINCT` sorts by every output column; a
- * `DISTINCT ON` sorts by its own expressions plus whatever `ORDER BY` adds, which is a
- * strict subset of the output exactly when the plan shows it. Where the sort key covers
- * the output the two plans are identical, and this answers `false`: that is the only
- * reading that holds across plans, because the same query is a grouping over every
- * column under another plan (a hashed `Aggregate` whose group key is the whole output).
- */
-function distinctOnUnique(node: ExplainPlanNode, soleAlias: string | null): boolean {
-  const output = node.Output ?? []
-  if (output.length === 0) return false
-  let cursor: ExplainPlanNode | undefined = inputChildren(node)[0]
-  let sortKey: string[] | undefined
-  for (let step = 0; step < 4 && cursor; step++) {
-    const key = cursor['Sort Key']
-    if (Array.isArray(key)) {
-      sortKey = key
-      break
-    }
-    const inputs = inputChildren(cursor)
-    cursor = inputs.length === 1 ? inputs[0] : undefined
-  }
-  if (!sortKey) return false
-  const normalize = (entry: string): string => {
-    const reference = parseReference(unwrap(entry))
-    if (!reference) return `expr:${unwrap(entry)}`
-    return qualifiedReference(reference.alias ?? soleAlias ?? '', reference.column)
-  }
-  const keys = new Set(sortKey.map(normalize))
-  return !output.every((entry) => keys.has(normalize(entry)))
 }
 
 /**

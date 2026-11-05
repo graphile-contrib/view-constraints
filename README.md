@@ -288,35 +288,46 @@ A view column is index-backed when all of these hold:
    column key counts; an expression key does not. When the origin is a materialized
    view, its own indexes are the ones asked about.
 3. No node on the path from the view's output to the scan of that base column stops a
-   condition: a `WindowAgg`, a `Limit` (LIMIT/OFFSET inside the view), a `Unique`
-   produced by `DISTINCT ON`, or a `ProjectSet` (a set-returning function in a select
-   list). A `Group`/`Aggregate` passes when the column is in its group key. Only the
-   path counts: a blocker in another branch of the plan does not affect the column.
+   condition: a `WindowAgg`, a `Limit` (LIMIT/OFFSET inside the view), a `ProjectSet` (a
+   set-returning function in a select list), a `Sample Scan` (`TABLESAMPLE`), or a
+   `DISTINCT ON` whose output the column passes through. A `Group`/`Aggregate` passes
+   when the column is in its group key. Only the path counts: a blocker in another branch
+   of the plan does not affect the column.
 4. For a `UNION ALL`, the column is index-backed only where every branch is.
 
 A column that fails names why in the report: `no-index-on-base-column`,
-`only-partial-or-expression-index`, `condition-stops-above-the-scan`, or the step-1
-refusal that left it without a base column.
+`only-partial-index`, `condition-stops-above-the-scan`, or the step-1 refusal that left it
+without a base column.
 
-The `Unique` of a `DISTINCT ON` is the one shape the plan does not fully print: it shows
-the de-duplication but not the key. A regular `DISTINCT` de-duplicates all of its output
-and its sort key covers that output; a `DISTINCT ON` de-duplicates a leading subset, so
-a sort key that does not cover the output is a `DISTINCT ON` and blocks. When the sort
-key does cover the output the plan is identical to a regular `DISTINCT`'s, and the
-column is read as through a regular `DISTINCT` — the reading that does not move with the
-plan, because the same query is a grouping over every column under another plan.
+A `DISTINCT ON` is read from the view's stored query (`pg_rewrite.ev_action`,
+`hasDistinctOn`), not inferred from the plan: the plan prints the `Unique` but not the
+key it de-duplicates on, so a `DISTINCT ON` whose key covers its whole output is
+indistinguishable from a plain `DISTINCT` there. The stored tree does not move with the
+plan. A plain `DISTINCT` de-duplicates all of its output and keeps passing; a
+`DISTINCT ON` closes every column that passes through the view — the asking view, or a
+view the value crosses on its way to the scan.
 
 A relation whose referencing side is a view's columns — the relations this plugin
 declares as `FAKE_` constraints, and hand-written `@foreignKey` tags on views — follows
-the same answer. Its backward relation (`isReferencee`) carries
-`relation.extensions.isIndexed = false` unless every referencing view column is
-index-backed, which is the test `PgIndexBehaviorsPlugin` applies to a table's own
-foreign key; its `-select`, `-list`, `-connection` and `-single` behaviors are withheld
-on the same terms.
+the table test `PgIndexBehaviorsPlugin` applies to a real foreign key. Its backward
+relation (`isReferencee`) carries `relation.extensions.isIndexed = false` unless all of
+its referencing view columns proxy columns of **one** base relation and one valid,
+non-partial index of that relation has all of those columns among its plain key columns.
+Two single-column indexes on the columns of a composite key are not one index of both.
+Its `-select`, `-list`, `-connection` and `-single` behaviors are withheld on the same
+terms.
 
-A `declare: false` instance derives the answer for its report and writes nothing to the
-schema; `reportingPreset` does exactly that, and `ViewConstraintsReportRenderer` prints
-each view's indexed columns beside the reason for each column that is not.
+A materialized view derives no index answer of its own: `PgIndexBehaviorsPlugin` reads
+the stored copy's own indexes for relkind `m`. A plain view whose column comes from the
+stored copy still asks that materialized view's indexes, because the origin read stops
+at its scan.
+
+A view whose index answer cannot be derived stays closed: its columns carry
+`isIndexed = false`, and the report names them `not-derived` with the reason instead of
+going silent. A `declare: false` instance derives the answer for its report and writes
+nothing to the schema; `reportingPreset` turns the index derivation on for its reporting
+instance (and declares nothing), and `ViewConstraintsReportRenderer` prints each view's
+indexed columns beside the reason for each column that is not.
 
 ## Plan invariance
 

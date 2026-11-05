@@ -388,6 +388,12 @@ export interface ViewTree {
   cteMaterialized: Map<string, boolean>
   /** How many times each `WITH` query is referenced in this view's own query. */
   cteRefCount: Map<string, number>
+  /**
+   * Whether any query of this view's stored tree de-duplicates on a leading subset of
+   * its output (`hasDistinctOn`): a `DISTINCT ON`. The plan prints the de-duplication but
+   * not its key, so this is the plan-independent way to tell it from a plain `DISTINCT`.
+   */
+  distinctOn: boolean
 }
 
 /**
@@ -404,7 +410,8 @@ export function readViewTree(action: string): ViewTree {
     optionallyFlattenedColumns: new Set(),
     relationAliases: new Map(),
     cteMaterialized: new Map(),
-    cteRefCount: new Map()
+    cteRefCount: new Map(),
+    distinctOn: false
   }
   const parsed = new DumpReader(action).parse()
   if (!parsed.ok || parsed.value === null) return tree
@@ -419,6 +426,15 @@ export function readViewTree(action: string): ViewTree {
   })
   if (!known) return tree
   tree.ok = true
+
+  // Whether any query of the tree de-duplicates on a leading subset of its output. The
+  // plan prints a `Unique` but not its key, so this is read from the stored query rather
+  // than inferred from a sort key the plan may or may not print.
+  walkDumped(root, (node) => {
+    if (node.type === 'QUERY' && textOf(node.fields.get('hasDistinctOn')) === 'true') {
+      tree.distinctOn = true
+    }
+  })
 
   // The whole tree, so a `WITH` query nested in another query's body is reached: a name
   // two of them share is dropped, because the plan spells both by that name and cannot

@@ -49,7 +49,8 @@
 import type {} from 'postgraphile'
 import { collectViewConstraints } from './collect.ts'
 import type { RunQuery } from './collect.ts'
-import type { TableDerivation, ViewDerivation } from './derive.ts'
+import { relationIndexBacked } from './derive.ts'
+import type { CatalogRelation, TableDerivation, ViewDerivation } from './derive.ts'
 
 export type { TableDerivation, ViewDerivation } from './derive.ts'
 export type { ColumnOrigin, ColumnSources } from './plan-origins.ts'
@@ -110,6 +111,11 @@ export interface ViewConstraintsReport {
    * because another object bears the name" from "had nothing to derive".
    */
   shadowedNames: string[]
+  /**
+   * Whether this instance derived the index-backed answer. A report without it has no
+   * index lines: the derivation was not asked for, so nothing is said about it.
+   */
+  indexes: boolean
 }
 
 export interface ViewConstraintsOptions {
@@ -225,7 +231,11 @@ export function PgViewConstraintsPlugin(
   // `PgIndexBehaviorsPlugin` already reads.
   const indexState = new Map<
     string,
-    { schemas: Set<string>; views: Map<string, Map<string, boolean>> }
+    {
+      schemas: Set<string>
+      catalog: ReadonlyMap<string, CatalogRelation>
+      views: Map<string, ViewDerivation>
+    }
   >()
   const applyIndexes = indexes && declare
   return {
@@ -315,7 +325,12 @@ export function PgViewConstraintsPlugin(
           if (indexes) {
             indexState.set(serviceName, {
               schemas: new Set(schemas),
-              views: indexAnswersOf(collected.derivations)
+              catalog: collected.catalog,
+              views: new Map(
+                collected.derivations.map(
+                  (derived) => [`${derived.schema}.${derived.view}`, derived] as const
+                )
+              )
             })
           }
 
@@ -439,7 +454,8 @@ export function PgViewConstraintsPlugin(
             unexamined,
             failures: collected.failures,
             skipped: collected.skipped,
-            shadowedNames: collected.shadowedNames
+            shadowedNames: collected.shadowedNames,
+            indexes
           })
         },
         // The codec of a plain view's column is what `PgIndexBehaviorsPlugin`'s behavior
@@ -454,9 +470,10 @@ export function PgViewConstraintsPlugin(
           if (!pgClass || pgClass.relkind !== 'v') return
           const namespace = pgClass.getNamespace()?.nspname
           if (!namespace || !state.schemas.has(namespace)) return
+          const derived = state.views.get(`${namespace}.${pgClass.relname}`)
           const answer =
-            state.views.get(`${namespace}.${pgClass.relname}`)?.get(event.pgAttribute.attname) ===
-            true
+            derived?.indexBacked?.find((entry) => entry.column === event.pgAttribute.attname)
+              ?.indexed === true
           const extensions =
             event.attribute.extensions ?? (event.attribute.extensions = Object.create(null))
           if (!('isIndexed' in extensions)) {
@@ -464,9 +481,9 @@ export function PgViewConstraintsPlugin(
           }
         },
         // The backward relation of a foreign key whose referencing side is a view is
-        // one-to-many only if the referencing view's columns can be served by indexes on
-        // the base columns they proxy — what `PgIndexBehaviorsPlugin` decides for a
-        // table's own foreign key and skips for a `FAKE_` constraint.
+        // one-to-many only if the referencing view's columns proxy one indexed base
+        // relation — the table test `PgIndexBehaviorsPlugin` applies to a real foreign
+        // key and skips for a `FAKE_` constraint.
         pgRelations_relation(_info, event) {
           if (!applyIndexes) return
           const { relation, pgConstraint, serviceName } = event
@@ -477,29 +494,13 @@ export function PgViewConstraintsPlugin(
           if (referencing?.relkind !== 'v') return
           const namespace = referencing.getNamespace()?.nspname
           if (!namespace || !state.schemas.has(namespace)) return
-          const answers = state.views.get(`${namespace}.${referencing.relname}`)
+          const derived = state.views.get(`${namespace}.${referencing.relname}`)
           const columns = (pgConstraint.getAttributes() ?? []).map((attribute) => attribute.attname)
-          const allIndexed =
-            answers !== undefined &&
-            columns.length > 0 &&
-            columns.every((column) => answers.get(column) === true)
-          if (allIndexed) return
+          if (derived && relationIndexBacked(derived, columns, state.catalog)) return
           const extensions = relation.extensions ?? (relation.extensions = Object.create(null))
           if (!('isIndexed' in extensions)) extensions.isIndexed = false
         }
       }
     }
   }
-}
-
-/** The index-backed answer for each plain view's columns, keyed by `schema.view`. */
-function indexAnswersOf(derivations: readonly ViewDerivation[]): Map<string, Map<string, boolean>> {
-  const views = new Map<string, Map<string, boolean>>()
-  for (const derived of derivations) {
-    if (derived.relkind !== 'v') continue
-    const columns = new Map<string, boolean>()
-    for (const entry of derived.indexBacked ?? []) columns.set(entry.column, entry.indexed)
-    views.set(`${derived.schema}.${derived.view}`, columns)
-  }
-  return views
 }

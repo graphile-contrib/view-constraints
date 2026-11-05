@@ -43,6 +43,20 @@ function tail(tag: string): string {
   return rest.join('|')
 }
 
+/**
+ * Why a view has no index answer of its own: a materialized view is owned by
+ * `PgIndexBehaviorsPlugin`, a plan refusal or a stored tree not read leaves the
+ * derivation with nothing to say, and anything else is the closed default.
+ */
+function indexNotDerivedReason(derived: ViewConstraintsReport['views'][number]['derived']): string {
+  if (derived.relkind === 'm') return 'materialized view: PgIndexBehaviorsPlugin owns its indexes'
+  if (derived.planRefusal !== null) return `plan refused: ${derived.planRefusal}`
+  if (derived.notes.some((note) => note.includes('stored rewrite tree'))) {
+    return 'stored rewrite tree not read'
+  }
+  return 'not derived'
+}
+
 /** The `@notNull` tally of one surface, and the names behind its worrying third. */
 interface NotNullTally {
   /** Hand-written `@notNull` the derivation confirms. */
@@ -87,6 +101,7 @@ function renderService(
     )
     const derivedNotNull = new Set(derived.notNullColumns)
     const declaredNotNull = new Set(view.declaredNotNullColumns)
+    const showIndexes = report.indexes
     const interesting =
       derivedKeys.size > 0 ||
       declaredKeys.size > 0 ||
@@ -96,7 +111,7 @@ function renderService(
       view.declaredUnique.length > 0 ||
       derivedNotNull.size > 0 ||
       declaredNotNull.size > 0 ||
-      derived.indexBacked !== null ||
+      showIndexes ||
       derived.origins === null
     if (!interesting) continue
 
@@ -162,15 +177,23 @@ function renderService(
     }
     // The index-backed columns are the ones whose filter and order behaviors a
     // `PgIndexBehaviorsPlugin` instance leaves in place; every other column names the
-    // condition that kept it closed.
-    if (derived.indexBacked !== null) {
-      const indexed = derived.indexBacked
-        .filter((entry) => entry.indexed)
-        .map((entry) => entry.column)
-      if (indexed.length > 0) line(`     idx INDEXED      ${indexed.join(', ')}`)
-      for (const entry of derived.indexBacked) {
-        if (entry.indexed) continue
-        line(`     idx no           ${entry.column}: ${entry.reason ?? 'not derived'}`)
+    // condition that kept it closed. A view whose answer could not be derived is not
+    // silent: its columns carry `isIndexed = false`, and each says so with the reason.
+    if (showIndexes) {
+      if (derived.indexBacked !== null) {
+        const indexed = derived.indexBacked
+          .filter((entry) => entry.indexed)
+          .map((entry) => entry.column)
+        if (indexed.length > 0) line(`     idx INDEXED      ${indexed.join(', ')}`)
+        for (const entry of derived.indexBacked) {
+          if (entry.indexed) continue
+          line(`     idx no           ${entry.column}: ${entry.reason ?? 'not derived'}`)
+        }
+      } else {
+        const why = indexNotDerivedReason(derived)
+        for (const column of derived.columns) {
+          line(`     idx no           ${column}: not-derived (${why})`)
+        }
       }
     }
     for (const note of derived.notes) line(`     note: ${note}`)
