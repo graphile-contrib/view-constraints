@@ -30,7 +30,9 @@ export function reportingPreset(
     ...preset,
     plugins: [
       ...(preset.plugins ?? []).filter((plugin) => plugin.name !== 'PgViewConstraintsPlugin'),
-      PgViewConstraintsPlugin({ report: onReport })
+      // `declare` defaults to on; the reporting instance must not add the tags the
+      // hand-written side is being compared against.
+      PgViewConstraintsPlugin({ report: onReport, declare: false })
     ]
   }
 }
