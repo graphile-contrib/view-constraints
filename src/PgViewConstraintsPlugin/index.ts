@@ -38,11 +38,19 @@
 //
 // `declare` is on unless disabled, so that adding the plugin adds the relations it
 // derives. `report` may observe the same derivation without changing that default.
+//
+// `indexes: true` adds one more derivation over the same plan: whether a condition on a
+// plain view's column can be served by an index of the base column it proxies. The
+// answer is written to `attribute.extensions.isIndexed`, which `PgIndexBehaviorsPlugin`
+// reads to withhold filter and order exactly as it does for a table column, and the
+// backward relation of a foreign key whose referencing side is a view is closed on the
+// same answer. The four conditions are in `README.md`, "Index-backed columns".
 
 import type {} from 'postgraphile'
 import { collectViewConstraints } from './collect.ts'
 import type { RunQuery } from './collect.ts'
-import type { TableDerivation, ViewDerivation } from './derive.ts'
+import { relationIndexBacked } from './derive.ts'
+import type { CatalogRelation, TableDerivation, ViewDerivation } from './derive.ts'
 
 export type { TableDerivation, ViewDerivation } from './derive.ts'
 export type { ColumnOrigin, ColumnSources } from './plan-origins.ts'
@@ -103,6 +111,11 @@ export interface ViewConstraintsReport {
    * because another object bears the name" from "had nothing to derive".
    */
   shadowedNames: string[]
+  /**
+   * Whether this instance derived the index-backed answer. A report without it has no
+   * index lines: the derivation was not asked for, so nothing is said about it.
+   */
+  indexes: boolean
 }
 
 export interface ViewConstraintsOptions {
@@ -118,6 +131,16 @@ export interface ViewConstraintsOptions {
    * derived surface to `@primaryKey`/`@notNull`/`@foreignKey` alone.
    */
   deriveUnique?: boolean
+  /**
+   * Open a plain view's columns whose values arrive from indexed base columns through a
+   * path a condition can be pushed down: set `extensions.isIndexed` true where the
+   * derivation proves it and false everywhere else, so `PgIndexBehaviorsPlugin` withholds
+   * the filter and order behaviors it withholds for an unindexed table column. Off unless
+   * asked for, so an existing surface keeps every view column filterable and sortable.
+   * The `declare: false` instance derives the same answer for its report and changes no
+   * schema.
+   */
+  indexes?: boolean
   /** Receives the derivation and the view's own declarations, once per service. */
   report?: (report: ViewConstraintsReport) => void | Promise<void>
 }
@@ -201,6 +224,20 @@ export function PgViewConstraintsPlugin(
 ): GraphileConfig.Plugin {
   const declare = options.declare ?? true
   const deriveUnique = options.deriveUnique ?? true
+  const indexes = options.indexes ?? false
+  // The index-backed answers are read by two other gather hooks below. They are the
+  // same answer the report carries, by service and by `schema.view`, and only a plain
+  // view's columns are opened: a materialized view has its own indexes, which
+  // `PgIndexBehaviorsPlugin` already reads.
+  const indexState = new Map<
+    string,
+    {
+      schemas: Set<string>
+      catalog: ReadonlyMap<string, CatalogRelation>
+      views: Map<string, ViewDerivation>
+    }
+  >()
+  const applyIndexes = indexes && declare
   return {
     name: 'PgViewConstraintsPlugin',
     version: '0.1.0',
@@ -267,7 +304,8 @@ export function PgViewConstraintsPlugin(
                   null,
                   publishedAsEnumeration,
                   declaredRowIdentity,
-                  deriveUnique
+                  deriveUnique,
+                  indexes
                 )
               }
               return withSuperuserPgClientFromPgService(pgService, pgSettings, (privilegedClient) =>
@@ -277,11 +315,24 @@ export function PgViewConstraintsPlugin(
                   runQueryOn(privilegedClient),
                   publishedAsEnumeration,
                   declaredRowIdentity,
-                  deriveUnique
+                  deriveUnique,
+                  indexes
                 )
               )
             }
           )
+
+          if (indexes) {
+            indexState.set(serviceName, {
+              schemas: new Set(schemas),
+              catalog: collected.catalog,
+              views: new Map(
+                collected.derivations.map(
+                  (derived) => [`${derived.schema}.${derived.view}`, derived] as const
+                )
+              )
+            })
+          }
 
           const views: ViewConstraintsComparison[] = []
           for (const derived of collected.derivations) {
@@ -403,8 +454,51 @@ export function PgViewConstraintsPlugin(
             unexamined,
             failures: collected.failures,
             skipped: collected.skipped,
-            shadowedNames: collected.shadowedNames
+            shadowedNames: collected.shadowedNames,
+            indexes
           })
+        },
+        // The codec of a plain view's column is what `PgIndexBehaviorsPlugin`'s behavior
+        // callback reads. Its own gather hook gives a view the benefit of the doubt; this
+        // one closes the column unless the derivation proved it. A column another plugin
+        // has already answered is left alone.
+        pgCodecs_attribute(_info, event) {
+          if (!applyIndexes) return
+          const state = indexState.get(event.serviceName)
+          if (!state) return
+          const pgClass = event.pgAttribute.getClass()
+          if (!pgClass || pgClass.relkind !== 'v') return
+          const namespace = pgClass.getNamespace()?.nspname
+          if (!namespace || !state.schemas.has(namespace)) return
+          const derived = state.views.get(`${namespace}.${pgClass.relname}`)
+          const answer =
+            derived?.indexBacked?.find((entry) => entry.column === event.pgAttribute.attname)
+              ?.indexed === true
+          const extensions =
+            event.attribute.extensions ?? (event.attribute.extensions = Object.create(null))
+          if (!('isIndexed' in extensions)) {
+            extensions.isIndexed = answer
+          }
+        },
+        // The backward relation of a foreign key whose referencing side is a view is
+        // one-to-many only if the referencing view's columns proxy one indexed base
+        // relation — the table test `PgIndexBehaviorsPlugin` applies to a real foreign
+        // key and skips for a `FAKE_` constraint.
+        pgRelations_relation(_info, event) {
+          if (!applyIndexes) return
+          const { relation, pgConstraint, serviceName } = event
+          if (!relation.isReferencee) return
+          const state = indexState.get(serviceName)
+          if (!state) return
+          const referencing = pgConstraint.getClass()
+          if (referencing?.relkind !== 'v') return
+          const namespace = referencing.getNamespace()?.nspname
+          if (!namespace || !state.schemas.has(namespace)) return
+          const derived = state.views.get(`${namespace}.${referencing.relname}`)
+          const columns = (pgConstraint.getAttributes() ?? []).map((attribute) => attribute.attname)
+          if (derived && relationIndexBacked(derived, columns, state.catalog)) return
+          const extensions = relation.extensions ?? (relation.extensions = Object.create(null))
+          if (!('isIndexed' in extensions)) extensions.isIndexed = false
         }
       }
     }

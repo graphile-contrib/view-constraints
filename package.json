@@ -1,6 +1,6 @@
 {
   "name": "@graphile-contrib/view-constraints",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Derive PostGraphile view constraints from PostgreSQL plans and catalogs.",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,6 +14,7 @@
     "lint:fix": "prettier --ignore-path .gitignore --write '**/*.{js,jsx,ts,tsx,graphql,md,json}'",
     "prettier:check": "prettier --ignore-path .gitignore --check '**/*.{js,jsx,ts,tsx,graphql,md,json}'",
     "test": "node --experimental-strip-types --test __tests__/PgViewConstraintsPlugin.test.ts",
+    "test:lab": "node --experimental-strip-types --test __tests__/PgViewConstraintsPlugin.schema.test.ts",
     "fixture": "node --experimental-strip-types __tests__/build-fixture.ts"
   },
   "repository": {

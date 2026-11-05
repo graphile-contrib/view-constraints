@@ -52,3 +52,8 @@ jobs:
           PGPORT: '5432'
           PGUSER: postgres
       - run: yarn test
+      - run: yarn test:lab
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
