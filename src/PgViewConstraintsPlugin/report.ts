@@ -1,10 +1,9 @@
 // Renders what `PgViewConstraintsPlugin` derives beside what a service's views
-// declare by hand, from the report a non-declaring instance of the plugin hands over.
+// declare by hand, from the report an instance of the plugin hands over.
 //
 // The comparison runs inside a real `makeSchema`, so the hand-written side is the
 // merged smart tags PostGraphile itself sees — tag plugins and SQL `COMMENT`s alike —
-// rather than a second reading of whatever wrote them. `reportingPreset` swaps the
-// declaring instance out for a reporting one, so nothing derived reaches the schema.
+// rather than a second reading of whatever wrote them.
 
 import type {} from 'postgraphile'
 import { foreignKeyReference, PgViewConstraintsPlugin } from './index.ts'
@@ -17,10 +16,25 @@ import type { TargetRefusal } from './derive.ts'
 type Refusal = PlanRefusal | ColumnRefusal | TargetRefusal
 
 /**
- * `preset` with its `PgViewConstraintsPlugin` replaced by one that declares nothing
- * and hands its report to `onReport` instead, so that the hand-written side of the
- * comparison is the tags a human wrote rather than the tags the declaring instance
- * would have added to them.
+ * `preset` with its `PgViewConstraintsPlugin` replaced by a reporting instance: one that
+ * declares what it derives, as the plugin does by default, and hands its report to
+ * `onReport`.
+ *
+ * It declares because the schema the report is built from needs the derived keys. A
+ * schema in which something stands on a view's derived key — a relational `@interface`
+ * whose variant is a view, a reference to a view — cannot be built without the tags that
+ * declare it, and a build that throws has nothing to report on.
+ *
+ * The instance runs with its own options, not the consumer's: `declare` on,
+ * `indexes: true` and `deriveUnique` at its default. Its schema is the consumer's where
+ * the consumer's options are the same, and differs where they are not. A consumer without
+ * `indexes` publishes the filter and order of every view column, and the reporting build
+ * withholds them from a view column no index backs; a consumer with `deriveUnique: false`
+ * publishes no row lookup by a derived `@unique`, and the reporting build does.
+ *
+ * The comparison is still a derivation against the tags a human wrote: the instance
+ * reads a relation's hand-written tags before it declares anything on that relation, so a
+ * tag it derived is never counted as a hand tag.
  */
 export function reportingPreset(
   preset: GraphileConfig.Preset,
@@ -30,10 +44,7 @@ export function reportingPreset(
     ...preset,
     plugins: [
       ...(preset.plugins ?? []).filter((plugin) => plugin.name !== 'PgViewConstraintsPlugin'),
-      // `declare` defaults to on; the reporting instance must not add the tags the
-      // hand-written side is being compared against. The index-backed answer is part
-      // of the report.
-      PgViewConstraintsPlugin({ report: onReport, indexes: true, declare: false })
+      PgViewConstraintsPlugin({ report: onReport, indexes: true })
     ]
   }
 }

@@ -22,9 +22,10 @@ export default {
 The plugin runs before `PgFakeConstraintsPlugin`, which turns the derived tags
 into relations in the generated schema.
 
-Pass `declare: false` only to inspect a `report` without changing the schema. Pass
-`indexes: true` to derive which view columns are backed by an index (see "Index-backed
-columns").
+Pass `declare: false` only to inspect a `report` without changing the schema: a schema in
+which something stands on a derived key — a relational `@interface` whose variant is a
+view, say — is not built without the tags that declare it. Pass `indexes: true` to derive
+which view columns are backed by an index (see "Index-backed columns").
 
 ## Row identity
 
@@ -326,8 +327,10 @@ A view whose index answer cannot be derived stays closed: its columns carry
 `isIndexed = false`, and the report names them `not-derived` with the reason instead of
 going silent. A `declare: false` instance derives the answer for its report and writes
 nothing to the schema; `reportingPreset` turns the index derivation on for its reporting
-instance (and declares nothing), and `ViewConstraintsReportRenderer` prints each view's
-indexed columns beside the reason for each column that is not.
+instance, which declares as the plugin does, so the schema it builds withholds filter and
+order behaviors from a view column no index backs, whatever the consumer's own `indexes`
+is, and `ViewConstraintsReportRenderer` prints each view's indexed columns beside the
+reason for each column that is not.
 
 ## Plan invariance
 
@@ -353,7 +356,18 @@ an empty database and another against production. A consumer wires its services 
 `InvarianceTarget`s and a driver into `open`, and fails the build on a difference.
 
 `reportingPreset(preset, onReport)` and `ViewConstraintsReportRenderer` print what
-is derived beside what the views declare by hand. The report also names the built-in
-spellings a user object has taken over in the database, whose rules stand down for
-every view, so a surface that derives less than expected can be read against that list
-rather than mistaken for one with nothing to derive.
+is derived beside what the views declare by hand. The reporting instance declares what
+it derives, as the plugin does by default, because the schema the report is built from
+needs the derived keys: a schema in which something stands on a derived key does not
+build without the declaration, and a build that throws has nothing to report on. The
+instance runs with its own options — `declare` on, `indexes: true`, `deriveUnique` at its
+default — and does not take the consumer's, so the schema it builds is the consumer's
+only where the consumer's options are the same. A consumer without `indexes` publishes
+the filter and order of every view column, and the reporting build withholds them from a
+view column no index backs; a consumer with `deriveUnique: false` publishes no row lookup
+by a derived `@unique`, and the reporting build does. The hand-written side is each
+relation's tags as they stand before the instance declares on that relation, so a
+derived tag is never counted as a hand tag. The report also names
+the built-in spellings a user object has taken over in the database, whose rules stand
+down for every view, so a surface that derives less than expected can be read against
+that list rather than mistaken for one with nothing to derive.
