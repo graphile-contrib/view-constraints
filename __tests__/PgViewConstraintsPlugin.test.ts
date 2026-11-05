@@ -203,7 +203,8 @@ function derive(
         cteOrigins,
         cteMaterialized,
         cteRefCount
-      )
+      ),
+      true
     ),
     catalog,
     coercions,
@@ -3613,7 +3614,8 @@ function labDerivations(regime: string = DEFAULT_REGIME): ViewDerivation[] {
           view.plan,
           view.columns.length,
           subqueryViewCandidates(fixture.viewSources, view.schema, view.view),
-          planCatalog
+          planCatalog,
+          true
         ),
         catalog,
         coercions,

@@ -936,7 +936,8 @@ export async function collectViewConstraints(
           resolveCteOrigins(relationOids, facts?.cteOrigins ?? new Map()),
           facts?.cteMaterialized ?? new Map(),
           facts?.cteRefCount ?? new Map()
-        )
+        ),
+        deriveIndexes
       ),
       catalog,
       coercions,

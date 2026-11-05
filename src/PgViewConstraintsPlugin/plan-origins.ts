@@ -1639,7 +1639,8 @@ export function readPlanOrigins(
   root: ExplainPlanNode,
   requestedColumnCount: number,
   candidates: ReadonlyMap<string, ViewShape>,
-  catalog: PlanCatalog
+  catalog: PlanCatalog,
+  conditionPaths = false
 ): PlanOrigins | PlanRefusal {
   if (countNodes(root, (node) => UNREADABLE_SET_NODE_TYPES.has(node['Node Type'])) > 0) {
     return 'unreadable-set-operation'
@@ -1710,7 +1711,9 @@ export function readPlanOrigins(
   // A value a union assembled is read off several streams, named together as
   // `a∨b`; a qualifier keeps it from NULL only where it does so in every one of them.
   const qualified = readQualifiedNonNull(root, context, catalog)
-  const stopped = reader.conditionBlocked(root, selectListNode)
+  // The path a condition would take to the scan is only read for the opt-in index
+  // derivation; the other readings of the plan do not ask it.
+  const stopped = conditionPaths ? reader.conditionBlocked(root, selectListNode) : new Set<string>()
   for (const reading of readings) {
     for (const origin of reading.origins ?? []) {
       origin.qualifiedNonNull = origin.alias
