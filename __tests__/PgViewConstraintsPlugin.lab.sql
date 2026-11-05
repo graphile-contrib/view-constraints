@@ -1064,3 +1064,91 @@ create view v_oj_union_src as
   select 'b'::text, id, nn from need;
 create view v_oj_union as
   select a.id as aid, u.src from need a left join v_oj_union_src u on u.id = a.id;
+
+-- ── Index-backed columns ───────────────────────────────────────────────────────
+--
+-- A plain view column is index-backed when the base column it proxies is a key column
+-- of a usable, non-partial index, and the plan's path from the view's output to that
+-- scan has no node a condition cannot be pushed through. Each condition has a positive
+-- and a negative case here; the fixture is rebuilt from this file on every supported
+-- major, so a plan shape that moves is a failure rather than a guess.
+
+create table idx_lab (
+  id bigint primary key,       -- first key position of the primary key
+  later text not null,         -- later key position of a composite index
+  group_key text not null,     -- a grouping key
+  no_index text not null,      -- no index at all
+  only_partial text,           -- a partial index only
+  only_expression text,        -- an expression index only
+  include_only text,           -- an INCLUDE column only
+  invalid_only text            -- an index that is not valid
+);
+create index idx_lab_id_later_key on idx_lab (id, later);
+create index idx_lab_group_key_idx on idx_lab (group_key);
+create index idx_lab_partial_idx on idx_lab (only_partial) where only_partial is not null;
+create index idx_lab_expression_idx on idx_lab (lower(only_expression));
+create index idx_lab_include_idx on idx_lab (id) include (include_only);
+create index idx_lab_invalid_idx on idx_lab (invalid_only);
+-- The fixture records an index PostgreSQL knows but will not use.
+update pg_index set indisvalid = false where indexrelid = 'idx_lab_invalid_idx'::regclass;
+
+-- POSITIVE: the primary key's only column, a composite index's later key column, and a
+-- grouping key; NEGATIVE: a column with no index beside them.
+create view v_idx_plain as select id, later, group_key, no_index from idx_lab;
+-- POSITIVE: a view over a view is flattened to the same scans.
+create view v_idx_over_view as select id, later from v_idx_plain;
+-- POSITIVE: a grouping key proxies; the aggregate beside it does not.
+create view v_idx_group as
+  select group_key, count(*) as n from idx_lab group by group_key;
+-- NEGATIVE: an index exists under each column, but none a condition on every row can use.
+create view v_idx_partial as select only_partial from idx_lab;
+create view v_idx_expression as select only_expression from idx_lab;
+create view v_idx_include as select include_only from idx_lab;
+create view v_idx_invalid as select invalid_only from idx_lab;
+-- NEGATIVE: a window function on the path. The partition key is selected beside it so
+-- that the window is the view's own select list rather than a subquery the reader cannot
+-- pin.
+create view v_idx_window as
+  select id, group_key, row_number() over (partition by group_key order by id) as rn
+  from idx_lab;
+-- NEGATIVE: a LIMIT inside the view.
+create view v_idx_limit as select id from idx_lab order by id limit 10;
+-- NEGATIVE: a DISTINCT ON de-duplicates on `id` alone, which is a strict subset of the
+-- output; the ORDER BY on a column no index provides keeps a Sort in every regime.
+create view v_idx_distinct_on as
+  select distinct on (id) id, later, no_index from idx_lab order by id, no_index;
+-- NEGATIVE: a set-returning function in the select list.
+create view v_idx_srf as
+  select id, unnest(array[id, id + 1]) as v from idx_lab;
+-- POSITIVE: a set-returning function only in the input of a semi join, which emits the
+-- outer side's column and never the inner side's.
+create view v_idx_srf_semi as
+  select t.id from idx_lab t where t.id in (select u.v from unnest(array[1, 2]) u(v));
+-- POSITIVE: every branch of the UNION ALL carries an indexed base column.
+create view v_idx_union_all as
+  select id from idx_lab where id > 0
+  union all
+  select id from idx_lab where id < 0;
+-- NEGATIVE: one branch of the UNION ALL carries a base column with no index.
+create table idx_unindexed (id bigint not null, later text not null);
+create view v_idx_union_mixed as
+  select id from idx_lab
+  union all
+  select id from idx_unindexed;
+-- POSITIVE and NEGATIVE of a materialized view's own indexes: the origin read stops at
+-- the scan of the stored copy, and only the columns it indexes are backed there.
+create materialized view m_idx as select id, later from idx_lab;
+create index m_idx_later_idx on m_idx (later);
+create view v_over_m_idx as select id, later from m_idx;
+
+-- A relation whose referencing side is a view: the backward relation's list and
+-- connection fields are withheld unless every referencing view column is index-backed.
+create table idx_target (id bigint primary key);
+create table idx_ref (
+  id bigint primary key,
+  target_id bigint not null references idx_target(id),
+  unindexed_id bigint not null references idx_target(id)
+);
+create index idx_ref_target_id_idx on idx_ref (target_id);
+create view v_idx_ref_indexed as select target_id from idx_ref;
+create view v_idx_ref_unindexed as select unindexed_id from idx_ref;

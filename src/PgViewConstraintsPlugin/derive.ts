@@ -86,6 +86,21 @@ export interface CatalogRelation {
   uniqueKeys: CatalogUniqueKey[]
   /** Partial indexes, with their predicates as `pg_get_expr` prints them. */
   partialIndexes: { name: string; predicate: string }[]
+  /**
+   * Every index of the relation, for the columns a condition can be pushed to. The key
+   * columns are the plain column keys of the first `indnkeyatts` positions — an
+   * expression key is not a column and an `INCLUDE` column is not a key. `usable` is
+   * `indisvalid AND indisready AND indpred IS NULL`, and `expressions` is the text of
+   * the expression keys, for the one reason a column can carry.
+   */
+  indexes: {
+    name: string
+    keyColumns: string[]
+    usable: boolean
+    /** Whether the index carries a partial-index predicate (`indpred`). */
+    partial: boolean
+    expressions: string | null
+  }[]
   columns: Map<string, CatalogColumn>
 }
 
@@ -168,6 +183,15 @@ export interface ViewDerivation {
   columnRefusals: (ColumnRefusal | null)[]
   /** View columns that proxy a NOT NULL base column with no NULL introduced on the way. */
   notNullColumns: string[]
+  /**
+   * Per column, whether a condition on it can be served by an index of the base column
+   * it proxies: that base column is a key column of a usable, non-partial index, and the
+   * plan's path from the view column to the scan has no node a condition cannot be
+   * pushed through. `null` where the answer was not derived — the `indexes` option is
+   * off, or the view's stored tree was not read. A column that fails names the condition
+   * that stopped it, or the step-1 refusal that left it without a base column.
+   */
+  indexBacked: { column: string; indexed: boolean; reason: string | null }[] | null
   foreignKeys: DerivedForeignKey[]
   primaryKey: DerivedPrimaryKey | null
   /**
@@ -285,6 +309,62 @@ export function castPreservesNonNull(
   if (from === to) return true
   if (coercions.binary.has(`${from}>${to}`)) return true
   return NON_NULL_FUNCTION_CASTS.has(`${from}>${to}`)
+}
+
+/**
+ * Whether a base column is a key column of a usable, non-partial index of its relation,
+ * and which condition stopped it when it is not — `no-index-on-base-column`, or
+ * `only-partial-or-expression-index` where the column is a key of a partial index or an
+ * operand of an expression key, which is an index a condition on the column cannot use.
+ */
+function indexBackingOf(
+  relation: CatalogRelation | undefined,
+  column: string
+): { indexed: true; reason: null } | { indexed: false; reason: string } {
+  if (relation) {
+    let onlyPartialOrExpression = false
+    for (const index of relation.indexes) {
+      if (index.keyColumns.includes(column)) {
+        if (index.usable) return { indexed: true, reason: null }
+        // A key column of a partial index: an index exists, but not one that serves a
+        // condition on every row.
+        if (index.partial) onlyPartialOrExpression = true
+      } else if (index.expressions !== null && mentionsColumn(index.expressions, column)) {
+        onlyPartialOrExpression = true
+      }
+    }
+    if (onlyPartialOrExpression) {
+      return { indexed: false, reason: 'only-partial-or-expression-index' }
+    }
+  }
+  return { indexed: false, reason: 'no-index-on-base-column' }
+}
+
+/**
+ * Whether an index expression names a column. The text is `pg_get_expr`'s, where a
+ * plain lower-case identifier is printed bare and anything else is quoted; this is a
+ * diagnostic reason rather than a proof, so a textual match is enough.
+ */
+function mentionsColumn(expressions: string, column: string): boolean {
+  if (expressions.includes(`"${column.replaceAll('"', '""')}"`)) return true
+  const escaped = column.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(^|[^A-Za-z0-9_$"])${escaped}(?=$|[^A-Za-z0-9_$"])`).test(expressions)
+}
+
+/**
+ * Whether a derived relation's referencing view columns are all index-backed, which is
+ * what keeps a backward relation's list and connection fields — `null` where the index
+ * answer was not derived.
+ */
+export function foreignKeyIndexBacked(
+  derivation: ViewDerivation,
+  foreignKey: DerivedForeignKey
+): boolean | null {
+  if (derivation.indexBacked === null) return null
+  const indexed = new Map(
+    derivation.indexBacked.map((entry) => [entry.column, entry.indexed] as const)
+  )
+  return foreignKey.viewColumns.every((column) => indexed.get(column) === true)
 }
 
 /** A relation a single base column authorises on its own: a one-column key. */
@@ -407,7 +487,8 @@ export function deriveViewConstraints(
     { schema: string; relation: string; column: string; relkind: string }
   > = new Map(),
   optionallyFlattenedColumns: ReadonlySet<number> = new Set(),
-  treeRead = true
+  treeRead = true,
+  deriveIndexes = false
 ): ViewDerivation {
   const notes: string[] = []
   const columns = viewColumns.map((column) => column.name)
@@ -421,6 +502,9 @@ export function deriveViewConstraints(
       planRefusal: plan,
       columnRefusals: columns.map(() => null),
       notNullColumns: [],
+      indexBacked: deriveIndexes
+        ? columns.map((column) => ({ column, indexed: false, reason: plan }))
+        : null,
       foreignKeys: [],
       primaryKey: null,
       unique: null,
@@ -729,7 +813,8 @@ export function deriveViewConstraints(
       coerced: false,
       via: [],
       nullExtended: false,
-      qualifiedNonNull: false
+      qualifiedNonNull: false,
+      conditionStops: false
     }
     for (const target of singleColumnTargets(origin, catalog)) {
       emit(
@@ -857,6 +942,34 @@ export function deriveViewConstraints(
     notes.push(`${viewColumn}: ${refusal} — ${COLUMN_REFUSALS[refusal]}`)
   }
 
+  // Whether a condition on a column can be served by an index of the base column it
+  // proxies: the base column is a key column of a usable, non-partial index, and no node
+  // a condition cannot be pushed through stands on the path from the view's output to
+  // the scan. A column with no base column carries the step-1 refusal that left it so.
+  // A view whose stored tree was not read has no answer that holds across plans (see
+  // below), so no index answer is derived for it either.
+  let indexBacked: ViewDerivation['indexBacked'] = null
+  if (deriveIndexes && treeRead) {
+    indexBacked = columns.map((column, index) => {
+      const refusal = columnRefusals[index]
+      const sources = origins[index]
+      if (refusal !== null || !sources) {
+        return { column, indexed: false, reason: refusal ?? 'not-a-column-reference' }
+      }
+      for (const origin of sources) {
+        const backing = indexBackingOf(
+          catalog.get(`${origin.schema}.${origin.relation}`),
+          origin.column
+        )
+        if (!backing.indexed) return { column, indexed: false, reason: backing.reason }
+        if (origin.conditionStops) {
+          return { column, indexed: false, reason: 'condition-stops-above-the-scan' }
+        }
+      }
+      return { column, indexed: true, reason: null }
+    })
+  }
+
   // A view whose stored tree was not read is left with nothing derived — no non-nullness,
   // no key and no relation — however readable its plan is. Which levels a plan may print
   // two ways is a fact of the tree, and has no floor without it: the columns that must be
@@ -869,6 +982,7 @@ export function deriveViewConstraints(
     foreignKeys.length = 0
     primaryKey = null
     unique = null
+    indexBacked = null
   }
 
   return {
@@ -880,6 +994,7 @@ export function deriveViewConstraints(
     planRefusal: null,
     columnRefusals,
     notNullColumns,
+    indexBacked,
     foreignKeys,
     primaryKey,
     unique,

@@ -184,6 +184,29 @@ const UNIQUE_KEY_QUERY = `
     AND index.indexprs IS NULL
     AND namespace.nspname NOT IN ('pg_catalog', 'information_schema')`
 
+// Every index of a relation, for the columns a condition can be pushed to. Only the
+// plain column keys among the first `indnkeyatts` positions count — an expression key is
+// not a column and an `INCLUDE` column is not a key — and an index serves a condition
+// only where it is valid, ready and not partial (`indpred` null). The expression text is
+// read for the one reason a column can carry when no usable key covers it.
+const INDEX_QUERY = `
+  SELECT namespace.nspname      AS schema,
+         class.relname          AS relation,
+         index_class.relname    AS index_name,
+         (index.indisvalid AND index.indisready AND index.indpred IS NULL) AS usable,
+         (index.indpred IS NOT NULL) AS partial,
+         (SELECT array_agg(attribute.attname::text ORDER BY key.ord)
+          FROM unnest(index.indkey[0:index.indnkeyatts - 1]) WITH ORDINALITY AS key(attnum, ord)
+                   JOIN pg_attribute attribute
+                        ON attribute.attrelid = index.indrelid
+                            AND attribute.attnum = key.attnum) AS key_columns,
+         pg_get_expr(index.indexprs, index.indrelid) AS expressions
+  FROM pg_index index
+           JOIN pg_class class ON class.oid = index.indrelid
+           JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
+           JOIN pg_class index_class ON index_class.oid = index.indexrelid
+  WHERE namespace.nspname NOT IN ('pg_catalog', 'information_schema')`
+
 // The predicates of partial indexes. A scan through one drops from its `Filter`
 // whatever the predicate implies, so the predicate is the qualifier the plan did not
 // print (`plan-qualifiers.ts`). Printed by `pg_get_expr` against the indexed relation,
@@ -359,7 +382,10 @@ function quoteIdentifier(name: string): string {
   return BARE_IDENTIFIER.test(name) ? name : `"${name.replaceAll('"', '""')}"`
 }
 
-export async function readCatalogRelations(query: RunQuery): Promise<Map<string, CatalogRelation>> {
+export async function readCatalogRelations(
+  query: RunQuery,
+  includeIndexes = false
+): Promise<Map<string, CatalogRelation>> {
   const catalog = new Map<string, CatalogRelation>()
   const relationOf = (schema: string, relation: string): CatalogRelation => {
     const key = `${schema}.${relation}`
@@ -371,6 +397,7 @@ export async function readCatalogRelations(query: RunQuery): Promise<Map<string,
         foreignKeys: [],
         uniqueKeys: [],
         partialIndexes: [],
+        indexes: [],
         columns: new Map()
       }
       catalog.set(key, found)
@@ -413,12 +440,32 @@ export async function readCatalogRelations(query: RunQuery): Promise<Map<string,
       predicate: row.predicate
     })
   }
+  if (includeIndexes) {
+    for (const row of await query<{
+      schema: string
+      relation: string
+      index_name: string
+      usable: boolean
+      partial: boolean
+      key_columns: string[] | null
+      expressions: string | null
+    }>(INDEX_QUERY)) {
+      relationOf(row.schema, row.relation).indexes.push({
+        name: row.index_name,
+        keyColumns: row.key_columns ?? [],
+        usable: row.usable === true,
+        partial: row.partial === true,
+        expressions: row.expressions
+      })
+    }
+  }
   for (const relation of catalog.values()) {
     relation.partialIndexes.sort((left, right) => left.name.localeCompare(right.name))
     relation.foreignKeys.sort((left, right) =>
       left.constraintName.localeCompare(right.constraintName)
     )
     relation.uniqueKeys.sort((left, right) => left.name.localeCompare(right.name))
+    relation.indexes.sort((left, right) => left.name.localeCompare(right.name))
   }
   return catalog
 }
@@ -819,9 +866,10 @@ export async function collectViewConstraints(
   privilegedQuery: RunQuery | null,
   publishedAsEnumeration?: PublishedAsEnumeration,
   declaredRowIdentity?: DeclaredRowIdentity,
-  deriveUnique = true
+  deriveUnique = true,
+  deriveIndexes = false
 ): Promise<CollectResult> {
-  const catalog = await readCatalogRelations(query)
+  const catalog = await readCatalogRelations(query, deriveIndexes)
   const strictEquality = await readStrictEquality(query)
   const coercions = await readTypeCoercions(query)
   const viewSources = await readViewSources(query)
@@ -895,7 +943,8 @@ export async function collectViewConstraints(
       deriveUnique,
       resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map()),
       facts?.optionallyFlattenedColumns ?? new Set(),
-      treeRead
+      treeRead,
+      deriveIndexes
     )
     // A tree the walk could not place is said out loud: its CTE map is empty, so a
     // `WITH` query reads as refused, and the reason the map is empty is named here

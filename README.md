@@ -22,7 +22,9 @@ export default {
 The plugin runs before `PgFakeConstraintsPlugin`, which turns the derived tags
 into relations in the generated schema.
 
-Pass `declare: false` only to inspect a `report` without changing the schema.
+Pass `declare: false` only to inspect a `report` without changing the schema. Pass
+`indexes: true` to derive which view columns are backed by an index (see "Index-backed
+columns").
 
 ## Row identity
 
@@ -265,6 +267,57 @@ and the pass-through nodes (`Gather`, `Gather Merge`, `Sort`, `Incremental Sort`
 window frame — anything else — is a named refusal on the columns that reach it, never a
 guess.
 
+## Index-backed columns
+
+`PgIndexBehaviorsPlugin` withholds a table column's filter and order behaviors when no
+index of the table has it as a key column. A plain view has no indexes of its own, so
+`PgIndexBehaviorsPlugin` gives every view column the benefit of the doubt. Pass
+`PgViewConstraintsPlugin({ indexes: true })` to derive the answer for a plain view and
+set `attribute.extensions.isIndexed` on each of its columns — `true` where the column is
+proven to arrive from an indexed base column through a path a condition can be pushed
+down, `false` everywhere else — so the filter and order behaviors are withheld on a
+view exactly as on a table. It is off by default: an existing surface sees no change.
+
+A view column is index-backed when all of these hold:
+
+1. It proxies a base column: its value in every row is that column's value or `NULL`,
+   under every rule of the derivation above.
+2. That base column is a key column, in any position, of a valid (`indisvalid`), ready
+   (`indisready`), non-partial (`indpred IS NULL`) index of its relation. Only the key
+   columns (`indnkeyatts`) count — an `INCLUDE` column is not a key — and only a plain
+   column key counts; an expression key does not. When the origin is a materialized
+   view, its own indexes are the ones asked about.
+3. No node on the path from the view's output to the scan of that base column stops a
+   condition: a `WindowAgg`, a `Limit` (LIMIT/OFFSET inside the view), a `Unique`
+   produced by `DISTINCT ON`, or a `ProjectSet` (a set-returning function in a select
+   list). A `Group`/`Aggregate` passes when the column is in its group key. Only the
+   path counts: a blocker in another branch of the plan does not affect the column.
+4. For a `UNION ALL`, the column is index-backed only where every branch is.
+
+A column that fails names why in the report: `no-index-on-base-column`,
+`only-partial-or-expression-index`, `condition-stops-above-the-scan`, or the step-1
+refusal that left it without a base column.
+
+The `Unique` of a `DISTINCT ON` is the one shape the plan does not fully print: it shows
+the de-duplication but not the key. A regular `DISTINCT` de-duplicates all of its output
+and its sort key covers that output; a `DISTINCT ON` de-duplicates a leading subset, so
+a sort key that does not cover the output is a `DISTINCT ON` and blocks. When the sort
+key does cover the output the plan is identical to a regular `DISTINCT`'s, and the
+column is read as through a regular `DISTINCT` — the reading that does not move with the
+plan, because the same query is a grouping over every column under another plan.
+
+A relation whose referencing side is a view's columns — the relations this plugin
+declares as `FAKE_` constraints, and hand-written `@foreignKey` tags on views — follows
+the same answer. Its backward relation (`isReferencee`) carries
+`relation.extensions.isIndexed = false` unless every referencing view column is
+index-backed, which is the test `PgIndexBehaviorsPlugin` applies to a table's own
+foreign key; its `-select`, `-list`, `-connection` and `-single` behaviors are withheld
+on the same terms.
+
+A `declare: false` instance derives the answer for its report and writes nothing to the
+schema; `reportingPreset` does exactly that, and `ViewConstraintsReportRenderer` prints
+each view's indexed columns beside the reason for each column that is not.
+
 ## Plan invariance
 
 The answer must not depend on the plan the planner happened to choose.
@@ -276,7 +329,8 @@ same two axes — its regimes, read again from production-scale row counts — s
 statistics are the planner's other input and a shape can move with them alone.
 
 What the proof holds is the **tags**: `@notNull`, `@foreignKey`, `@primaryKey` and
-`@unique`, and whether the plan was read at all. A refusal's **reason** is a diagnostic
+`@unique`, whether the plan was read at all, and the per-column index-backed answer with
+the relation marks that stand on it. A refusal's **reason** is a diagnostic
 and may differ between plans for the same outcome — a column with no source either way
 is the same published answer whichever shape of plan named it — so the reasons are
 compared in the report and not in the proof.

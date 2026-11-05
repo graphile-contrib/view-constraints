@@ -16,6 +16,7 @@
 
 import { collectViewConstraints } from './collect.ts'
 import type { RunQuery } from './collect.ts'
+import { foreignKeyIndexBacked } from './derive.ts'
 
 /**
  * Opens a session on one connection string with the caller's driver; the plugin
@@ -102,9 +103,17 @@ interface Contract {
   relkind: string
   planReadable: boolean
   foreignKeys: string[]
+  /** Each derived relation, and whether its referencing view columns are all indexed. */
+  relations: { tag: string; indexBacked: boolean | null }[]
   primaryKey: string | null
   unique: string | null
   notNull: string[]
+  /**
+   * Per column, whether it is index-backed. Only the answer, not the diagnostic reason:
+   * like the refusal text, a reason may name a different condition for the same outcome
+   * and is compared in the report, not in the proof.
+   */
+  indexBacked: { column: string; indexed: boolean }[] | null
 }
 
 interface TargetContract {
@@ -138,7 +147,11 @@ async function contractOf(
     const collected = await collectViewConstraints(
       targetSession.query,
       target.schemas,
-      ownerSession.query
+      ownerSession.query,
+      undefined,
+      undefined,
+      true,
+      true
     )
     return {
       target: target.name,
@@ -147,9 +160,19 @@ async function contractOf(
         relkind: derived.relkind,
         planReadable: derived.origins !== null,
         foreignKeys: derived.foreignKeys.map((key) => key.tag).sort(),
+        relations: derived.foreignKeys
+          .map((key) => ({ tag: key.tag, indexBacked: foreignKeyIndexBacked(derived, key) }))
+          .sort((left, right) => left.tag.localeCompare(right.tag)),
         primaryKey: derived.primaryKey?.tag ?? null,
         unique: derived.unique?.tag ?? null,
-        notNull: [...derived.notNullColumns].sort()
+        notNull: [...derived.notNullColumns].sort(),
+        indexBacked:
+          derived.indexBacked === null
+            ? null
+            : derived.indexBacked.map((entry) => ({
+                column: entry.column,
+                indexed: entry.indexed
+              }))
       })),
       tables: collected.tables
         .filter((derived) => derived.foreignKeys.length > 0)
@@ -173,9 +196,19 @@ function indexed(contracts: TargetContract[]): Map<string, string> {
   const lines = new Map<string, string>()
   for (const target of contracts) {
     for (const view of target.views) {
+      const relations = view.relations
+        .map(
+          (relation) =>
+            `${relation.tag}=${relation.indexBacked === null ? '-' : relation.indexBacked}`
+        )
+        .join('; ')
+      const indexBacked =
+        view.indexBacked === null
+          ? '-'
+          : view.indexBacked.map((entry) => `${entry.column}=${entry.indexed}`).join(',')
       lines.set(
         `${target.target} ${view.view}`,
-        `readable=${view.planReadable} fk=[${view.foreignKeys.join('; ')}] pk=${view.primaryKey ?? '-'} unique=${view.unique ?? '-'} nn=[${view.notNull.join(',')}]`
+        `readable=${view.planReadable} fk=[${view.foreignKeys.join('; ')}] rel=[${relations}] pk=${view.primaryKey ?? '-'} unique=${view.unique ?? '-'} nn=[${view.notNull.join(',')}] idx=[${indexBacked}]`
       )
     }
     for (const table of target.tables) {

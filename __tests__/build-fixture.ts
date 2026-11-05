@@ -104,6 +104,7 @@ const PLAN_FIELDS = [
   'Grouping Sets',
   'Index Name',
   'Group Key',
+  'Sort Key',
   'Partial Mode',
   'CTE Name',
   'Subplan Name',
@@ -154,7 +155,7 @@ await lab.query(readFileSync(LAB_SQL, 'utf8'))
 // The lab schema is written unqualified, and `pg_get_viewdef` deparses against the
 // search path, so every session below reads and plans it with the same one.
 
-const catalog = await readCatalogRelations(runQueryOn(lab))
+const catalog = await readCatalogRelations(runQueryOn(lab), true)
 const coercions = await readTypeCoercions(runQueryOn(lab))
 const strictEquality = await readStrictEquality(runQueryOn(lab))
 // The rule spellings a user object has taken over in the lab: the names whose rule
@@ -249,6 +250,7 @@ const labCatalog = [...catalog.values()]
     foreignKeys: relation.foreignKeys,
     uniqueKeys: relation.uniqueKeys,
     partialIndexes: relation.partialIndexes,
+    indexes: relation.indexes,
     columns: Object.fromEntries(relation.columns)
   }))
 

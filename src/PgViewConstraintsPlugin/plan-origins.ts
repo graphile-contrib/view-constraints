@@ -100,6 +100,8 @@ export interface ExplainPlanNode {
   'Grouping Sets'?: unknown
   /** The grouping of an `Aggregate` or a `Group`, one expression per entry. */
   'Group Key'?: string[]
+  /** The ordering a `Sort`, `Merge Append` or the like applies, one expression per entry. */
+  'Sort Key'?: string[]
   /** `Simple`, or `Partial` / `Finalize` for an aggregate split across workers. */
   'Partial Mode'?: string
   /** On a `CTE Scan`: the `WITH` query it reads. */
@@ -229,6 +231,13 @@ export interface ColumnOrigin {
    * Set after the reading, over every stream a union assembled the value from.
    */
   qualifiedNonNull: boolean
+  /**
+   * A node a condition on this column cannot be pushed through stands on the path
+   * between the view's output and this scan: a `WindowAgg`, a `Limit`, a `DISTINCT ON`'s
+   * `Unique`, a `ProjectSet`, or a grouping the column is not a group key of. Set after
+   * the reading, over every stream a union assembled the value from.
+   */
+  conditionStops: boolean
 }
 
 /**
@@ -765,6 +774,7 @@ function mergeReadings(readings: Reading[]): Reading {
         same.aliases.add(origin.alias)
         same.coerced = same.coerced || origin.coerced
         same.nullExtended = same.nullExtended || origin.nullExtended
+        same.conditionStops = same.conditionStops || origin.conditionStops
         continue
       }
       origins.push({ ...origin, aliases: new Set([origin.alias]) })
@@ -1085,7 +1095,8 @@ class OriginReader {
           coerced: reference.coerced,
           via: [],
           nullExtended: this.nulled.has(alias),
-          qualifiedNonNull: false
+          qualifiedNonNull: false,
+          conditionStops: false
         }
       ],
       nullValue: false,
@@ -1280,6 +1291,175 @@ class OriginReader {
   }
 
   /**
+   * Every `alias.column` reference whose path from the plan's output to its scan
+   * crosses a node a condition on the column cannot be pushed through: a `WindowAgg`, a
+   * `Limit`, a `DISTINCT ON`'s `Unique`, a `ProjectSet`, or a grouping the column is
+   * not grouped by. The path is followed through the nodes that only carry the value —
+   * a join into the input the value comes from, a `Subquery Scan` through the view it is
+   * pinned to, a `CTE Scan` into the subplan proved to be its query — so a blocker in
+   * another branch of the plan does not count.
+   *
+   * The `Unique` question is the plan's one blind spot: it prints a de-duplication but
+   * not its key, and the key is what tells a `DISTINCT ON` from a regular `DISTINCT`.
+   * See `distinctOnUnique`.
+   */
+  conditionBlocked(root: ExplainPlanNode, selectList: ExplainPlanNode): Set<string> {
+    const blocked = new Set<string>()
+    const mark = (entry: string, branchLocal: boolean): void => {
+      const reading = this.read(entry, new Set(), branchLocal)
+      for (const origin of reading.origins ?? []) {
+        for (const alias of origin.alias.split('∨')) {
+          blocked.add(qualifiedReference(alias, origin.column))
+        }
+      }
+    }
+    const pass = (node: ExplainPlanNode, entries: string[], branchLocal: boolean): void => {
+      if (entries.length === 0) return
+      const type = node['Node Type']
+      if (type === 'WindowAgg' || type === 'Limit' || type === 'ProjectSet') {
+        for (const entry of entries) mark(entry, branchLocal)
+        return
+      }
+      if (type === 'Unique') {
+        if (distinctOnUnique(node, this.soleRelation?.alias ?? null)) {
+          for (const entry of entries) mark(entry, branchLocal)
+          return
+        }
+        for (const child of inputChildren(node)) pass(child, entries, branchLocal)
+        return
+      }
+      if (type === 'Aggregate' || type === 'Group') {
+        // A column passes a grouping only when the grouping is by it: the group key the
+        // plan prints is read for the base columns it stands on, so a grouping over a
+        // union or through a view is read in the branches' own vocabulary.
+        const grouped = this.groupKeyReferences(node)
+        const passing: string[] = []
+        for (const entry of entries) {
+          const references = this.referenceKeys(entry, branchLocal)
+          if ([...references].every((reference) => grouped.has(reference))) passing.push(entry)
+          else mark(entry, branchLocal)
+        }
+        for (const child of inputChildren(node)) pass(child, passing, branchLocal)
+        return
+      }
+      if (type === SUBQUERY_SCAN) {
+        const alias = node.Alias
+        const crossable = alias === undefined ? undefined : this.crossable.get(alias)
+        const children = inputChildren(node)
+        const child = children.length === 1 ? children[0] : undefined
+        if (!crossable || !child || alias === undefined) {
+          for (const entry of entries) mark(entry, branchLocal)
+          return
+        }
+        const positions: number[] = []
+        const translated: string[] = []
+        for (const entry of entries) {
+          const reference = parseReference(entry)
+          if (reference?.alias !== alias) continue
+          const position = crossable.view.columns.indexOf(reference.column)
+          if (position < 0) continue
+          positions.push(position)
+          translated.push(crossable.selectList.Output?.[position] ?? '')
+        }
+        if (translated.length === 0) return
+        // The value readers step over a `Limit` above a select list; here it is on the
+        // path and blocks every column of the crossed view.
+        let between: ExplainPlanNode | undefined = child
+        for (let step = 0; step < 16 && between && between !== crossable.selectList; step++) {
+          if (between['Node Type'] === 'Limit') {
+            for (const entry of translated) mark(entry, branchLocal)
+            return
+          }
+          const inputs = inputChildren(between)
+          between = inputs.length === 1 ? inputs[0] : undefined
+        }
+        if (crossable.branches) {
+          for (const branch of crossable.branches) {
+            pass(
+              branch,
+              positions
+                .map((position) => branch.Output?.[position] ?? '')
+                .filter((entry) => entry !== ''),
+              true
+            )
+          }
+          return
+        }
+        pass(child, translated, branchLocal)
+        return
+      }
+      if (type === CTE_SCAN) {
+        const alias = node.Alias
+        const cte = alias === undefined ? undefined : this.cteOfAlias.get(alias)
+        const columns = cte === undefined ? undefined : this.catalog.cteColumns.get(cte)
+        const subplan = cte === undefined ? null : this.usableSubplan(cte)
+        if (alias === undefined || columns === undefined || !subplan) {
+          for (const entry of entries) mark(entry, branchLocal)
+          return
+        }
+        const translated: string[] = []
+        for (const entry of entries) {
+          const reference = parseReference(entry)
+          if (reference?.alias !== alias) continue
+          const position = columns.indexOf(reference.column)
+          if (position < 0) continue
+          translated.push(subplan.Output?.[position] ?? '')
+        }
+        if (translated.length > 0) pass(subplan, translated, branchLocal)
+        return
+      }
+      if (SET_OPERATION_NODE_TYPES.has(type)) {
+        for (const entry of entries) {
+          const column = branchLocal ? undefined : this.unionColumns.get(entry)
+          if (column) {
+            for (const branch of column.branches) {
+              pass(branch.node, [branch.output[column.position] ?? ''], true)
+            }
+            continue
+          }
+          for (const child of inputChildren(node)) {
+            if (this.emits(entry, child)) pass(child, [entry], true)
+          }
+        }
+        return
+      }
+      for (const child of inputChildren(node)) {
+        pass(
+          child,
+          entries.filter((entry) => this.emits(entry, child)),
+          branchLocal
+        )
+      }
+    }
+    pass(root, selectList.Output ?? [], false)
+    return blocked
+  }
+
+  /** The base references the node's `Group Key` groups by. */
+  private groupKeyReferences(node: ExplainPlanNode): Set<string> {
+    const grouped = new Set<string>()
+    for (const entry of node['Group Key'] ?? []) {
+      for (const origin of this.read(unwrap(entry)).origins ?? []) {
+        for (const alias of origin.alias.split('∨')) {
+          grouped.add(qualifiedReference(alias, origin.column))
+        }
+      }
+    }
+    return grouped
+  }
+
+  /** The base references one entry stands on, read in its own level's vocabulary. */
+  private referenceKeys(entry: string, branchLocal: boolean): Set<string> {
+    const references = new Set<string>()
+    for (const origin of this.read(entry, new Set(), branchLocal).origins ?? []) {
+      for (const alias of origin.alias.split('∨')) {
+        references.add(qualifiedReference(alias, origin.column))
+      }
+    }
+    return references
+  }
+
+  /**
    * Whether the value one `Output` entry spells can be NULL because an outer join
    * between `node` and where the value is read nulls the side it comes from.
    *
@@ -1361,6 +1541,41 @@ function computesCount(entry: string): boolean {
 function groupsItsInput(node: ExplainPlanNode): boolean {
   const keys = node['Group Key']
   return node['Grouping Sets'] === undefined && Array.isArray(keys) && keys.length > 0
+}
+
+/**
+ * Whether a `Unique` de-duplicates a leading subset of its output — a `DISTINCT ON`.
+ *
+ * The plan prints the de-duplication but not the key it de-duplicates on, and the key is
+ * what tells the two apart. A regular `DISTINCT` sorts by every output column; a
+ * `DISTINCT ON` sorts by its own expressions plus whatever `ORDER BY` adds, which is a
+ * strict subset of the output exactly when the plan shows it. Where the sort key covers
+ * the output the two plans are identical, and this answers `false`: that is the only
+ * reading that holds across plans, because the same query is a grouping over every
+ * column under another plan (a hashed `Aggregate` whose group key is the whole output).
+ */
+function distinctOnUnique(node: ExplainPlanNode, soleAlias: string | null): boolean {
+  const output = node.Output ?? []
+  if (output.length === 0) return false
+  let cursor: ExplainPlanNode | undefined = inputChildren(node)[0]
+  let sortKey: string[] | undefined
+  for (let step = 0; step < 4 && cursor; step++) {
+    const key = cursor['Sort Key']
+    if (Array.isArray(key)) {
+      sortKey = key
+      break
+    }
+    const inputs = inputChildren(cursor)
+    cursor = inputs.length === 1 ? inputs[0] : undefined
+  }
+  if (!sortKey) return false
+  const normalize = (entry: string): string => {
+    const reference = parseReference(unwrap(entry))
+    if (!reference) return `expr:${unwrap(entry)}`
+    return qualifiedReference(reference.alias ?? soleAlias ?? '', reference.column)
+  }
+  const keys = new Set(sortKey.map(normalize))
+  return !output.every((entry) => keys.has(normalize(entry)))
 }
 
 /**
@@ -1495,11 +1710,15 @@ export function readPlanOrigins(
   // A value a union assembled is read off several streams, named together as
   // `a∨b`; a qualifier keeps it from NULL only where it does so in every one of them.
   const qualified = readQualifiedNonNull(root, context, catalog)
+  const stopped = reader.conditionBlocked(root, selectListNode)
   for (const reading of readings) {
     for (const origin of reading.origins ?? []) {
       origin.qualifiedNonNull = origin.alias
         .split('∨')
         .every((alias) => qualified.has(qualifiedReference(alias, origin.column)))
+      origin.conditionStops = origin.alias
+        .split('∨')
+        .some((alias) => stopped.has(qualifiedReference(alias, origin.column)))
     }
   }
 

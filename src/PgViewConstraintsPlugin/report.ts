@@ -31,8 +31,9 @@ export function reportingPreset(
     plugins: [
       ...(preset.plugins ?? []).filter((plugin) => plugin.name !== 'PgViewConstraintsPlugin'),
       // `declare` defaults to on; the reporting instance must not add the tags the
-      // hand-written side is being compared against.
-      PgViewConstraintsPlugin({ report: onReport, declare: false })
+      // hand-written side is being compared against. The index-backed answer is part
+      // of the report.
+      PgViewConstraintsPlugin({ report: onReport, indexes: true, declare: false })
     ]
   }
 }
@@ -95,6 +96,7 @@ function renderService(
       view.declaredUnique.length > 0 ||
       derivedNotNull.size > 0 ||
       declaredNotNull.size > 0 ||
+      derived.indexBacked !== null ||
       derived.origins === null
     if (!interesting) continue
 
@@ -156,6 +158,19 @@ function renderService(
       line(`     nn HAND-ONLY    ${handOnly.join(', ')}`)
       for (const column of handOnly) {
         tally.handOnly.push(`${derived.schema}.${derived.view}.${column}`)
+      }
+    }
+    // The index-backed columns are the ones whose filter and order behaviors a
+    // `PgIndexBehaviorsPlugin` instance leaves in place; every other column names the
+    // condition that kept it closed.
+    if (derived.indexBacked !== null) {
+      const indexed = derived.indexBacked
+        .filter((entry) => entry.indexed)
+        .map((entry) => entry.column)
+      if (indexed.length > 0) line(`     idx INDEXED      ${indexed.join(', ')}`)
+      for (const entry of derived.indexBacked) {
+        if (entry.indexed) continue
+        line(`     idx no           ${entry.column}: ${entry.reason ?? 'not derived'}`)
       }
     }
     for (const note of derived.notes) line(`     note: ${note}`)
