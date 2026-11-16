@@ -111,6 +111,8 @@ interface Fixture {
     >
     /** Columns the view reads from a `WITH` query it inlines, refused whatever the plan. */
     optionallyFlattenedColumns: number[]
+    /** Columns whose own select-list entry is never NULL by its shape, from the stored tree. */
+    neverNullColumns: number[]
     /** Each range-table alias of the view, resolved to the relation it names. */
     viewAliases: Record<string, string>
     plan: ExplainPlanNode
@@ -218,6 +220,7 @@ function derive(
     true,
     treeColumns,
     new Set(view.optionallyFlattenedColumns ?? []),
+    new Set(view.neverNullColumns ?? []),
     true,
     true,
     distinctOnViews
@@ -971,11 +974,24 @@ const CASES: Case[] = [
   },
   {
     view: 'v_recursive',
-    about: 'a recursive WITH reads its own output as one tagged stream: no branch',
-    origins: null,
+    about:
+      'a recursive WITH reads its own output as one tagged stream: every column read ' +
+      'through it is refused, with no branch to read',
+    origins: ['id=—', 'bank_id=—'],
     notNull: [],
     foreignKeys: [],
     primaryKey: null
+  },
+  {
+    view: 'v_recursive_beside',
+    about:
+      'a recursive WITH beside the relations refuses only the column read through it: ' +
+      'the relation keeps its key, and a COALESCE with a constant over the column is ' +
+      'never NULL',
+    origins: ['id=tx.id', 'n=—'],
+    notNull: ['id', 'n'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
   },
   {
     view: 'v_function_scan',
@@ -1202,7 +1218,9 @@ const CASES: Case[] = [
       'a subplan\u2019s condition holds of the subplan\u2019s rows — and a `Gather` ' +
       'that computes the subplan itself is read where it prints the select list',
     origins: ['id=tx.id', 'bank_id=tx.bank_id', 'known=—'],
-    notNull: ['id'],
+    // `known` is an `EXISTS`, never NULL by its shape (`v_expr_exists`); the subplan's
+    // condition still says nothing of `bank_id`.
+    notNull: ['id', 'known'],
     foreignKeys: ['(bank_id) references lab.bank (id)', '(id) references lab.tx (id)'],
     primaryKey: 'id'
   },
@@ -1557,6 +1575,34 @@ const CASES: Case[] = [
     about: 'a literal is never NULL, however cast',
     origins: ['id=tx.id', 'code=—', 'zero=—'],
     notNull: ['id', 'code', 'zero'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_exists',
+    about:
+      'EXISTS and NOT EXISTS answer true or false and never NULL — read from the stored ' +
+      'tree, since the plan may print either as a hashed ANY',
+    origins: ['id=tx.id', 'known=—', 'unmatched=—'],
+    notNull: ['id', 'known', 'unmatched'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_coalesce_over_grouped',
+    about:
+      'a COALESCE with a constant in the view\u2019s own select list is never NULL over a ' +
+      'grouped subquery a plan may print either way',
+    origins: ['id=tx.id', 'total=—'],
+    notNull: ['id', 'total'],
+    foreignKeys: ['(id) references lab.tx (id)'],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_expr_coalesce_cast_call',
+    about: 'a constant behind a cast call is not read: a cast is free to answer NULL',
+    origins: ['id=tx.id', 'total=—'],
+    notNull: ['id'],
     foreignKeys: ['(id) references lab.tx (id)'],
     primaryKey: 'id'
   },
@@ -2123,7 +2169,7 @@ const CASES: Case[] = [
   {
     view: 'v_cte_recursive',
     about: 'a recursive `WITH` reads its own output as one tagged stream',
-    origins: null,
+    origins: ['id=—', 'nul=—'],
     notNull: [],
     foreignKeys: [],
     primaryKey: null
@@ -2708,6 +2754,7 @@ test('a view whose stored tree was not read derives nothing', () => {
     // The tree facts an unread tree leaves: none, and the flag that says so.
     new Map(),
     new Set(),
+    new Set(),
     false
   )
   assert.deepEqual(withoutTree.notNullColumns, [])
@@ -2849,7 +2896,7 @@ test('a view’s stored tree is read by field name, and a format it does not kno
   // A constant array (`:constvalue […]`) is read, not treated as a format break.
   assert.equal(
     readViewTree(
-      '({QUERY :cteList <> :targetList <> :jointree {FROMEXPR :quals {CONST :constvalue 1 [ 0 0 ]}}})'
+      '({QUERY :cteList <> :targetList <> :jointree {FROMEXPR :quals {CONST :constisnull false :constvalue 1 [ 0 0 ]}}})'
     ).ok,
     true
   )
@@ -3739,6 +3786,7 @@ function labDerivations(regime: string = DEFAULT_REGIME): ViewDerivation[] {
         coercions,
         true,
         new Map(),
+        new Set(),
         new Set(),
         true,
         true,

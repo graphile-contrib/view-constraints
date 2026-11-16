@@ -262,6 +262,23 @@ create view v_recursive as
   )
   select id, bank_id from walk;
 
+-- POSITIVE: a recursive WITH beside the relations, not under them. The column read
+-- through the recursion is refused; the relation it stands beside keeps its key and its
+-- columns, because a lateral query that aggregates over no group answers one row, and
+-- the `COALESCE` with a constant the view's own select list wraps the value in is never
+-- NULL whatever the recursion leaves.
+create view v_recursive_beside as
+  select t.id, coalesce(w.n, '0') as n
+  from tx t
+  cross join lateral (
+    with recursive walk (k) as (
+      select 1
+      union all
+      select walk.k + 1 from walk where walk.k < 3
+    )
+    select sum(walk.k) + t.id as n from walk
+  ) w;
+
 -- NEGATIVE: a row source the catalog has nothing to say about. A function scan
 -- carries an alias like any other scan and names no relation.
 create view v_function_scan as
@@ -652,6 +669,26 @@ create view v_union_one_filtered as
 
 -- POSITIVE: a literal is never NULL, however cast.
 create view v_expr_literal as select id, 'usdt'::text as code, 0::numeric as zero from tx;
+-- POSITIVE: `EXISTS` and `NOT EXISTS` answer true or false and never NULL. PostgreSQL may
+-- print either as a hashed `ANY`, which reads like an `ANY` sublink that can be NULL, so
+-- the answer is taken from the view's stored tree, not from the plan.
+create view v_expr_exists as
+  select t.id,
+         exists (select 1 from bank b where b.id = t.bank_id) as known,
+         not exists (select 1 from bank b where b.id = t.bank_id or b.title = t.cur_code) as unmatched
+  from tx t;
+-- POSITIVE: a COALESCE with a constant in the view's own select list is never NULL even
+-- over a grouped subquery, whose column a plan may print flattened or behind a kept
+-- subquery: the constant arm is the top query's own.
+create view v_expr_coalesce_over_grouped as
+  select t.id, coalesce(s.total, '0') as total
+  from tx t
+  cross join lateral (select sum(t2.amount) as total from tx t2 where t2.bank_id = t.bank_id) s;
+-- NEGATIVE: a constant behind a cast call is not read: a cast is free to answer NULL.
+create view v_expr_coalesce_cast_call as
+  select t.id, coalesce(s.total, 0) as total
+  from tx t
+  cross join lateral (select sum(t2.amount) as total from tx t2 where t2.bank_id = t.bank_id) s;
 -- POSITIVE: one never-NULL arm of a COALESCE is enough — here the literal at the end
 -- of an arm that is itself a COALESCE over a NULL literal and a nullable column.
 create view v_expr_coalesce as

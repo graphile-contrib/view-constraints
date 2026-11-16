@@ -563,6 +563,8 @@ export interface ViewTreeFacts {
    * a kept subquery, and the two are read differently (see `view-tree.ts` and `derive.ts`).
    */
   optionallyFlattenedColumns: Set<number>
+  /** The view's columns whose own select-list entry is never NULL by its shape (see `view-tree.ts`). */
+  neverNullColumns: Set<number>
   /** The relation each range-table alias of the view names, by alias. */
   relationAliases: Map<string, number>
   /** Whether each `WITH` query of the view is materialized (see `view-tree.ts`). */
@@ -693,6 +695,7 @@ export async function readViewTrees(query: RunQuery, schemas: string[]): Promise
       cteAmbiguous: tree.cteAmbiguous,
       treeOrigins: tree.treeOrigins,
       optionallyFlattenedColumns: tree.optionallyFlattenedColumns,
+      neverNullColumns: tree.neverNullColumns,
       relationAliases: tree.relationAliases,
       cteMaterialized: tree.cteMaterialized,
       cteRefCount: tree.cteRefCount,
@@ -976,6 +979,7 @@ export async function collectViewConstraints(
       deriveUnique,
       resolveTreeColumns(relationOids, facts?.treeOrigins ?? new Map()),
       facts?.optionallyFlattenedColumns ?? new Set(),
+      facts?.neverNullColumns ?? new Set(),
       treeRead,
       deriveIndexes,
       distinctOnViews

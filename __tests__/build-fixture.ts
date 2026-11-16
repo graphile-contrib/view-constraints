@@ -235,6 +235,7 @@ for (const state of STATISTICS_STATES) {
         optionallyFlattenedColumns: [...(facts?.optionallyFlattenedColumns ?? [])].sort(
           (left, right) => left - right
         ),
+        neverNullColumns: [...(facts?.neverNullColumns ?? [])].sort((left, right) => left - right),
         viewAliases,
         plan: prune(plan)
       })

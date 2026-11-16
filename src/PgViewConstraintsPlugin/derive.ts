@@ -488,6 +488,7 @@ export function deriveViewConstraints(
     { schema: string; relation: string; column: string; relkind: string }
   > = new Map(),
   optionallyFlattenedColumns: ReadonlySet<number> = new Set(),
+  neverNullShapeColumns: ReadonlySet<number> = new Set(),
   treeRead = true,
   deriveIndexes = false,
   distinctOnViews: ReadonlySet<string> = new Set()
@@ -648,6 +649,14 @@ export function deriveViewConstraints(
   for (let index = 0; index < columns.length; index++) {
     const viewColumn = columns[index]
     if (viewColumn === undefined) continue
+    // The view's own select-list entry is never NULL by its SQL shape — an `EXISTS`, a
+    // `NOT EXISTS`, a `COALESCE` with a non-NULL constant — read from the stored tree. It
+    // stands in the top query, over every join of the view, so neither the plan's shape
+    // nor a query below it the planner may or may not flatten bears on it.
+    if (neverNullShapeColumns.has(index)) {
+      notNullColumns.push(viewColumn)
+      continue
+    }
     if (disagreed.has(index)) continue
     if (optionallyFlattenedColumns.has(index)) continue
     const sources = plan.columns[index]

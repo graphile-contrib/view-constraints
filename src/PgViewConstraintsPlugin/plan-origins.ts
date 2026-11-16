@@ -138,9 +138,6 @@ export interface ViewShape {
  * `__tests__/PgViewConstraintsPlugin.lab.sql`.
  */
 export const PLAN_REFUSALS = {
-  'unreadable-set-operation':
-    'a `Recursive Union`: its input is one tagged stream that references its own ' +
-    'output, and there is no branch to read a column off',
   'set-operation-not-a-select-list':
     'a set operation’s branches cannot be told apart — a column of a branch is ' +
     'spelled the same as a column of another, as when a set operation stands over ' +
@@ -157,6 +154,10 @@ export type PlanRefusal = keyof typeof PLAN_REFUSALS
  * reason as `PLAN_REFUSALS`, and every one of them carries a lab case.
  */
 export const COLUMN_REFUSALS = {
+  'unreadable-set-operation':
+    'the entry is read through a recursive `WITH` query, computed by a `Recursive ' +
+    'Union`: its input is one tagged stream that references its own output, and there ' +
+    'is no branch to read a column off',
   'not-a-column-reference':
     'the entry is an expression, an aggregate, a constant, an operator, a subplan ' +
     'reference, a whole-row reference or a second cast — not a reference to a column',
@@ -325,16 +326,33 @@ function selectListNodeOf(root: ExplainPlanNode): ExplainPlanNode {
     if (!only) return node
     // A `Gather` can project after all: a select-list subplan a worker may not run is
     // computed at the `Gather`, whose `Output` then carries an entry its child does
-    // not. The node that prints the select list is the one to read.
-    if (node.Output && only.Output && node.Output.length !== only.Output.length) return node
+    // not. The node that prints the select list is the one to read. The entries are
+    // compared, not only counted: a `Gather` computing two subplans over a child that
+    // prints three columns has as many entries as its child, and reading the child by
+    // position would name its columns as the subplans' values. An entry that hands a
+    // computed value of the child on is printed as that value in parentheses, and is
+    // the child's own.
+    if (
+      node.Output &&
+      only.Output &&
+      (node.Output.length !== only.Output.length ||
+        node.Output.some((entry, position) => {
+          const child = only.Output?.[position]
+          return entry !== child && entry !== `(${child})`
+        }))
+    ) {
+      return node
+    }
     node = only
   }
   return node
 }
 
 // A recursive `WITH` reads one tagged stream that references its own output, so a
-// column cannot be traced to a branch. No other set operation is refused here: the
-// branches of an `Append`, a `SetOp` and their kin are read position by position.
+// column read through it cannot be traced to a branch. Only such a column is refused: the
+// rest of the plan — the relations beside the query, and a key the query cannot multiply
+// — reads as it would without it. No other set operation is refused here: the branches
+// of an `Append`, a `SetOp` and their kin are read position by position.
 const UNREADABLE_SET_NODE_TYPES = new Set(['Recursive Union'])
 
 // Which input of a join the join itself can null. `Left` keeps every row of its outer
@@ -1054,6 +1072,13 @@ class OriginReader {
   private crossCte(alias: string, column: string, crossing: ReadonlySet<string>): Reading {
     const cte = this.cteOfAlias.get(alias)
     if (cte === undefined) return unknown('through-a-materialized-with')
+    if (
+      (this.cteSubplans.get(cte) ?? []).some((subplan) =>
+        UNREADABLE_SET_NODE_TYPES.has(subplan['Node Type'])
+      )
+    ) {
+      return unknown('unreadable-set-operation')
+    }
     const columns = this.catalog.cteColumns.get(cte)
     const subplan = this.usableSubplan(cte)
     if (!columns || !subplan || this.cteStack.has(cte)) {
@@ -1232,6 +1257,13 @@ class OriginReader {
   ): ExpressionNullability {
     const cte = this.cteOfAlias.get(alias)
     if (cte === undefined) return 'unknown'
+    if (
+      (this.cteSubplans.get(cte) ?? []).some((subplan) =>
+        UNREADABLE_SET_NODE_TYPES.has(subplan['Node Type'])
+      )
+    ) {
+      return 'unknown'
+    }
     const columns = this.catalog.cteColumns.get(cte)
     const subplan = this.usableSubplan(cte)
     if (!columns || !subplan || this.cteStack.has(cte)) return 'unknown'
@@ -1610,9 +1642,6 @@ export function readPlanOrigins(
   catalog: PlanCatalog,
   conditionPaths = false
 ): PlanOrigins | PlanRefusal {
-  if (countNodes(root, (node) => UNREADABLE_SET_NODE_TYPES.has(node['Node Type'])) > 0) {
-    return 'unreadable-set-operation'
-  }
   // `GROUP BY ROLLUP`, `CUBE` and `GROUPING SETS` emit a superaggregate row in which
   // the grouping columns are NULL and which stands for no base row at all. The values
   // in the ordinary rows are still the base column's, so the origins hold; what does
