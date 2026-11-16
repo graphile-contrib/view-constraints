@@ -132,6 +132,25 @@ is the claim proves the column never `NULL`:
 | `expr::type`                                                                     | `expr` never `NULL` and the cast cannot turn a non-`NULL` value into `NULL`: it is binary-coercible (`pg_cast.castmethod = 'b'` — a type modifier then truncates but does not null), or one of the few widening integer-to-integer and integer-to-`numeric` casts PostgreSQL sends through a function; any other cast — `jsonb` to `integer`, a user `CREATE CAST`, a second cast — may answer `NULL` and stands the rule down |
 | anything else — a function by name, a window function, a subscript, a subplan    | never claimed: `unknown`, and the column stays nullable                                                                                                                                                                                                                                                                                                                                                                        |
 
+These shapes are read from the view's stored tree, and only where they stand as the whole
+of one of the view's own select-list entries:
+
+- `EXISTS (…)` and `NOT EXISTS (…)` answer true or false and never `NULL`. The plan
+  cannot be asked: PostgreSQL may print an `EXISTS` as a hashed `ANY` sublink, which
+  reads exactly like an `ANY` sublink that can be `NULL`, and which of the two it prints
+  moves with the plan.
+- `COALESCE(…)` with an argument that is a constant other than `NULL` — a constant the
+  parser left a constant (`'0'`, `0` where the other arguments are integers), not one
+  under a cast call, since a cast is free to answer `NULL`. The plan reads this shape
+  too, but where an argument stands on a query the plan may print flattened or behind a
+  kept subquery the column is refused whatever its shape (below), and the constant arm,
+  which is the view's own, is then the one answer that holds.
+
+An entry of the view's top query is computed over every join of the view, so no outer
+join pads it, and its shape is its answer whatever plan computes it. A view whose top
+query is a set operation lists the operation's columns, not such a shape, and its
+branches are left to the plan.
+
 No expression is computed and no function's strictness is trusted: strictness says
 `NULL` in, `NULL` out and nothing about non-`NULL` in (`lower()` over an empty range
 is `NULL` from a non-`NULL` argument), which is why a function's name gives no
@@ -264,9 +283,15 @@ forms and refuses the rest rather than guess. It reads: relation scans; blocks o
 pins, including one spelled with an explicit alias); `CTE Scan`; `Result`; `WindowAgg`;
 and the pass-through nodes (`Gather`, `Gather Merge`, `Sort`, `Incremental Sort`,
 `Limit`, `Materialize`, `Memoize`, `LockRows`) that hand their child's select list on. A
-`Recursive Union`, a join type it does not know, a function scan, a `VALUES` list, a
-window frame — anything else — is a named refusal on the columns that reach it, never a
-guess.
+`Gather` that computes an entry itself — a subplan a worker may not run — prints an
+entry its child does not, and is read where it prints the select list; an entry that is
+the child's computed value in parentheses is the child's own. A `Recursive Union`, a join
+type it does not know, a function scan, a `VALUES` list, a window frame — anything else —
+is a named refusal on the columns that reach it, never a guess. A recursive `WITH` query
+is refused this way and no wider: a column read through it is
+`unreadable-set-operation`, and the relations beside it keep their columns and their key,
+so a lateral query over a recursion that aggregates over no group answers one row per
+row of the relation it stands beside.
 
 ## Index-backed columns
 

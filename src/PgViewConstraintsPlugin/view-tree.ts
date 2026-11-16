@@ -12,7 +12,7 @@
 // caller turns into a named refusal (see `plan-origins.ts`). `__tests__` reads the lab
 // views through it on every run, so a major-version change to the format fails a case.
 //
-// Three questions it answers:
+// Four questions it answers:
 //
 //   * `:ctename` and `:ctecolnames` give, for every `WITH` query, its column names in
 //     select-list order. That is the map a `CTE Scan` in the plan does not print, and
@@ -35,6 +35,9 @@
 //     `varno` of each column's expression, says which columns this view reads from a
 //     `WITH` query whose columns a plan may spell either way (`:rtekind 6`, inlined and
 //     not simple) — the columns refused rather than read.
+//   * Each of the view's own select-list entries, for the shapes whose SQL definition
+//     makes them never NULL — `EXISTS`, `NOT EXISTS`, a `COALESCE` with a non-NULL
+//     constant — which the plan cannot be asked about (`neverNullByShape`).
 
 /** One value of a `pg_node_tree`: a node, a list, an array, a string, or a bare token. */
 type Dumped =
@@ -308,7 +311,7 @@ export interface TreeOrigin {
  * sets move between majors (PostgreSQL 15 and 16 print a field on these nodes that 17
  * and 18 do not), so an unknown field with a well-formed value is read past, while a
  * missing one the reader needs fails the tree. Node types the reader only walks past
- * (`CONST`, `BOOL`, …) are not listed: nothing is taken from them.
+ * (`BOOL`, …) are not listed: nothing is taken from them.
  */
 const REQUIRED_NODE_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
   ['QUERY', ['cteList', 'targetList']],
@@ -316,8 +319,51 @@ const REQUIRED_NODE_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
   ['COMMONTABLEEXPR', ['ctename', 'ctecolnames']],
   ['RANGETBLENTRY', ['rtekind', 'alias']],
   ['ALIAS', ['aliasname']],
-  ['VAR', ['varno', 'varlevelsup']]
+  ['VAR', ['varno', 'varlevelsup']],
+  ['SUBLINK', ['subLinkType']],
+  ['BOOLEXPR', ['boolop', 'args']],
+  ['COALESCEEXPR', ['args']],
+  ['CONST', ['constisnull']]
 ])
+
+// `SubLinkType` in `primnodes.h`: `EXISTS_SUBLINK` is the first member, and the dump
+// prints the enum's number.
+const EXISTS_SUBLINK = 0
+
+/**
+ * Whether a view's own select-list entry is never NULL by the SQL definition of its
+ * shape, read from the stored tree rather than the plan: an `EXISTS` sublink, `NOT` over
+ * one, or a `COALESCE` with an argument that is a constant other than `NULL`. The entry
+ * stands in the view's top query, which no join of the view nulls — the select list is
+ * computed over the joined rows — so its shape is its answer whatever plan computes it.
+ * The plan cannot say this: PostgreSQL may print an `EXISTS` as a hashed `ANY`, which
+ * reads the same as an `ANY` sublink that can be NULL, and a `COALESCE` over a query the
+ * planner may or may not flatten is printed either way. A constant hidden under a cast
+ * call is not read: a cast is free to answer NULL for a value.
+ */
+function neverNullByShape(expr: Dumped | undefined): boolean {
+  if (expr?.kind !== 'node') return false
+  if (expr.type === 'SUBLINK') return numberOf(expr.fields.get('subLinkType')) === EXISTS_SUBLINK
+  if (expr.type === 'BOOLEXPR') {
+    if (textOf(expr.fields.get('boolop')) !== 'not') return false
+    const args = nodesOf(expr.fields.get('args'))
+    const only = args.length === 1 ? args[0] : undefined
+    return (
+      only?.kind === 'node' &&
+      only.type === 'SUBLINK' &&
+      numberOf(only.fields.get('subLinkType')) === EXISTS_SUBLINK
+    )
+  }
+  if (expr.type === 'COALESCEEXPR') {
+    return nodesOf(expr.fields.get('args')).some(
+      (arg) =>
+        arg.kind === 'node' &&
+        arg.type === 'CONST' &&
+        textOf(arg.fields.get('constisnull')) === 'false'
+    )
+  }
+  return false
+}
 
 /**
  * The fields a range-table entry must carry for the kind it says it is (`:rtekind`): the
@@ -371,6 +417,12 @@ export interface ViewTree {
    * rather than read (`derive.ts`).
    */
   optionallyFlattenedColumns: Set<number>
+  /**
+   * View column positions whose own select-list entry is never NULL by its shape: an
+   * `EXISTS`, `NOT EXISTS`, or a `COALESCE` with a non-NULL constant argument
+   * (`neverNullByShape`). Read from the tree, so the answer does not move with the plan.
+   */
+  neverNullColumns: Set<number>
   /** Range-table alias → the relation oid it names. */
   relationAliases: Map<string, number>
   /**
@@ -408,6 +460,7 @@ export function readViewTree(action: string): ViewTree {
     cteAmbiguous: new Set(),
     treeOrigins: new Map(),
     optionallyFlattenedColumns: new Set(),
+    neverNullColumns: new Set(),
     relationAliases: new Map(),
     cteMaterialized: new Map(),
     cteRefCount: new Map(),
@@ -658,6 +711,14 @@ export function readViewTree(action: string): ViewTree {
     const attnum = numberOf(entry.fields.get('resorigcol'))
     if (tableId === null || tableId === 0 || attnum === null || attnum === 0) continue
     tree.treeOrigins.set(position, { tableId, attnum })
+  }
+
+  // A select-list entry whose shape is never NULL in the view's own top query. A set
+  // operation's top query lists `Var`s of the operation, never such a shape, so its
+  // branches are left to the plan.
+  for (const [position, entry] of nodesOf(top.fields.get('targetList')).entries()) {
+    if (entry.kind !== 'node') continue
+    if (neverNullByShape(entry.fields.get('expr'))) tree.neverNullColumns.add(position)
   }
 
   // A column whose value stands on a level a plan may spell either way — or on a path the
