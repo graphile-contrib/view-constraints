@@ -1000,6 +1000,13 @@ class OriginReader {
    * columns' origins, position for position. Any of these unproved refuses every column
    * read through the scan.
    */
+  /** Whether the plan computes this `WITH` query by a `Recursive Union`. */
+  private recursive(name: string): boolean {
+    return (this.cteSubplans.get(name) ?? []).some((subplan) =>
+      UNREADABLE_SET_NODE_TYPES.has(subplan['Node Type'])
+    )
+  }
+
   private usableSubplan(name: string): ExplainPlanNode | null {
     if (this.catalog.cteMaterialized.get(name) !== true) return null
     if ((this.cteSubplans.get(name) ?? []).length !== 1) return null
@@ -1072,11 +1079,7 @@ class OriginReader {
   private crossCte(alias: string, column: string, crossing: ReadonlySet<string>): Reading {
     const cte = this.cteOfAlias.get(alias)
     if (cte === undefined) return unknown('through-a-materialized-with')
-    if (
-      (this.cteSubplans.get(cte) ?? []).some((subplan) =>
-        UNREADABLE_SET_NODE_TYPES.has(subplan['Node Type'])
-      )
-    ) {
+    if (this.recursive(cte)) {
       return unknown('unreadable-set-operation')
     }
     const columns = this.catalog.cteColumns.get(cte)
@@ -1257,11 +1260,7 @@ class OriginReader {
   ): ExpressionNullability {
     const cte = this.cteOfAlias.get(alias)
     if (cte === undefined) return 'unknown'
-    if (
-      (this.cteSubplans.get(cte) ?? []).some((subplan) =>
-        UNREADABLE_SET_NODE_TYPES.has(subplan['Node Type'])
-      )
-    ) {
+    if (this.recursive(cte)) {
       return 'unknown'
     }
     const columns = this.catalog.cteColumns.get(cte)

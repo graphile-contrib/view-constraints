@@ -677,6 +677,13 @@ create view v_expr_exists as
          exists (select 1 from bank b where b.id = t.bank_id) as known,
          not exists (select 1 from bank b where b.id = t.bank_id or b.title = t.cur_code) as unmatched
   from tx t;
+-- NEGATIVE: a writable view's `DO INSTEAD` rule is a row of pg_rewrite beside the view's
+-- own query, and its tree is another query: a `COALESCE` with a constant in the rule's
+-- target list says nothing of the view's column at that position.
+create view v_extra_rule as select id, cur_code, bank_id from tx;
+create rule v_extra_rule_insert as on insert to v_extra_rule do instead
+  insert into tx (id, cur_code, bank_id, amount)
+  values (new.id, new.cur_code, coalesce(new.bank_id, 1), 0);
 -- POSITIVE: a COALESCE with a constant in the view's own select list is never NULL even
 -- over a grouped subquery, whose column a plan may print flattened or behind a kept
 -- subquery: the constant arm is the top query's own.

@@ -1599,6 +1599,20 @@ const CASES: Case[] = [
     primaryKey: 'id'
   },
   {
+    view: 'v_extra_rule',
+    about:
+      'a writable view\u2019s DO INSTEAD rule is not the view\u2019s query: its tree says ' +
+      'nothing of the view\u2019s columns',
+    origins: ['id=tx.id', 'cur_code=tx.cur_code', 'bank_id=tx.bank_id'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: [
+      '(bank_id) references lab.bank (id)',
+      '(cur_code) references lab.currency (code)',
+      '(id) references lab.tx (id)'
+    ],
+    primaryKey: 'id'
+  },
+  {
     view: 'v_expr_coalesce_cast_call',
     about: 'a constant behind a cast call is not read: a cast is free to answer NULL',
     origins: ['id=tx.id', 'total=—'],

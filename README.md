@@ -132,8 +132,8 @@ is the claim proves the column never `NULL`:
 | `expr::type`                                                                     | `expr` never `NULL` and the cast cannot turn a non-`NULL` value into `NULL`: it is binary-coercible (`pg_cast.castmethod = 'b'` — a type modifier then truncates but does not null), or one of the few widening integer-to-integer and integer-to-`numeric` casts PostgreSQL sends through a function; any other cast — `jsonb` to `integer`, a user `CREATE CAST`, a second cast — may answer `NULL` and stands the rule down |
 | anything else — a function by name, a window function, a subscript, a subplan    | never claimed: `unknown`, and the column stays nullable                                                                                                                                                                                                                                                                                                                                                                        |
 
-Three shapes are read from the view's stored tree rather than from the plan, and only
-where they stand as the whole of one of the view's own select-list entries:
+These shapes are read from the view's stored tree, and only where they stand as the whole
+of one of the view's own select-list entries:
 
 - `EXISTS (…)` and `NOT EXISTS (…)` answer true or false and never `NULL`. The plan
   cannot be asked: PostgreSQL may print an `EXISTS` as a hashed `ANY` sublink, which

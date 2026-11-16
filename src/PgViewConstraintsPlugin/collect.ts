@@ -294,6 +294,9 @@ const VIEW_ACTION_QUERY = `
            JOIN pg_class class ON class.oid = rule.ev_class
            JOIN pg_namespace namespace ON namespace.oid = class.relnamespace
   WHERE class.relkind IN ('v', 'm')
+    -- The view's own query: a writable view's \`DO INSTEAD\` rules are rows of
+    -- pg_rewrite too, and their trees are other queries.
+    AND rule.rulename = '_RETURN'
     AND namespace.nspname = ANY ($1)`
 
 // Column types, for the one question the plan cannot answer: whether a cast over a
@@ -354,6 +357,7 @@ const VIEW_SOURCE_QUERY = `
           WHERE dependency.classid = 'pg_rewrite'::regclass
             AND dependency.refclassid = 'pg_class'::regclass
             AND rule.ev_class = class.oid
+            AND rule.rulename = '_RETURN'
             AND source.oid <> class.oid
             AND source.relkind IN ('v', 'm')) AS sources
   FROM pg_class class

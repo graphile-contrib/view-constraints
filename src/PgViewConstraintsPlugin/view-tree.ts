@@ -12,7 +12,7 @@
 // caller turns into a named refusal (see `plan-origins.ts`). `__tests__` reads the lab
 // views through it on every run, so a major-version change to the format fails a case.
 //
-// Three questions it answers:
+// Four questions it answers:
 //
 //   * `:ctename` and `:ctecolnames` give, for every `WITH` query, its column names in
 //     select-list order. That is the map a `CTE Scan` in the plan does not print, and
@@ -35,6 +35,9 @@
 //     `varno` of each column's expression, says which columns this view reads from a
 //     `WITH` query whose columns a plan may spell either way (`:rtekind 6`, inlined and
 //     not simple) — the columns refused rather than read.
+//   * Each of the view's own select-list entries, for the shapes whose SQL definition
+//     makes them never NULL — `EXISTS`, `NOT EXISTS`, a `COALESCE` with a non-NULL
+//     constant — which the plan cannot be asked about (`neverNullByShape`).
 
 /** One value of a `pg_node_tree`: a node, a list, an array, a string, or a bare token. */
 type Dumped =
@@ -308,7 +311,7 @@ export interface TreeOrigin {
  * sets move between majors (PostgreSQL 15 and 16 print a field on these nodes that 17
  * and 18 do not), so an unknown field with a well-formed value is read past, while a
  * missing one the reader needs fails the tree. Node types the reader only walks past
- * (`CONST`, `BOOL`, …) are not listed: nothing is taken from them.
+ * (`BOOL`, …) are not listed: nothing is taken from them.
  */
 const REQUIRED_NODE_FIELDS: ReadonlyMap<string, readonly string[]> = new Map([
   ['QUERY', ['cteList', 'targetList']],
