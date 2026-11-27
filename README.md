@@ -185,19 +185,22 @@ only where every branch proves it), across a crossed view boundary, and below an
 outer join: a computed column of a nulled side is `NULL` in every padded row,
 whatever the expression promises about the rows it computed over.
 
-A set operation's branches are read wherever the operation stands: at the select
-list, under a node that computes over it — a `GROUP BY`, a `DISTINCT`, an
+A set operation's branches are read by position wherever the operation stands: at the
+select list, under a node that computes over it — a `GROUP BY`, a `DISTINCT`, an
 `ORDER BY` — or at the select list of a view the reader crosses. The node above prints
 the Vars of one branch, and each column is that branch's entry at the same position;
 a column of the result is therefore never `NULL` only where the entry at that position
 of **every** branch is not (a `UNION`, `UNION ALL`, `INTERSECT` and `EXCEPT` alike,
-each branch printing its own select list in the operation's column order). Where the
-branches cannot be told apart — a set operation standing over another, so the same
-spelling names a column of both — no column is read and the view says
+each branch printing its own select list in the operation's column order). What names
+a column is its **position**, not its spelling: a set operation standing over another
+— an inline subquery's union, or a union view whose append the planner kept under the
+outer branch — is read position by position, and two positions of one operation that
+print the same entry are two columns. A branch that prints no select list, or one
+whose entries do not line up with the operation's columns, is the refusal
 `set-operation-not-a-select-list`. `INTERSECT` and `EXCEPT` are read where the plan
 prints their branches directly; a PostgreSQL major that wraps the operation in a
-subquery the reader leaves unread leaves them refused whole, an under-count taken on
-purpose rather than a claim on a branch the plan does not name.
+subquery whose branches do not line up with its columns leaves them refused whole, an
+under-count taken on purpose rather than a claim on a branch the plan does not name.
 
 A `WITH` query referenced twice is materialized, and the plan prints its columns by the
 query's own names in the `CTE Scan` that reads them while the subplan computes the

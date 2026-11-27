@@ -244,13 +244,49 @@ create view v_union_grouped as
   ) u
   group by sid, cur_code;
 
--- NEGATIVE: a set operation over another cannot tell its branches apart — the same
--- spelling names a column of both — so no column of it is read.
+-- POSITIVE: a set operation over another is read per position. The same spelling
+-- names a column of both — the outer branch prints the inner operation's first
+-- branch's Var — and the position on the node tells the two operations apart.
 create view v_union_nested as
   select id, cur_code from tx
   union all
   select id, cur_code
   from (select id, cur_code from tx union select id, cur_code from wallet) w;
+
+-- POSITIVE: a union whose branch reads another union view. The edge view's append
+-- stands under the outer union's branch, and the branch's entries are spelled the
+-- same as the edge view's own; the reader tells them apart by position, not by text.
+create view v_union_edge as
+  select id, cur_code from tx
+  union all
+  select id, cur_code from wallet;
+create view v_union_over_union_view as
+  select id, cur_code from tx
+  union
+  select e.id, e.cur_code
+  from v_union_edge e join bank b on b.id = e.id;
+create view v_over_union_over_union_view as
+  select l.id, count(*) as n from v_union_over_union_view l group by l.id;
+
+-- POSITIVE: two positions of a union print the very same entry. The consumer bent a
+-- view around this once (a second row of the same relation so the positions printed
+-- different texts); the position, not the spelling, is what names the column.
+create view v_union_repeated_position as
+  select a.id as first_id, a.id as second_id from tx a
+  union all
+  select b.id, b.id from wallet b;
+
+-- POSITIVE: a single SELECT over a union view, folded by a grouping, derives what the
+-- flattened equivalent derives: the column is a column of every branch, whether the
+-- planner flattens the union into this query or keeps it behind a `Subquery Scan`.
+create view v_union_edge_distinct as
+  select id, cur_code from tx
+  union
+  select id, cur_code from wallet;
+create view v_link_over_union_distinct as
+  select e.id, e.cur_code from v_union_edge_distinct e;
+create view v_published_over_union_distinct as
+  select l.id, count(*) as n from v_link_over_union_distinct l group by l.id;
 
 -- NEGATIVE: a recursive WITH reads its own output as one tagged stream, so a column
 -- has no branch to be read off.

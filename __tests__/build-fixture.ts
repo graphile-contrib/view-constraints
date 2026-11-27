@@ -31,7 +31,8 @@ import {
   readViews,
   readViewSources,
   resolveCteOrigins,
-  resolveTreeColumns
+  resolveTreeColumns,
+  subqueryCandidatesFor
 } from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { RunQuery } from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { ExplainPlanNode } from '../src/PgViewConstraintsPlugin/plan-origins.ts'
@@ -207,13 +208,21 @@ for (const state of STATISTICS_STATES) {
       const plan = rows.rows[0]?.['QUERY PLAN']?.[0]?.Plan
       if (!plan) throw new Error(`${view.view}: EXPLAIN returned no plan`)
       const facts = viewTrees.get(`lab.${view.view}`)
-      // Each range-table alias the view's stored tree names, resolved to the relation it
-      // stands for, so a `Subquery Scan` spelled with an explicit alias is crossable.
+      // Each range-table alias a source view's stored tree names, resolved to the
+      // relation it stands for, so a `Subquery Scan` spelled with an explicit alias the
+      // planner flattened a level down to is crossable. The alias is read from every
+      // view the analysed one goes through, not from its own tree alone.
+      const candidates = subqueryCandidatesFor(
+        viewSources,
+        viewTrees,
+        relationOids,
+        view.schema,
+        view.view
+      )
       const viewAliases = Object.fromEntries(
-        [...(facts?.relationAliases ?? [])].flatMap(([alias, relid]) => {
-          const relation = relationOids.get(relid)
-          return relation ? [[alias, relation.relation]] : []
-        })
+        [...candidates]
+          .filter(([alias, shape]) => alias !== shape.name)
+          .map(([alias, shape]) => [alias, shape.name])
       )
       planned.push({
         schema: view.schema,
