@@ -276,6 +276,25 @@ create view v_union_repeated_position as
   union all
   select b.id, b.id from wallet b;
 
+-- NEGATIVE for the second column: one branch spells both union columns `a.id`, the other
+-- puts a NULL into the second, so the second column is nullable; a grouping above the
+-- union prints both in the first branch's spelling, and reading the second position as
+-- the first would carry the first column's never-NULL answer to it.
+create view v_union_spelling_twice as
+  select a.id as first_id, a.id as second_id from tx a where a.bank_id is null
+  union
+  select b.id, null::bigint from tx b where b.bank_id is not null;
+-- NEGATIVE: the same union without the branch conditions — one tx row is in both
+-- branches, as (x, x) and as (x, NULL), so first_id is not unique.
+create view v_union_spelling_twice_overlap as
+  select a.id as first_id, a.id as second_id from tx a
+  union
+  select b.id, null::bigint from tx b;
+create view v_over_union_spelling_twice as
+  select u.first_id, u.second_id, count(*) as n
+  from v_union_spelling_twice u
+  group by u.first_id, u.second_id;
+
 -- POSITIVE: a single SELECT over a union view, folded by a grouping, derives what the
 -- flattened equivalent derives: the column is a column of every branch, whether the
 -- planner flattens the union into this query or keeps it behind a `Subquery Scan`.

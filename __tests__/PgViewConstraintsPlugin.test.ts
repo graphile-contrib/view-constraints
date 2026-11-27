@@ -1019,6 +1019,39 @@ const CASES: Case[] = [
     primaryKey: null
   },
   {
+    view: 'v_union_spelling_twice',
+    about:
+      'one branch spells both union columns alike, the other puts a NULL into the second: ' +
+      'the deduplication key is the pair, never the first column alone',
+    origins: ['first_id=—', 'second_id=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null,
+    unique: 'first_id,second_id'
+  },
+  {
+    view: 'v_union_spelling_twice_overlap',
+    about:
+      'the same union with one row in both branches, as (x, x) and as (x, NULL): first_id ' +
+      'repeats, so only the pair is a key',
+    origins: ['first_id=—', 'second_id=—'],
+    notNull: [],
+    foreignKeys: [],
+    primaryKey: null,
+    unique: 'first_id,second_id'
+  },
+  {
+    view: 'v_over_union_spelling_twice',
+    about:
+      'a grouping over that union prints both columns in the first branch spelling; its ' +
+      'group key is still the pair',
+    origins: ['first_id=—', 'second_id=—', 'n=—'],
+    notNull: ['n'],
+    foreignKeys: [],
+    primaryKey: null,
+    unique: 'first_id,second_id'
+  },
+  {
     view: 'v_union_edge_distinct',
     about: 'the deduplicating edge view whose branch a union above reads',
     origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
@@ -3709,6 +3742,21 @@ test('an Output that does not line up with the view’s columns is refused whole
     readPlanOrigins({ 'Node Type': 'Hash Join', 'Join Type': 'Inner' }, 2, new Map(), planCatalog),
     'output-not-positional'
   )
+})
+
+test('one spelling at two positions over two union columns is not read as the first', () => {
+  // A grouping over the union prints both union columns in the first branch's spelling
+  // (`a.id`), so the deduplication key `(a.id, a.id)` names two positions with one
+  // element. Under every regime it stays the pair: read as the first position alone it
+  // would claim first_id unique where one tx row is both (x, x) and (x, NULL).
+  for (const regime of REGIMES) {
+    for (const name of ['v_union_spelling_twice_overlap', 'v_over_union_spelling_twice']) {
+      const view = derive(name, regime)
+      assert.notEqual(view.unique, 'first_id', `${regime} ${name}: first_id alone is no key`)
+      assert.notEqual(view.primaryKey, 'first_id', `${regime} ${name}: first_id alone is no key`)
+      assert.ok(!view.notNull.includes('second_id'), `${regime} ${name}: second_id is nullable`)
+    }
+  }
 })
 
 test('a set operation whose branches print no select list is refused whole', () => {
