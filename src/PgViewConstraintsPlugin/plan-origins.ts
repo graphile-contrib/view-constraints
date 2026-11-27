@@ -139,9 +139,9 @@ export interface ViewShape {
  */
 export const PLAN_REFUSALS = {
   'set-operation-not-a-select-list':
-    'a set operation’s branches cannot be told apart — a column of a branch is ' +
-    'spelled the same as a column of another, as when a set operation stands over ' +
-    'another, or a branch has no select list to read position by position',
+    'a set operation’s branches do not each print the operation’s columns in order — ' +
+    'a branch with no select list, or one whose entries are not the same width as the ' +
+    'first branch’s, so nothing may be read off it position by position',
   'output-not-positional':
     'the node carrying the select list prints no `Output`, or one that does not line ' +
     'up one-to-one with the view’s columns'
@@ -620,74 +620,19 @@ interface UnionColumn {
 }
 
 /**
- * Every column of every set operation whose branches can be told apart, by the
- * `Output` entry an enclosing node spells it with.
+ * The columns of every set operation whose branches print the operation's select list
+ * position for position.
  *
- * A node above a set operation prints the Vars of one branch, so a column of the union
- * appears there as that branch's own expression; the position of that expression in
- * the branch's select list is the union's column. The branches are told apart by their
- * scan aliases, which name one range-table entry each; where the same spelling would
- * name a column of two different set operations — a set operation over another — there
- * is no one branch to read the column off, and the plan is refused rather than guessed
- * between them. A set operation inside a view this reader crosses is read by the cross
- * itself and left out here.
+ * A set operation is identified by the node that prints its columns, not by the text of
+ * an `Output` entry: the same spelling can name a column of two set operations at once —
+ * a union over a union, or a branch of one union read through another — and no reading
+ * of the text can say which was meant. What does say it is the position: a node above a
+ * set operation prints the operations's columns position for position, and a value read
+ * at a position of a node is the set operation's column at that same position. So the
+ * reader resolves a column from the node it stands on (`OriginReader.columnsOf`), and
+ * the spelling is only a fallback for a reference inside a larger expression, where no
+ * position is at hand.
  */
-function unionColumnsOf(
-  root: ExplainPlanNode,
-  crossable: ReadonlyMap<string, CrossableSubquery>
-): { columns: Map<string, UnionColumn>; aliases: Set<string>; ambiguous: boolean } {
-  const columns = new Map<string, UnionColumn>()
-  const aliases = new Set<string>()
-  let ambiguous = false
-
-  const branchesOf = (node: ExplainPlanNode): UnionBranch[] | null => {
-    const branches = inputChildren(node).map((child) => {
-      const list = selectListNodeOf(child)
-      return { node: list, output: list.Output ?? [] }
-    })
-    if (branches.length < 2) return null
-    const width = branches[0]?.output.length ?? 0
-    if (width === 0) return null
-    // A branch that prints a shorter list than the first is not the set operation's
-    // columns in the same order, and nothing may be read off it positionally.
-    if (branches.some((branch) => branch.output.length !== width)) return null
-    return branches
-  }
-
-  const visit = (node: ExplainPlanNode, insideCrossing: boolean): void => {
-    if (!insideCrossing && SET_OPERATION_NODE_TYPES.has(node['Node Type'])) {
-      const branches = branchesOf(node)
-      if (branches === null) {
-        ambiguous = true
-      } else {
-        for (const branch of branches) {
-          for (const entry of branch.output) {
-            const reference = parseReference(entry)
-            if (reference?.alias != null) aliases.add(reference.alias)
-          }
-        }
-        const width = branches[0]?.output.length ?? 0
-        for (let position = 0; position < width; position++) {
-          const column: UnionColumn = { branches, position }
-          for (const branch of branches) {
-            const entry = branch.output[position] ?? ''
-            const seen = columns.get(entry)
-            if (seen !== undefined && seen !== column) {
-              ambiguous = true
-              continue
-            }
-            columns.set(entry, column)
-          }
-        }
-      }
-    }
-    const crossed =
-      node['Node Type'] === SUBQUERY_SCAN && node.Alias !== undefined && crossable.has(node.Alias)
-    for (const child of node.Plans ?? []) visit(child, insideCrossing || crossed)
-  }
-  visit(root, false)
-  return { columns, aliases, ambiguous }
-}
 
 /**
  * Whether everything this `Subquery Scan` says about itself agrees with the view it
@@ -855,11 +800,14 @@ class OriginReader {
   /** A `WITH` query name's proved subplan, or `null` where none was proved. */
   private readonly cteProven = new Map<string, ExplainPlanNode | null>()
   private readonly catalog: PlanCatalog
-  /** Every column of a set operation whose branches can be told apart, by entry text. */
-  private readonly unionColumns: ReadonlyMap<string, UnionColumn>
-  /** Branch scan aliases of those set operations, by alias. */
+  /** Every set operation column each `Output` entry spelling is claimed by, by entry. */
+  private readonly unionClaims: ReadonlyMap<string, UnionColumn[]>
+  /** Branch scan aliases of every set operation, by alias. */
   private readonly unionAliases: ReadonlySet<string>
-  private readonly unionsAmbiguous: boolean
+  /** Whether a set operation's branches print no select list to read positionally. */
+  private readonly unionsUnreadable: boolean
+  /** Per node, the set operation column each of its `Output` positions is. */
+  private readonly columnsMemo = new Map<ExplainPlanNode, (UnionColumn | null)[]>()
   private readonly unionMemo = new Map<UnionColumn, Reading>()
   private readonly unionPending = new Set<UnionColumn>()
 
@@ -877,10 +825,10 @@ class OriginReader {
     this.cteOfAlias = cteAliasesIn(root)
     this.cteSubplans = cteSubplansIn(root)
     this.cteScanCounts = cteScanCountsIn(root)
-    const unions = unionColumnsOf(root, this.crossable)
-    this.unionColumns = unions.columns
+    const unions = this.indexUnions(root)
+    this.unionClaims = unions.claims
     this.unionAliases = unions.aliases
-    this.unionsAmbiguous = unions.ambiguous
+    this.unionsUnreadable = unions.unreadable
     const [sole] = [...this.relations]
     const aliasNodes = countNodes(root, (node) => node.Alias !== undefined)
     this.soleRelation =
@@ -893,9 +841,9 @@ class OriginReader {
     return this.crossable
   }
 
-  /** Whether a set operation's branches could not be told apart anywhere in the plan. */
+  /** Whether a set operation's branches print no select list to read positionally. */
   get ambiguousUnions(): boolean {
-    return this.unionsAmbiguous
+    return this.unionsUnreadable
   }
 
   /** The alias an unqualified column name belongs to, where there is one. */
@@ -909,11 +857,33 @@ class OriginReader {
    * range-table names are unique, so an alias that came round twice would be a
    * cycle, which PostgreSQL does not allow between views and this reader does not
    * follow.
+   *
+   * `node` and `position` are the plan node that printed the entry and its position
+   * there. A value at a position of a node is the set operation column at that
+   * position when the node carries one (`columnsOf`), which is how the same spelling
+   * standing for two set operations — a union over a union — is told apart: by where
+   * it stands, not by how it is spelled. `branchLocal` says the entry is one branch's
+   * own select-list entry, so a spelling that names a column of the union the branch
+   * belongs to is the value read here, not the union's column again.
    */
-  read(entry: string, crossing: ReadonlySet<string> = new Set(), branchLocal = false): Reading {
+  read(
+    entry: string,
+    crossing: ReadonlySet<string> = new Set(),
+    branchLocal = false,
+    node: ExplainPlanNode | undefined = undefined,
+    position: number | undefined = undefined
+  ): Reading {
+    const atNode = this.columnAt(entry, node, position)
+    if (atNode) {
+      if (this.unionPending.has(atNode)) return unknown('not-a-column-reference')
+      return this.readUnionColumn(atNode, crossing)
+    }
     if (!branchLocal) {
-      const column = this.unionColumns.get(entry)
-      if (column) return this.readUnionColumn(column, crossing)
+      const claims = this.unionClaims.get(entry)
+      if (claims !== undefined && claims.length === 1) {
+        const [column] = claims
+        if (column && !this.unionPending.has(column)) return this.readUnionColumn(column, crossing)
+      }
       const reference = parseReference(entry)
       if (reference?.alias != null && this.unionAliases.has(reference.alias)) {
         // A column of a set operation's branch reached somewhere its position in the
@@ -928,6 +898,195 @@ class OriginReader {
   }
 
   /**
+   * The set operation column a node's `Output` position is, or `null` where the value
+   * at that position is not one column of a set operation.
+   *
+   * A set operation node's own positions are its columns. A node that hands a value
+   * on — a pass-through, a de-duplication, a `Subquery Scan` — is followed to the
+   * child whose entry at that position is the same value; a grouping or a join is
+   * followed through the entry it prints, which its input prints too. A set operation
+   * inside a view this reader crosses is read by the cross itself, so a pinned
+   * `Subquery Scan` is a boundary here and not followed.
+   */
+  private columnAt(
+    entry: string,
+    node: ExplainPlanNode | undefined,
+    position: number | undefined
+  ): UnionColumn | undefined {
+    if (node === undefined) return undefined
+    const at = position ?? this.positionIn(node, entry)
+    if (at === undefined) return undefined
+    return this.columnsOf(node)[at] ?? undefined
+  }
+
+  /** The `Output` a node prints, or a set operation's first branch's, which is its own. */
+  private representativeOutput(node: ExplainPlanNode): string[] {
+    if (Array.isArray(node.Output) && node.Output.length > 0) return node.Output
+    if (SET_OPERATION_NODE_TYPES.has(node['Node Type'])) {
+      return this.branchesOf(node)?.[0]?.output ?? []
+    }
+    return []
+  }
+
+  /** The position of an entry in the `Output` a node prints, where it prints one. */
+  private positionIn(node: ExplainPlanNode, entry: string): number | undefined {
+    const target = unwrap(entry)
+    const found = this.representativeOutput(node).findIndex(
+      (candidate) => unwrap(candidate) === target
+    )
+    return found >= 0 ? found : undefined
+  }
+
+  /** The set operation column each `Output` position of `node` is, memoized. */
+  private columnsOf(node: ExplainPlanNode): (UnionColumn | null)[] {
+    const memoized = this.columnsMemo.get(node)
+    if (memoized) return memoized
+    const columns = this.computeColumns(node)
+    this.columnsMemo.set(node, columns)
+    return columns
+  }
+
+  private computeColumns(node: ExplainPlanNode): (UnionColumn | null)[] {
+    const type = node['Node Type']
+    if (SET_OPERATION_NODE_TYPES.has(type)) {
+      const branches = this.branchesOf(node)
+      if (branches === null) return []
+      const width = branches[0]?.output.length ?? 0
+      return Array.from({ length: width }, (_, position): UnionColumn => ({ branches, position }))
+    }
+    const inputs = inputChildren(node)
+    if (type === SUBQUERY_SCAN) {
+      const alias = node.Alias
+      // A view this reader crosses: its columns are the view's own, read through the
+      // cross, not the base columns behind it.
+      if (alias !== undefined && this.crossable.has(alias)) return []
+      const only = inputs.length === 1 ? inputs[0] : undefined
+      const output = node.Output ?? []
+      if (!only) return []
+      const childColumns = this.columnsOf(only)
+      if (childColumns.length !== output.length) return []
+      // A `Subquery Scan` hands its child's select list on position for position. An
+      // entry under a cast is a transformed value, not the child's value, and is left
+      // to be read as the cast it is.
+      return output.map((entry, index) => {
+        const reference = parseReference(entry)
+        const plain = reference !== null && !reference.coerced && reference.alias === alias
+        return plain ? (childColumns[index] ?? null) : null
+      })
+    }
+    const output = node.Output ?? []
+    if (output.length === 0) return []
+    return output.map((entry) => {
+      const target = unwrap(entry)
+      const matches: { node: ExplainPlanNode; index: number }[] = []
+      for (const child of inputs) {
+        const childOutput = this.representativeOutput(child)
+        for (let index = 0; index < childOutput.length; index++) {
+          if (unwrap(childOutput[index] ?? '') === target) matches.push({ node: child, index })
+        }
+      }
+      // An entry two inputs print is not said to come from one of them; a value the
+      // node computes itself is none of its inputs'.
+      if (matches.length !== 1) return null
+      const [match] = matches
+      if (!match) return null
+      return this.columnsOf(match.node)[match.index] ?? null
+    })
+  }
+
+  /**
+   * The branch of a set operation read at one position, as the node and entry the value
+   * stands as. A branch's `Subquery Scan` — a set-operation branch, an inline subquery,
+   * or a source view the plan flattened — hands its subquery's target list on position
+   * for position, so a branch that is not a view this reader crosses is read through it
+   * to the node printing the expressions, where a cast the operation applies to the
+   * branch stands. A `Subquery Scan` the catalog pins to a view is left to the cross.
+   */
+  branchEntry(branch: UnionBranch, position: number): { node: ExplainPlanNode; entry: string } {
+    let node = branch.node
+    let entry = this.representativeOutput(node)[position] ?? ''
+    for (let step = 0; step < 16; step++) {
+      if (node['Node Type'] !== SUBQUERY_SCAN) break
+      const alias = node.Alias
+      if (alias !== undefined && this.crossable.has(alias)) break
+      const inputs = inputChildren(node)
+      const only = inputs.length === 1 ? inputs[0] : undefined
+      if (!only) break
+      const list = selectListNodeOf(only)
+      const next = this.representativeOutput(list)[position] ?? ''
+      if (next === '') break
+      node = list
+      entry = next
+    }
+    return { node, entry }
+  }
+
+  /** The branches of a set operation, each printing the operation's columns in order. */
+  branchesOf(node: ExplainPlanNode): UnionBranch[] | null {
+    const branches = inputChildren(node).map((child) => {
+      const list = selectListNodeOf(child)
+      // A branch that is itself a set operation prints its columns in its first
+      // branch's vocabulary; it is read as that child's columns, by position.
+      return { node: list, output: this.representativeOutput(list) }
+    })
+    if (branches.length < 2) return null
+    const width = branches[0]?.output.length ?? 0
+    if (width === 0) return null
+    // A branch that prints a shorter list than the first is not the set operation's
+    // columns in the same order, and nothing may be read off it positionally.
+    if (branches.some((branch) => branch.output.length !== width)) return null
+    return branches
+  }
+
+  /**
+   * Every set operation's columns, by the `Output` spelling they answer to, and the
+   * aliases its branches name. The spelling is only a fallback: where a spelling names
+   * a column of more than one set operation — a union over another — it is a list, and
+   * the position on the node (`columnsOf`) is what tells them apart.
+   */
+  private indexUnions(root: ExplainPlanNode): {
+    claims: Map<string, UnionColumn[]>
+    aliases: Set<string>
+    unreadable: boolean
+  } {
+    const claims = new Map<string, UnionColumn[]>()
+    const aliases = new Set<string>()
+    let unreadable = false
+    const visit = (node: ExplainPlanNode, insideCrossing: boolean): void => {
+      if (!insideCrossing && SET_OPERATION_NODE_TYPES.has(node['Node Type'])) {
+        const branches = this.branchesOf(node)
+        if (branches === null) {
+          unreadable = true
+        } else {
+          for (const branch of branches) {
+            for (const entry of branch.output) {
+              const reference = parseReference(entry)
+              if (reference?.alias != null) aliases.add(reference.alias)
+            }
+          }
+          const width = branches[0]?.output.length ?? 0
+          for (let position = 0; position < width; position++) {
+            const column: UnionColumn = { branches, position }
+            for (const branch of branches) {
+              const entry = branch.output[position] ?? ''
+              const seen = claims.get(entry)
+              if (seen === undefined) claims.set(entry, [column])
+              else if (!seen.includes(column)) seen.push(column)
+            }
+          }
+        }
+      }
+      const crossed =
+        node['Node Type'] === SUBQUERY_SCAN &&
+        node.Alias !== undefined &&
+        this.crossable.has(node.Alias)
+      for (const child of node.Plans ?? []) visit(child, insideCrossing || crossed)
+    }
+    visit(root, false)
+    return { claims, aliases, unreadable }
+  }
+
+  /**
    * The one value every branch of a set operation answers at this column: one base
    * column per branch, and a NULL in any branch makes the column nullable there. A key
    * of the union under a column a branch reads is not carried: the union's own columns
@@ -939,17 +1098,19 @@ class OriginReader {
     if (this.unionPending.has(column)) return unknown('not-a-column-reference')
     this.unionPending.add(column)
     const merged = mergeReadings(
-      column.branches.map((branch) =>
-        this.readEntry(branch.output[column.position] ?? '', crossing)
-      )
+      column.branches.map((branch) => {
+        const { node, entry } = this.branchEntry(branch, column.position)
+        return this.read(entry, crossing, true, node, column.position)
+      })
     )
     // The origins name the base columns a branch proxies and say nothing where a branch
     // spells a literal; the nullability is the union's own answer — never NULL only
     // where every branch's entry is — and is kept beside them.
     merged.nullability = mergeNullabilities(
-      column.branches.map((branch) =>
-        this.evaluateEntry(branch.output[column.position] ?? '', branch.node, crossing, true)
-      )
+      column.branches.map((branch) => {
+        const { node, entry } = this.branchEntry(branch, column.position)
+        return this.evaluateEntry(entry, node, crossing, true)
+      })
     )
     this.unionPending.delete(column)
     this.unionMemo.set(column, merged)
@@ -1147,11 +1308,10 @@ class OriginReader {
     // columns before the node was called crossable, so a name that is not one of them
     // cannot arrive here.
     if (position < 0) return unknown('through-an-unpinned-subquery')
-    const inner = crossable.branches
-      ? mergeReadings(
-          crossable.branches.map((branch) => this.read(branch.Output?.[position] ?? '', crossing))
-        )
-      : this.read(crossable.selectList.Output?.[position] ?? '', crossing)
+    // The node under the `Subquery Scan` prints the crossed view's select list position
+    // for position, whether it is one expression, a de-duplication or a set operation.
+    const entry = this.representativeOutput(crossable.selectList)[position] ?? ''
+    const inner = this.read(entry, crossing, true, crossable.selectList, position)
     if (inner.origins === null) return inner
     if (inner.origins.length === 0) return inner
     const waypoint = {
@@ -1236,7 +1396,9 @@ class OriginReader {
           )
         }
       }
-      return this.readingNullability(this.read(entry, crossing, branchLocal))
+      return this.readingNullability(
+        this.read(entry, crossing, branchLocal, node, this.positionIn(node, entry))
+      )
     }
     return evaluateExpression(parseExpression(entry), {
       column: (referenceText) =>
@@ -1334,8 +1496,8 @@ class OriginReader {
    */
   conditionBlocked(root: ExplainPlanNode, selectList: ExplainPlanNode): Set<string> {
     const blocked = new Set<string>()
-    const mark = (entry: string, branchLocal: boolean): void => {
-      const reading = this.read(entry, new Set(), branchLocal)
+    const mark = (entry: string, branchLocal: boolean, node: ExplainPlanNode): void => {
+      const reading = this.read(entry, new Set(), branchLocal, node, this.positionIn(node, entry))
       for (const origin of reading.origins ?? []) {
         for (const alias of origin.alias.split('∨')) {
           blocked.add(qualifiedReference(alias, origin.column))
@@ -1351,7 +1513,7 @@ class OriginReader {
         type === 'ProjectSet' ||
         type === 'Sample Scan'
       ) {
-        for (const entry of entries) mark(entry, branchLocal)
+        for (const entry of entries) mark(entry, branchLocal, node)
         return
       }
       if (type === 'Unique') {
@@ -1369,9 +1531,9 @@ class OriginReader {
         const grouped = this.groupKeyReferences(node)
         const passing: string[] = []
         for (const entry of entries) {
-          const references = this.referenceKeys(entry, branchLocal)
+          const references = this.referenceKeys(entry, branchLocal, node)
           if ([...references].every((reference) => grouped.has(reference))) passing.push(entry)
-          else mark(entry, branchLocal)
+          else mark(entry, branchLocal, node)
         }
         for (const child of inputChildren(node)) pass(child, passing, branchLocal)
         return
@@ -1382,7 +1544,7 @@ class OriginReader {
         const children = inputChildren(node)
         const child = children.length === 1 ? children[0] : undefined
         if (!crossable || !child || alias === undefined) {
-          for (const entry of entries) mark(entry, branchLocal)
+          for (const entry of entries) mark(entry, branchLocal, node)
           return
         }
         const positions: number[] = []
@@ -1393,7 +1555,7 @@ class OriginReader {
           const position = crossable.view.columns.indexOf(reference.column)
           if (position < 0) continue
           positions.push(position)
-          translated.push(crossable.selectList.Output?.[position] ?? '')
+          translated.push(this.representativeOutput(crossable.selectList)[position] ?? '')
         }
         if (translated.length === 0) return
         // The value readers step over a `Limit` above a select list; here it is on the
@@ -1401,7 +1563,7 @@ class OriginReader {
         let between: ExplainPlanNode | undefined = child
         for (let step = 0; step < 16 && between && between !== crossable.selectList; step++) {
           if (between['Node Type'] === 'Limit') {
-            for (const entry of translated) mark(entry, branchLocal)
+            for (const entry of translated) mark(entry, branchLocal, crossable.selectList)
             return
           }
           const inputs = inputChildren(between)
@@ -1428,7 +1590,7 @@ class OriginReader {
         const columns = cte === undefined ? undefined : this.catalog.cteColumns.get(cte)
         const subplan = cte === undefined ? null : this.usableSubplan(cte)
         if (alias === undefined || columns === undefined || !subplan) {
-          for (const entry of entries) mark(entry, branchLocal)
+          for (const entry of entries) mark(entry, branchLocal, node)
           return
         }
         const translated: string[] = []
@@ -1444,10 +1606,16 @@ class OriginReader {
       }
       if (SET_OPERATION_NODE_TYPES.has(type)) {
         for (const entry of entries) {
-          const column = branchLocal ? undefined : this.unionColumns.get(entry)
+          const column = branchLocal
+            ? undefined
+            : this.columnAt(entry, node, this.positionIn(node, entry))
           if (column) {
             for (const branch of column.branches) {
-              pass(branch.node, [branch.output[column.position] ?? ''], true)
+              const { node: branchNode, entry: branchValue } = this.branchEntry(
+                branch,
+                column.position
+              )
+              pass(branchNode, [branchValue], true)
             }
             continue
           }
@@ -1465,7 +1633,7 @@ class OriginReader {
         )
       }
     }
-    pass(root, selectList.Output ?? [], false)
+    pass(root, this.representativeOutput(selectList), false)
     return blocked
   }
 
@@ -1473,7 +1641,13 @@ class OriginReader {
   private groupKeyReferences(node: ExplainPlanNode): Set<string> {
     const grouped = new Set<string>()
     for (const entry of node['Group Key'] ?? []) {
-      for (const origin of this.read(unwrap(entry)).origins ?? []) {
+      for (const origin of this.read(
+        unwrap(entry),
+        new Set(),
+        false,
+        node,
+        this.positionIn(node, unwrap(entry))
+      ).origins ?? []) {
         for (const alias of origin.alias.split('∨')) {
           grouped.add(qualifiedReference(alias, origin.column))
         }
@@ -1483,9 +1657,15 @@ class OriginReader {
   }
 
   /** The base references one entry stands on, read in its own level's vocabulary. */
-  private referenceKeys(entry: string, branchLocal: boolean): Set<string> {
+  private referenceKeys(entry: string, branchLocal: boolean, node: ExplainPlanNode): Set<string> {
     const references = new Set<string>()
-    for (const origin of this.read(entry, new Set(), branchLocal).origins ?? []) {
+    for (const origin of this.read(
+      entry,
+      new Set(),
+      branchLocal,
+      node,
+      this.positionIn(node, entry)
+    ).origins ?? []) {
       for (const alias of origin.alias.split('∨')) {
         references.add(qualifiedReference(alias, origin.column))
       }
@@ -1652,43 +1832,52 @@ export function readPlanOrigins(
 
   // A set operation's branches are read position by position, wherever the operation
   // stands: at the select list of the plan, under a node that computes over it, or at
-  // the select list of a view the reader descends into. Where the branches cannot be
-  // told apart — a set operation over another, a branch with no select list — the
-  // plan is refused rather than one branch's spelling trusted for the union's.
+  // the select list of a view the reader descends into. A set operation whose branches
+  // print no select list to read position by position is refused whole rather than one
+  // branch's spelling trusted for the operation's.
   if (reader.ambiguousUnions) return 'set-operation-not-a-select-list'
 
   const readings: Reading[] = []
   const nullabilities: ExpressionNullability[] = []
   const nullExtended: boolean[] = []
   if (SET_OPERATION_NODE_TYPES.has(selectListNode['Node Type'])) {
-    const branches = inputChildren(selectListNode).map((child) => selectListNodeOf(child))
-    if (branches.length === 0) return 'output-not-positional'
+    const branches = reader.branchesOf(selectListNode)
+    if (branches === null) return 'set-operation-not-a-select-list'
     // Each branch prints its own select list, in the set operation's column order. A
     // shorter or longer one is not that list, and nothing may be read off it
     // positionally.
-    if (branches.some((branch) => branch.Output?.length !== requestedColumnCount)) {
+    if (branches.some((branch) => branch.output.length !== requestedColumnCount)) {
       return 'output-not-positional'
     }
     for (let index = 0; index < requestedColumnCount; index++) {
       readings.push(
-        mergeReadings(branches.map((branch) => reader.readEntry(branch.Output?.[index] ?? '')))
+        mergeReadings(
+          branches.map((branch) => {
+            const { node, entry } = reader.branchEntry(branch, index)
+            return reader.read(entry, new Set(), true, node, index)
+          })
+        )
       )
       nullabilities.push(
         mergeNullabilities(
-          branches.map((branch) =>
-            reader.evaluateEntry(branch.Output?.[index] ?? '', branch, new Set(), true)
-          )
+          branches.map((branch) => {
+            const { node, entry } = reader.branchEntry(branch, index)
+            return reader.evaluateEntry(entry, node, new Set(), true)
+          })
         )
       )
       nullExtended.push(
-        branches.some((branch) => reader.entryNullExtended(branch.Output?.[index] ?? '', branch))
+        branches.some((branch) => {
+          const { node, entry } = reader.branchEntry(branch, index)
+          return reader.entryNullExtended(entry, node)
+        })
       )
     }
   } else {
     const output = selectListNode.Output
     if (!output || output.length !== requestedColumnCount) return 'output-not-positional'
-    for (const entry of output) {
-      readings.push(reader.read(entry))
+    for (const [index, entry] of output.entries()) {
+      readings.push(reader.read(entry, new Set(), false, selectListNode, index))
       nullabilities.push(reader.evaluateEntry(entry, selectListNode))
       nullExtended.push(reader.entryNullExtended(entry, selectListNode))
     }

@@ -711,23 +711,55 @@ export async function readViewTrees(query: RunQuery, schemas: string[]): Promise
 
 /**
  * The views a `Subquery Scan` may be pinned to, by the name it carries: the source
- * views of this relation by their own names, and — for a source the defining query
+ * views of this relation by their own names, and — for a source some query on the way
  * referred to by an explicit alias (`FROM deposit.v bank_range`) — by that alias, read
- * from the relation each range-table alias names. The plan spells such a node with the
- * range-table entry's name, which is the alias, and the alias is no view's name.
+ * from the relation each range-table alias names.
+ *
+ * The aliases are read from the stored trees of **every** view the analysed view goes
+ * through, not from its own tree alone. A query above flattens a projection view into
+ * itself, and a `Subquery Scan` it keeps for the relation under that view is spelled
+ * with the alias the flattened view wrote — `FROM client_link direct` in the view is
+ * what the plan's node is called, though the analysed view's own tree never wrote it.
+ * An alias two queried views give two relations is dropped rather than guessed
+ * between: the plan prints the name and nothing says which query's entry it is.
  */
 export function subqueryCandidatesFor(
   views: readonly ViewSourceRow[],
-  facts: ViewTreeFacts | undefined,
+  trees: ReadonlyMap<string, ViewTreeFacts>,
   oids: RelationOidIndex,
   schema: string,
   name: string
 ): Map<string, ViewShape> {
   const candidates = subqueryViewCandidates(views, schema, name)
-  for (const [alias, relid] of facts?.relationAliases ?? []) {
-    const relation = oids.get(relid)
+  if (candidates.size === 0) return candidates
+  const byKey = new Map(views.map((view) => [`${view.schema}.${view.name}`, view]))
+  // The analysed view and every view it reaches, whose own trees the plan may print an
+  // alias from once the planner flattens the levels between.
+  const reached = new Set<string>()
+  const queue = [`${schema}.${name}`]
+  while (queue.length > 0) {
+    const key = queue.pop()
+    if (key === undefined || reached.has(key)) continue
+    reached.add(key)
+    queue.push(...(byKey.get(key)?.sources ?? []))
+  }
+  const targets = new Map<string, Set<number>>()
+  for (const key of reached) {
+    for (const [alias, relid] of trees.get(key)?.relationAliases ?? []) {
+      const set = targets.get(alias)
+      if (set) set.add(relid)
+      else targets.set(alias, new Set([relid]))
+    }
+  }
+  for (const [alias, relids] of targets) {
+    if (relids.size !== 1) continue
+    const [relid] = relids
+    const relation = relid === undefined ? undefined : oids.get(relid)
     const shape = relation === undefined ? undefined : candidates.get(relation.relation)
-    if (shape) candidates.set(alias, shape)
+    if (!shape) continue
+    const seen = candidates.get(alias)
+    if (seen !== undefined && seen !== shape) continue
+    candidates.set(alias, shape)
   }
   return candidates
 }
@@ -966,7 +998,7 @@ export async function collectViewConstraints(
       readPlanOrigins(
         plan,
         columns.length,
-        subqueryCandidatesFor(viewSources, facts, relationOids, view.schema, view.view),
+        subqueryCandidatesFor(viewSources, viewTrees, relationOids, view.schema, view.view),
         planCatalogFrom(
           catalog,
           strictEquality,

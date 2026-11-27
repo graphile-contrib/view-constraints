@@ -42,11 +42,16 @@ import {
   NO_PRIVILEGED_CONNECTION_REASON,
   readShadowedNames,
   readViewTrees,
+  subqueryCandidatesFor,
   subqueryViewCandidates,
   TREE_FORMAT_UNCHECKED_REASON,
   planCatalogFrom
 } from '../src/PgViewConstraintsPlugin/collect.ts'
-import type { ViewSourceRow } from '../src/PgViewConstraintsPlugin/collect.ts'
+import type {
+  RelationOidIndex,
+  ViewSourceRow,
+  ViewTreeFacts
+} from '../src/PgViewConstraintsPlugin/collect.ts'
 import type { RunQuery } from '../src/PgViewConstraintsPlugin/collect.ts'
 import {
   COLUMN_REFUSALS,
@@ -937,9 +942,10 @@ const CASES: Case[] = [
     notNull: ['id', 'cur_code'],
     foreignKeys: ['(cur_code) references lab.currency (code)'],
     primaryKey: null,
-    // PostgreSQL 17 and earlier wrap the `SetOp` in a `Subquery Scan`, so the columns
-    // are not read and the view is refused whole; both answers hold back rather than
-    // claim.
+    // PostgreSQL 17 and earlier wrap the `SetOp` in a `Subquery Scan`. The reader
+    // descends such a scan position for position, so the columns are read where that
+    // major's branches line up; a wrapped shape whose branches do not is refused whole,
+    // and both answers hold back rather than claim.
     alsoPlanRefusal: 'set-operation-not-a-select-list'
   },
   {
@@ -965,12 +971,78 @@ const CASES: Case[] = [
   {
     view: 'v_union_nested',
     about:
-      'a set operation over another cannot tell its branches apart: the same spelling ' +
-      'names a column of both, so no column is read',
-    origins: null,
-    notNull: [],
+      'a set operation over another is read per position: the same spelling names a ' +
+      'column of both, and the position on the node, not the text, says which operation ' +
+      'a value belongs to',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_union_edge',
+    about: 'the `UNION ALL` edge view whose branch a union above reads',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: null
+  },
+  {
+    view: 'v_union_over_union_view',
+    about:
+      'a union whose branch reads another union view: the edge view’s append stands under ' +
+      'the outer union’s branch and prints the same entries at the same positions, and ' +
+      'each column is read per position rather than refused for the shared spelling',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'id,cur_code'
+  },
+  {
+    view: 'v_over_union_over_union_view',
+    about:
+      'a grouping over that union: the group key carries every branch the nested union ' +
+      'assembles, so its key and non-nullness stand',
+    origins: ['id=tx.id|wallet.id', 'n=—'],
+    notNull: ['id', 'n'],
+    foreignKeys: [],
+    primaryKey: 'id'
+  },
+  {
+    view: 'v_union_repeated_position',
+    about:
+      'two positions of a union print the very same entry: the position names the column, ' +
+      'so both proxy both branches rather than the union being refused for one spelling',
+    origins: ['first_id=tx.id|wallet.id', 'second_id=tx.id|wallet.id'],
+    notNull: ['first_id', 'second_id'],
     foreignKeys: [],
     primaryKey: null
+  },
+  {
+    view: 'v_union_edge_distinct',
+    about: 'the deduplicating edge view whose branch a union above reads',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'id,cur_code'
+  },
+  {
+    view: 'v_link_over_union_distinct',
+    about: 'a single SELECT over the union view: each column is a column of every branch',
+    origins: ['id=tx.id|wallet.id', 'cur_code=tx.cur_code|wallet.cur_code'],
+    notNull: ['id', 'cur_code'],
+    foreignKeys: ['(cur_code) references lab.currency (code)'],
+    primaryKey: 'id,cur_code'
+  },
+  {
+    view: 'v_published_over_union_distinct',
+    about:
+      'a grouping over a SELECT over a union view derives what the flattened equivalent ' +
+      'derives: the key is the group key and its columns are every branch’s',
+    origins: ['id=tx.id|wallet.id', 'n=—'],
+    notNull: ['id', 'n'],
+    foreignKeys: [],
+    primaryKey: 'id'
   },
   {
     view: 'v_recursive',
@@ -3477,7 +3549,7 @@ test('the stored rewrite tree is read only on a major the format is checked agai
 // built by hand here — the same way the join type this reader does not know is held.
 const REFUSAL_CASES: Record<PlanRefusal | ColumnRefusal, string> = {
   'unreadable-set-operation': 'v_recursive',
-  'set-operation-not-a-select-list': 'v_union_nested',
+  'set-operation-not-a-select-list': 'a plan built by hand, below',
   'output-not-positional': 'a plan built by hand, below',
   'not-a-column-reference': 'v_coalesce',
   'unqualified-name-without-a-sole-relation': 'a plan built by hand, above',
@@ -3637,6 +3709,129 @@ test('an Output that does not line up with the view’s columns is refused whole
     readPlanOrigins({ 'Node Type': 'Hash Join', 'Join Type': 'Inner' }, 2, new Map(), planCatalog),
     'output-not-positional'
   )
+})
+
+test('a set operation whose branches print no select list is refused whole', () => {
+  // No lab view produces this: a set operation's branches always print the
+  // operation's columns. A reader without an answer would read a column off a branch
+  // that printed nothing by position.
+  const plan: ExplainPlanNode = {
+    'Node Type': 'Append',
+    Plans: [{ 'Node Type': 'Seq Scan' }, { 'Node Type': 'Seq Scan', Output: ['wallet.id'] }]
+  }
+  assert.equal(readPlanOrigins(plan, 1, new Map(), planCatalog), 'set-operation-not-a-select-list')
+})
+
+test('a union behind a Subquery Scan an intermediate view aliased is read per position', () => {
+  // A projection view between the analysed view and the union view is flattened away,
+  // and the `Subquery Scan` the planner keeps for the union view is spelled with the
+  // alias the flattened view wrote (`FROM v_edge d`). The alias is read from the
+  // intermediate view's stored tree, and the union under the scan is read column by
+  // column — every branch, not the first one's spelling.
+  const edge: ViewShape = { schema: 'lab', name: 'v_edge', columns: ['id', 'cur_code'] }
+  const plan: ExplainPlanNode = {
+    'Node Type': 'Subquery Scan',
+    Alias: 'd',
+    Output: ['d.id', 'd.cur_code'],
+    Plans: [
+      {
+        'Node Type': 'Unique',
+        Output: ['tx.id', 'tx.cur_code'],
+        Plans: [
+          {
+            'Node Type': 'Append',
+            Plans: [
+              {
+                'Node Type': 'Seq Scan',
+                'Parent Relationship': 'Member',
+                Schema: 'lab',
+                'Relation Name': 'tx',
+                Alias: 'tx',
+                Output: ['tx.id', 'tx.cur_code']
+              },
+              {
+                'Node Type': 'Seq Scan',
+                'Parent Relationship': 'Member',
+                Schema: 'lab',
+                'Relation Name': 'wallet',
+                Alias: 'wallet',
+                Output: ['wallet.id', 'wallet.cur_code']
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+  const origins = read(plan, 2, new Map([['d', edge]]))
+  assert.deepEqual(
+    origins.columns.map(
+      (sources) => sources?.map((origin) => `${origin.relation}.${origin.column}`).join('|') ?? '—'
+    ),
+    ['tx.id|wallet.id', 'tx.cur_code|wallet.cur_code']
+  )
+})
+
+/** A view's stored tree with nothing but the range-table aliases a case needs. */
+function treeFacts(aliases: [string, number][]): ViewTreeFacts {
+  return {
+    ok: true,
+    cteColumns: new Map(),
+    cteOrigins: new Map(),
+    cteAmbiguous: new Set(),
+    treeOrigins: new Map(),
+    optionallyFlattenedColumns: new Set(),
+    neverNullColumns: new Set(),
+    relationAliases: new Map(aliases),
+    cteMaterialized: new Map(),
+    cteRefCount: new Map(),
+    distinctOn: false
+  }
+}
+
+test('a Subquery Scan is pinned by an alias an intermediate view wrote', () => {
+  // The analysed view's own tree never writes the alias: the view between it and the
+  // union view did, and the planner flattened that level away. Reading only the
+  // analysed view's tree leaves the node unpinned, and the union under it loses its
+  // columns.
+  const views: ViewSourceRow[] = [
+    { schema: 'lab', name: 'v_pub', columns: ['cid'], sources: ['lab.v_link'] },
+    { schema: 'lab', name: 'v_link', columns: ['cid'], sources: ['lab.v_edge'] },
+    { schema: 'lab', name: 'v_edge', columns: ['cid', 'other_cid'], sources: [] }
+  ]
+  const oids: RelationOidIndex = new Map([
+    [1, { schema: 'lab', relation: 'v_link', relkind: 'v', columns: new Map() }],
+    [2, { schema: 'lab', relation: 'v_edge', relkind: 'v', columns: new Map() }]
+  ])
+  const trees = new Map<string, ViewTreeFacts>([
+    ['lab.v_pub', treeFacts([['l', 1]])],
+    ['lab.v_link', treeFacts([['d', 2]])]
+  ])
+  const candidates = subqueryCandidatesFor(views, trees, oids, 'lab', 'v_pub')
+  assert.equal(candidates.get('l')?.name, 'v_link')
+  assert.equal(candidates.get('d')?.name, 'v_edge')
+  // An alias two queried views give two relations says nothing, and is dropped.
+  trees.set('lab.v_edge', treeFacts([['d', 2]]))
+  const stillOne = subqueryCandidatesFor(
+    [...views, { schema: 'lab', name: 'v_other', columns: ['cid'], sources: ['lab.v_edge'] }],
+    new Map([
+      [
+        'lab.v_pub',
+        treeFacts([
+          ['l', 1],
+          ['d', 9]
+        ])
+      ],
+      ['lab.v_link', treeFacts([['d', 2]])]
+    ]),
+    new Map([
+      ...oids,
+      [9, { schema: 'lab', relation: 'v_other', relkind: 'v', columns: new Map() }]
+    ]),
+    'lab',
+    'v_pub'
+  )
+  assert.equal(stillOne.get('d'), undefined)
 })
 
 test('a Subquery Scan is crossed only where the catalog pins it to one view', () => {
