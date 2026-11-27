@@ -1065,18 +1065,39 @@ export function readPlanKeys(
   // would find the key under one plan and miss it under another.
   const groupKey = selectList['Group Key']
   const output = selectList.Output ?? []
+  // Only a grouping that de-duplicates a set operation is read this way: a grouping
+  // over a table's expression keeps the stance that its key names nothing the view
+  // can name. The set operation is reached through the nodes that hand rows on
+  // unchanged or re-group them (a gather, a sort, a partial or inner aggregate).
+  const overSetOperation = (): boolean => {
+    let node: ExplainPlanNode | undefined = context.inputs(selectList)[0]
+    for (let step = 0; step < 16 && node !== undefined; step++) {
+      if (context.unioning.has(node['Node Type'])) return true
+      const type = node['Node Type']
+      if (!context.passThrough.has(type) && type !== 'Aggregate' && type !== 'Unique') return false
+      const inputs = context.inputs(node)
+      if (inputs.length !== 1) return false
+      node = inputs[0]
+    }
+    return false
+  }
   if (
     (selectList['Node Type'] === 'Aggregate' || selectList['Node Type'] === 'Group') &&
+    overSetOperation() &&
     selectList['Grouping Sets'] === undefined &&
     selectList['Partial Mode'] !== 'Partial' &&
     groupKey !== undefined &&
     output.length > 0 &&
     !gatherAbove(root, selectList, context)
   ) {
+    // The positions printing a group key expression, beside the aggregates the node
+    // computes: every group key expression has to be printed for them to hold the key.
     const keyed = new Set(groupKey.map((entry) => unwrap(entry)))
     const printed = output.map((entry) => unwrap(entry))
-    if (printed.every((entry) => keyed.has(entry)) && keyed.size <= new Set(printed).size) {
-      const columns = output.map((_, index) => index)
+    const grouped = printed.flatMap((entry, index) => (keyed.has(entry) ? [index] : []))
+    const shown = new Set(grouped.map((index) => printed[index]))
+    if (grouped.length > 0 && [...keyed].every((entry) => shown.has(entry))) {
+      const columns = grouped
       const held = found.some(
         (key) =>
           key.columns.length === columns.length &&
