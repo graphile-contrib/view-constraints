@@ -1023,9 +1023,9 @@ const CASES: Case[] = [
     about:
       'one branch spells both union columns alike, the other puts a NULL into the second: ' +
       'the deduplication key is the pair, never the first column alone',
-    origins: ['first_id=—', 'second_id=—'],
-    notNull: [],
-    foreignKeys: [],
+    origins: ['first_id=tx.id', 'second_id=tx.id'],
+    notNull: ['first_id'],
+    foreignKeys: ['(first_id) references lab.tx (id)', '(second_id) references lab.tx (id)'],
     primaryKey: null,
     unique: 'first_id,second_id'
   },
@@ -1034,9 +1034,9 @@ const CASES: Case[] = [
     about:
       'the same union with one row in both branches, as (x, x) and as (x, NULL): first_id ' +
       'repeats, so only the pair is a key',
-    origins: ['first_id=—', 'second_id=—'],
-    notNull: [],
-    foreignKeys: [],
+    origins: ['first_id=tx.id', 'second_id=tx.id'],
+    notNull: ['first_id'],
+    foreignKeys: ['(first_id) references lab.tx (id)', '(second_id) references lab.tx (id)'],
     primaryKey: null,
     unique: 'first_id,second_id'
   },

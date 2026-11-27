@@ -991,6 +991,22 @@ class OriginReader {
     }
     const output = node.Output ?? []
     if (output.length === 0) return []
+    // A node over one input that prints exactly that input's list, entry for entry —
+    // a deduplication, a sort, a gather, a grouping on every column — hands each
+    // position on as it stands. Matching by spelling cannot tell two positions apart
+    // when the input spells them alike (a set operation's first branch printing `a.id`
+    // twice); the position can.
+    const sole = inputs.length === 1 ? inputs[0] : undefined
+    if (sole !== undefined) {
+      const below = this.representativeOutput(sole)
+      if (
+        below.length === output.length &&
+        output.every((entry, index) => unwrap(entry) === unwrap(below[index] ?? ''))
+      ) {
+        const childColumns = this.columnsOf(sole)
+        return output.map((_, index) => childColumns[index] ?? null)
+      }
+    }
     return output.map((entry) => {
       const target = unwrap(entry)
       const matches: { node: ExplainPlanNode; index: number }[] = []
