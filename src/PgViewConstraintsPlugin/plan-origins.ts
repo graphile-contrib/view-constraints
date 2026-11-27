@@ -894,6 +894,10 @@ class OriginReader {
       const claims = this.unionClaims.get(entry)
       if (claims !== undefined && claims.length === 1) {
         const [column] = claims
+        // A set operation spelling two columns alike in some branch is told apart by
+        // position only (`spellsTwice`): a spelling claimed by one of its columns under
+        // this plan may be ambiguous under another.
+        if (column && spellsTwice(column)) return unknown('not-a-column-reference')
         if (column && !this.unionPending.has(column)) return this.readUnionColumn(column, crossing)
       }
       const reference = parseReference(entry)
