@@ -1717,7 +1717,7 @@
           "notNull": true
         },
         "cur_code": {
-          "typeId": 284263886,
+          "typeId": 284303928,
           "typeMod": -1,
           "notNull": true
         }
@@ -2282,7 +2282,7 @@
           "notNull": false
         },
         "mystery_id": {
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1,
           "notNull": false
         }
@@ -5540,6 +5540,31 @@
     },
     {
       "schema": "lab",
+      "relation": "v_over_union_spelling_twice",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "indexes": [],
+      "columns": {
+        "first_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "second_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "n": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_over_view",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -6495,6 +6520,46 @@
     },
     {
       "schema": "lab",
+      "relation": "v_union_spelling_twice",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "indexes": [],
+      "columns": {
+        "first_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "second_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
+      "relation": "v_union_spelling_twice_overlap",
+      "foreignKeys": [],
+      "uniqueKeys": [],
+      "partialIndexes": [],
+      "indexes": [],
+      "columns": {
+        "first_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        },
+        "second_id": {
+          "typeId": 20,
+          "typeMod": -1,
+          "notNull": false
+        }
+      }
+    },
+    {
+      "schema": "lab",
       "relation": "v_union_unreadable_branch",
       "foreignKeys": [],
       "uniqueKeys": [],
@@ -6658,7 +6723,7 @@
   "coercions": {
     "binary": ["1043>25", "25>1043"],
     "domainBase": {
-      "284263886": 25
+      "284303928": 25
     }
   },
   "strictEquality": true,
@@ -7926,6 +7991,12 @@
     },
     {
       "schema": "lab",
+      "name": "v_over_union_spelling_twice",
+      "columns": ["first_id", "second_id", "n"],
+      "sources": ["lab.v_union_spelling_twice"]
+    },
+    {
+      "schema": "lab",
       "name": "v_over_view",
       "columns": ["id", "cur_code"],
       "sources": ["lab.v_distinct_src"]
@@ -8210,6 +8281,18 @@
       "schema": "lab",
       "name": "v_union_same_target",
       "columns": ["id", "cur_code"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_union_spelling_twice",
+      "columns": ["first_id", "second_id"],
+      "sources": []
+    },
+    {
+      "schema": "lab",
+      "name": "v_union_spelling_twice_overlap",
+      "columns": ["first_id", "second_id"],
       "sources": []
     },
     {
@@ -9682,7 +9765,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -20625,6 +20708,95 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["a.id", "a.id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "default",
@@ -23750,6 +23922,124 @@
             "Relation Name": "wallet",
             "Alias": "wallet",
             "Parent Relationship": "Member"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member",
+                "Filter": "(a.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member",
+                "Filter": "(b.bank_id IS NOT NULL)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "default",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member"
+              }
+            ]
           }
         ]
       }
@@ -25461,7 +25751,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -36404,6 +36694,95 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["a.id", "a.id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "serial",
@@ -39529,6 +39908,124 @@
             "Relation Name": "wallet",
             "Alias": "wallet",
             "Parent Relationship": "Member"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member",
+                "Filter": "(a.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member",
+                "Filter": "(b.bank_id IS NOT NULL)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "serial",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member"
+              }
+            ]
           }
         ]
       }
@@ -41432,7 +41929,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -53658,6 +54155,102 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["a.id", "a.id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Gather",
+                "Output": ["a.id", "a.id"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Append",
+                    "Parent Relationship": "Outer",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["a.id", "a.id"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "a",
+                        "Parent Relationship": "Member",
+                        "Filter": "(a.bank_id IS NULL)"
+                      },
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["b.id", "NULL::bigint"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "b",
+                        "Parent Relationship": "Member",
+                        "Filter": "(b.bank_id IS NOT NULL)"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "parallel-forced",
@@ -57154,6 +57747,138 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Gather",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "parallel-forced",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Gather",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_unreadable_branch",
       "relkind": "v",
       "regime": "parallel-forced",
@@ -58887,7 +59612,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -70034,6 +70759,100 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Unique",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Output": ["a.id", "a.id"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Append",
+                    "Parent Relationship": "Outer",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["a.id", "a.id"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "a",
+                        "Parent Relationship": "Member",
+                        "Filter": "(a.bank_id IS NULL)"
+                      },
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["b.id", "NULL::bigint"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "b",
+                        "Parent Relationship": "Member",
+                        "Filter": "(b.bank_id IS NOT NULL)"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -73231,6 +74050,134 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Unique",
+        "Output": ["a.id", "a.id"],
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "no-hashagg",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Unique",
+        "Output": ["a.id", "a.id"],
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_unreadable_branch",
       "relkind": "v",
       "regime": "no-hashagg",
@@ -74936,7 +75883,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -85714,6 +86661,95 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["a.id", "a.id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "no-sort",
@@ -88833,6 +89869,124 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member",
+                "Filter": "(a.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member",
+                "Filter": "(b.bank_id IS NOT NULL)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "no-sort",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_unreadable_branch",
       "relkind": "v",
       "regime": "no-sort",
@@ -90561,7 +91715,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -101702,6 +102856,97 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["a.id", "a.id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Index Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Index Name": "tx_pkey",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Index Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Index Name": "tx_pkey",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -104969,6 +106214,128 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Index Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member",
+                "Index Name": "tx_pkey",
+                "Filter": "(a.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Index Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member",
+                "Index Name": "tx_pkey",
+                "Filter": "(b.bank_id IS NOT NULL)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "no-seqscan",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member",
+                "Index Name": "tx_pkey"
+              },
+              {
+                "Node Type": "Index Only Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member",
+                "Index Name": "tx_pkey"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_unreadable_branch",
       "relkind": "v",
       "regime": "no-seqscan",
@@ -106683,7 +108050,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -117245,6 +118612,95 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["a.id", "a.id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "nestloop-only",
@@ -120306,6 +121762,124 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member",
+                "Filter": "(a.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member",
+                "Filter": "(b.bank_id IS NOT NULL)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "nestloop-only",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_unreadable_branch",
       "relkind": "v",
       "regime": "nestloop-only",
@@ -122011,7 +123585,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -132961,6 +134535,95 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "no-nestloop",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["a.id", "a.id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "no-nestloop",
@@ -136092,6 +137755,124 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "no-nestloop",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member",
+                "Filter": "(a.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member",
+                "Filter": "(b.bank_id IS NOT NULL)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "no-nestloop",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_unreadable_branch",
       "relkind": "v",
       "regime": "no-nestloop",
@@ -137797,7 +139578,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -148716,6 +150497,95 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Aggregate",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Group Key": ["a.id", "a.id"],
+            "Partial Mode": "Simple",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "genetic-join-order",
@@ -151847,6 +153717,124 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member",
+                "Filter": "(a.bank_id IS NULL)"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member",
+                "Filter": "(b.bank_id IS NOT NULL)"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "genetic-join-order",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Append",
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["a.id", "a.id"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "a",
+                "Parent Relationship": "Member"
+              },
+              {
+                "Node Type": "Seq Scan",
+                "Output": ["b.id", "NULL::bigint"],
+                "Schema": "lab",
+                "Relation Name": "tx",
+                "Alias": "b",
+                "Parent Relationship": "Member"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_unreadable_branch",
       "relkind": "v",
       "regime": "genetic-join-order",
@@ -153548,7 +155536,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -164133,6 +166121,100 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "production/default",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Unique",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Output": ["a.id", "a.id"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Append",
+                    "Parent Relationship": "Outer",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["a.id", "a.id"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "a",
+                        "Parent Relationship": "Member",
+                        "Filter": "(a.bank_id IS NULL)"
+                      },
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["b.id", "NULL::bigint"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "b",
+                        "Parent Relationship": "Member",
+                        "Filter": "(b.bank_id IS NOT NULL)"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "production/default",
@@ -167108,6 +169190,134 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "production/default",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Unique",
+        "Output": ["a.id", "a.id"],
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "production/default",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Unique",
+        "Output": ["a.id", "a.id"],
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_unreadable_branch",
       "relkind": "v",
       "regime": "production/default",
@@ -168809,7 +171019,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -179314,6 +181524,100 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "production/nestloop-only",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Unique",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Output": ["a.id", "a.id"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Append",
+                    "Parent Relationship": "Outer",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["a.id", "a.id"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "a",
+                        "Parent Relationship": "Member",
+                        "Filter": "(a.bank_id IS NULL)"
+                      },
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["b.id", "NULL::bigint"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "b",
+                        "Parent Relationship": "Member",
+                        "Filter": "(b.bank_id IS NOT NULL)"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "production/nestloop-only",
@@ -182275,6 +184579,134 @@
     },
     {
       "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "production/nestloop-only",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Unique",
+        "Output": ["a.id", "a.id"],
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "production/nestloop-only",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Unique",
+        "Output": ["a.id", "a.id"],
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_union_unreadable_branch",
       "relkind": "v",
       "regime": "production/nestloop-only",
@@ -183990,7 +186422,7 @@
         },
         {
           "name": "mystery_id",
-          "typeId": 284264854,
+          "typeId": 284304908,
           "typeMod": -1
         }
       ],
@@ -194798,6 +197230,100 @@
     },
     {
       "schema": "lab",
+      "view": "v_over_union_spelling_twice",
+      "relkind": "v",
+      "regime": "production/no-nestloop",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "n",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {
+        "0": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "first_id",
+          "relkind": "v"
+        },
+        "1": {
+          "schema": "lab",
+          "relation": "v_union_spelling_twice",
+          "column": "second_id",
+          "relkind": "v"
+        }
+      },
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {
+        "u": "v_union_spelling_twice"
+      },
+      "plan": {
+        "Node Type": "Aggregate",
+        "Output": ["a.id", "a.id", "count(*)"],
+        "Group Key": ["a.id", "a.id"],
+        "Partial Mode": "Simple",
+        "Plans": [
+          {
+            "Node Type": "Unique",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Output": ["a.id", "a.id"],
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Append",
+                    "Parent Relationship": "Outer",
+                    "Plans": [
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["a.id", "a.id"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "a",
+                        "Parent Relationship": "Member",
+                        "Filter": "(a.bank_id IS NULL)"
+                      },
+                      {
+                        "Node Type": "Seq Scan",
+                        "Output": ["b.id", "NULL::bigint"],
+                        "Schema": "lab",
+                        "Relation Name": "tx",
+                        "Alias": "b",
+                        "Parent Relationship": "Member",
+                        "Filter": "(b.bank_id IS NOT NULL)"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
       "view": "v_over_view",
       "relkind": "v",
       "regime": "production/no-nestloop",
@@ -197908,6 +200434,134 @@
             "Relation Name": "wallet",
             "Alias": "wallet",
             "Parent Relationship": "Member"
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice",
+      "relkind": "v",
+      "regime": "production/no-nestloop",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Unique",
+        "Output": ["a.id", "a.id"],
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member",
+                    "Filter": "(a.bank_id IS NULL)"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member",
+                    "Filter": "(b.bank_id IS NOT NULL)"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "schema": "lab",
+      "view": "v_union_spelling_twice_overlap",
+      "relkind": "v",
+      "regime": "production/no-nestloop",
+      "columns": [
+        {
+          "name": "first_id",
+          "typeId": 20,
+          "typeMod": -1
+        },
+        {
+          "name": "second_id",
+          "typeId": 20,
+          "typeMod": -1
+        }
+      ],
+      "treeOk": true,
+      "cteColumns": {},
+      "cteOrigins": {},
+      "cteAmbiguous": [],
+      "cteMaterialized": {},
+      "cteRefCount": {},
+      "treeColumns": {},
+      "optionallyFlattenedColumns": [],
+      "neverNullColumns": [],
+      "viewAliases": {},
+      "plan": {
+        "Node Type": "Unique",
+        "Output": ["a.id", "a.id"],
+        "Plans": [
+          {
+            "Node Type": "Sort",
+            "Output": ["a.id", "a.id"],
+            "Parent Relationship": "Outer",
+            "Plans": [
+              {
+                "Node Type": "Append",
+                "Parent Relationship": "Outer",
+                "Plans": [
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["a.id", "a.id"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "a",
+                    "Parent Relationship": "Member"
+                  },
+                  {
+                    "Node Type": "Seq Scan",
+                    "Output": ["b.id", "NULL::bigint"],
+                    "Schema": "lab",
+                    "Relation Name": "tx",
+                    "Alias": "b",
+                    "Parent Relationship": "Member"
+                  }
+                ]
+              }
+            ]
           }
         ]
       }

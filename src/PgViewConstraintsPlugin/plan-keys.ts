@@ -491,6 +491,24 @@ class KeyReader {
     return positions
   }
 
+  /**
+   * Every position of `node`'s `Output` at which each element stands, leaving out an
+   * entry under a cast. One element printed at several positions is not one value
+   * there: above a set operation the first branch's spelling stands for every
+   * position, and two of them may be two different columns of the operation.
+   */
+  allPositionsIn(node: ExplainPlanNode): Map<string, number[]> {
+    const positions = new Map<string, number[]>()
+    for (const [at, entry] of (node.Output ?? []).entries()) {
+      const value = this.bareElement(entry)
+      if (value === null) continue
+      const held = positions.get(value)
+      if (held) held.push(at)
+      else positions.set(value, [at])
+    }
+    return positions
+  }
+
   keysOf(node: ExplainPlanNode, scope: Scope): NodeKey[] {
     const memoized = this.memo.get(node)
     if (memoized) return memoized
@@ -1013,23 +1031,32 @@ export function readPlanKeys(
         underJoin: false
       })
     : reader.keysOf(root, { inWorker: false, underJoin: false })
-  const positions = union ? new Map<string, number>() : reader.positionsIn(selectList)
-  const at = (value: string): number | undefined =>
-    union ? Number(value.slice(1)) : positions.get(value)
+  // An element the select list prints at several positions is read at every one of
+  // them: the positions may be different columns spelled alike (a grouping over a
+  // union prints the first branch's spelling for each), and a key naming the element
+  // holds of all of them together — a wider key is still a key, a narrower one is not.
+  const positions = union ? new Map<string, number[]>() : reader.allPositionsIn(selectList)
+  const at = (value: string): number[] | undefined =>
+    union ? [Number(value.slice(1))] : positions.get(value)
 
   const found: PlanKey[] = []
   for (const key of keys) {
     if (key.elements.length === 0 || key.pinOnly) continue
     const mapped = key.order.map(at)
-    if (mapped.some((index) => index === undefined)) continue
-    const columns = key.carried
-      ? (mapped as number[])
-      : [...new Set(mapped as number[])].sort((left, right) => left - right)
-    const discriminators = key.discriminators
-      .map(at)
-      .filter((index): index is number => index !== undefined)
-      .sort((left, right) => left - right)
-    found.push({ columns, carried: key.carried, discriminators })
+    if (mapped.some((indexes) => indexes === undefined)) continue
+    const indexes = mapped as number[][]
+    // A carried key names its base constraint's columns in order, one position each;
+    // an element at several positions has no one position, so the key is carried no
+    // further and stands as the set of every position it covers.
+    const spread = indexes.some((held) => held.length !== 1)
+    const carried = spread ? null : key.carried
+    const columns = carried
+      ? indexes.map((held) => held[0] as number)
+      : [...new Set(indexes.flat())].sort((left, right) => left - right)
+    const discriminators = [
+      ...new Set(key.discriminators.flatMap((value) => at(value) ?? []))
+    ].sort((left, right) => left - right)
+    found.push({ columns, carried, discriminators })
   }
   return found
 }

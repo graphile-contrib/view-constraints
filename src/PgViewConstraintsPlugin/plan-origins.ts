@@ -928,13 +928,28 @@ class OriginReader {
     return []
   }
 
-  /** The position of an entry in the `Output` a node prints, where it prints one. */
+  /**
+   * The position of an entry in the `Output` a node prints, where it prints one.
+   *
+   * A spelling printed at several positions names one position only when every one of
+   * them is the same set operation column (or none is one): `a.id, a.id` over two
+   * different columns of a union is two values with one spelling, and taking the first
+   * would read the second column as the first — its nullability and its key with it. No
+   * position is answered then, and the entry is read as an unplaced reference, as
+   * `computeColumns` does for an entry two inputs print.
+   */
   private positionIn(node: ExplainPlanNode, entry: string): number | undefined {
     const target = unwrap(entry)
-    const found = this.representativeOutput(node).findIndex(
-      (candidate) => unwrap(candidate) === target
-    )
-    return found >= 0 ? found : undefined
+    const found: number[] = []
+    this.representativeOutput(node).forEach((candidate, index) => {
+      if (unwrap(candidate) === target) found.push(index)
+    })
+    const [first] = found
+    if (first === undefined) return undefined
+    if (found.length === 1) return first
+    const columns = this.columnsOf(node)
+    const firstColumn = columns[first] ?? null
+    return found.every((index) => (columns[index] ?? null) === firstColumn) ? first : undefined
   }
 
   /** The set operation column each `Output` position of `node` is, memoized. */
