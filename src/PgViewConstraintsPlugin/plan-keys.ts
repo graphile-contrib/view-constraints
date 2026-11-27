@@ -1058,5 +1058,34 @@ export function readPlanKeys(
     ].sort((left, right) => left - right)
     found.push({ columns, carried, discriminators })
   }
+  // A grouping that is the select list and groups by every position it prints emits
+  // each combination of them once, whatever those positions spell — a NULL literal
+  // a set operation's branch put there included, which no element names. The planner
+  // may put that branch first (a parallel `Append` does), so reading only elements
+  // would find the key under one plan and miss it under another.
+  const groupKey = selectList['Group Key']
+  const output = selectList.Output ?? []
+  if (
+    (selectList['Node Type'] === 'Aggregate' || selectList['Node Type'] === 'Group') &&
+    selectList['Grouping Sets'] === undefined &&
+    selectList['Partial Mode'] !== 'Partial' &&
+    groupKey !== undefined &&
+    output.length > 0 &&
+    !gatherAbove(root, selectList, context)
+  ) {
+    const keyed = new Set(groupKey.map((entry) => unwrap(entry)))
+    const printed = output.map((entry) => unwrap(entry))
+    if (printed.every((entry) => keyed.has(entry)) && keyed.size <= new Set(printed).size) {
+      const columns = output.map((_, index) => index)
+      const held = found.some(
+        (key) =>
+          key.columns.length === columns.length &&
+          key.columns.every((at, index) => at === columns[index])
+      )
+      if (!held) {
+        found.push({ columns, carried: null, discriminators: [] })
+      }
+    }
+  }
   return found
 }
