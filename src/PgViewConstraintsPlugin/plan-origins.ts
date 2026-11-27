@@ -620,6 +620,18 @@ interface UnionColumn {
 }
 
 /**
+ * Whether some branch of the column's set operation spells two of its positions alike:
+ * the node above the operation prints one branch's spelling, and which branch is the
+ * planner's choice, so such a column is told apart by position only, never by text.
+ */
+function spellsTwice(column: UnionColumn): boolean {
+  return column.branches.some((branch) => {
+    const spellings = branch.output.map((entry) => unwrap(entry))
+    return new Set(spellings).size !== spellings.length
+  })
+}
+
+/**
  * The columns of every set operation whose branches print the operation's select list
  * position for position.
  *
@@ -1021,7 +1033,13 @@ class OriginReader {
       if (matches.length !== 1) return null
       const [match] = matches
       if (!match) return null
-      return this.columnsOf(match.node)[match.index] ?? null
+      const column = this.columnsOf(match.node)[match.index] ?? null
+      // A set operation one of whose branches spells two of its columns alike is
+      // matched by spelling nowhere above it: which branch the plan prints first —
+      // and so whether the spelling above is ambiguous — is the planner's choice, and
+      // an answer that holds under one plan only is no answer.
+      if (column !== null && spellsTwice(column)) return null
+      return column
     })
   }
 
